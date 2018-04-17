@@ -11,3 +11,9 @@ python -m venv venv
 source venv/bin/activate
 pip install -e .
 ```
+
+### Running tests locally
+```
+pip install -r requirements-test.txt
+pytest -vv tests
+```
