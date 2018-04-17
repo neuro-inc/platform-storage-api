@@ -14,3 +14,10 @@ jobs:
           command: |
             pip install -r requirements-test.txt
             pytest -vv tests
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - test:
+          context: org-global
