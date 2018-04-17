@@ -9,11 +9,28 @@ jobs:
     steps:
       - checkout
 
+      # NOTE: these are temporary steps until moved to docker
       - run:
-          name: Running tests
+          name: Creating a virtual environment
           command: |
+            python -m venv venv
+
+      - run:
+          name: Installing dependencies
+          command: |
+            source venv/bin/activate
             pip install -r requirements-test.txt
-            pytest -vv tests
+
+      - run:
+          name: Running static code analysis
+          command: |
+            source venv/bin/activate
+            PYTHONPATH=$(pwd) flake8 platform_storage_api tests
+      - run:
+          name: Running test suite
+          command: |
+            source venv/bin/activate
+            PYTHONPATH=$(pwd) pytest -vv tests
 
 workflows:
   version: 2
