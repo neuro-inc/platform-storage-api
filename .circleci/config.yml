@@ -1,0 +1,16 @@
+version: 2
+
+jobs:
+  test:
+    working_directory: ~/workspace
+    docker:
+      - image: circleci/python:3.6.4-stretch
+
+    steps:
+      - checkout
+
+      - run:
+          name: Running tests
+          command: |
+            pip install -r requirements-test.txt
+            pytest -vv tests
