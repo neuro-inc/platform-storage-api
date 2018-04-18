@@ -1,0 +1,40 @@
+version: 2
+
+jobs:
+  test:
+    working_directory: ~/workspace
+    docker:
+      - image: circleci/python:3.6.4-stretch
+
+    steps:
+      - checkout
+
+      # NOTE: these are temporary steps until moved to docker
+      - run:
+          name: Creating a virtual environment
+          command: |
+            python -m venv venv
+
+      - run:
+          name: Installing dependencies
+          command: |
+            source venv/bin/activate
+            pip install -r requirements-test.txt
+
+      - run:
+          name: Running static code analysis
+          command: |
+            source venv/bin/activate
+            PYTHONPATH=$(pwd) flake8 platform_storage_api tests
+      - run:
+          name: Running test suite
+          command: |
+            source venv/bin/activate
+            PYTHONPATH=$(pwd) pytest -vv tests
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - test:
+          context: org-global
