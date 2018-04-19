@@ -1,9 +1,11 @@
-import os
 import tempfile
+from pathlib import Path
+import uuid
 
 import pytest
 
-from platform_storage_api.fs.local import StorageType, FileSystem
+from platform_storage_api.fs.local import (
+    StorageType, FileSystem, copy_streams)
 
 
 class TestLocalFileSystem:
@@ -11,7 +13,7 @@ class TestLocalFileSystem:
     def tmp_dir_path(self):
         # although blocking, this is fine for tests
         with tempfile.TemporaryDirectory() as d:
-            yield d
+            yield Path(d)
 
     @pytest.fixture
     def tmp_file(self, tmp_dir_path):
@@ -27,7 +29,7 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_open_empty_file_for_reading(self, fs, tmp_file):
-        async with fs.open(tmp_file.name) as f:
+        async with fs.open(Path(tmp_file.name)) as f:
             payload = await f.read()
             assert not payload
 
@@ -35,10 +37,30 @@ class TestLocalFileSystem:
     async def test_open_for_writing(self, fs, tmp_file):
         expected_payload = b'test'
 
-        async with fs.open(tmp_file.name, 'wb') as f:
+        async with fs.open(Path(tmp_file.name), 'wb') as f:
             await f.write(expected_payload)
             await f.flush()
 
-        async with fs.open(tmp_file.name, 'rb') as f:
+        async with fs.open(Path(tmp_file.name), 'rb') as f:
+            payload = await f.read()
+            assert payload == expected_payload
+
+    @pytest.mark.asyncio
+    async def test_copy_streams(self, fs, tmp_dir_path):
+        expected_payload = b'test'
+        chunk_size = 1
+
+        out_filename = tmp_dir_path / str(uuid.uuid4())
+        in_filename = tmp_dir_path / str(uuid.uuid4())
+
+        async with fs.open(out_filename, mode='wb') as f:
+            await f.write(b'test')
+            await f.flush()
+
+        async with fs.open(out_filename, mode='rb') as out_f:
+            async with fs.open(in_filename, mode='wb') as in_f:
+                await copy_streams(out_f, in_f, chunk_size=chunk_size)
+
+        async with fs.open(in_filename, mode='rb') as f:
             payload = await f.read()
             assert payload == expected_payload
