@@ -1,7 +1,9 @@
 import abc
+from concurrent.futures import ThreadPoolExecutor
 import enum
 import io
 from pathlib import Path
+from typing import Optional
 
 import aiofiles
 
@@ -34,18 +36,23 @@ class FileSystem(metaclass=abc.ABCMeta):
 
 
 class LocalFileSystem(FileSystem):
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(
+            self, *args, executor_max_workers: Optional[int]=None,
+            **kwargs) -> None:
+        self._executor_max_workers = executor_max_workers
+        self._executor: Optional[ThreadPoolExecutor] = None
+
+    async def init(self) -> None:
+        self._executor = ThreadPoolExecutor(
+            max_workers=self._executor_max_workers,
+            thread_name_prefix='LocalFileSystemThread')
 
     async def close(self) -> None:
-        """no need to close anything, because there is no state for now.
-
-        it may soon be the case if we start using explicit thread pool
-        executors.
-        """
+        if self._executor:
+            self._executor.shutdown()
 
     def open(self, path: Path, mode='r') -> io.FileIO:
-        return aiofiles.open(path, mode=mode)
+        return aiofiles.open(path, mode=mode, executor=self._executor)
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
