@@ -78,3 +78,8 @@ class TestLocalFileSystem:
         async with fs.open(in_filename, mode='rb') as f:
             payload = await f.read()
             assert payload == expected_payload
+
+    @pytest.mark.asyncio
+    async def test_listdir(self, fs, tmp_dir_path, tmp_file):
+        files = await fs.listdir(tmp_dir_path)
+        assert files == [Path(tmp_file.name)]

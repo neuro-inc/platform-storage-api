@@ -3,8 +3,8 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import enum
 import io
-from pathlib import Path
-from typing import Optional
+from pathlib import PurePath, Path
+from typing import Optional, List
 
 import aiofiles
 
@@ -37,7 +37,11 @@ class FileSystem(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def open(self, path: Path, mode='r') -> io.FileIO:
+    def open(self, path: PurePath, mode='r') -> io.FileIO:
+        pass
+
+    @abc.abstractmethod
+    async def listdir(self, path: PurePath) -> List[PurePath]:
         pass
 
 
@@ -60,7 +64,15 @@ class LocalFileSystem(FileSystem):
         if self._executor:
             self._executor.shutdown()
 
-    def open(self, path: Path, mode='r') -> io.FileIO:
+    def _listdir(self, path: PurePath) -> List[PurePath]:
+        path = Path(path)
+        return list(path.iterdir())
+
+    async def listdir(self, path: PurePath) -> List[PurePath]:
+        return await self._loop.run_in_executor(
+            self._executor, self._listdir, path)
+
+    def open(self, path: PurePath, mode='r') -> io.FileIO:
         return aiofiles.open(path, mode=mode, executor=self._executor)
 
 
