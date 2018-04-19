@@ -1,4 +1,5 @@
 import abc
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import enum
 import io
@@ -21,10 +22,15 @@ class FileSystem(metaclass=abc.ABCMeta):
         raise ValueError(f'Unsupported storage type: {type_}')
 
     async def __aenter__(self) -> 'FileSystem':
+        await self.init()
         return self
 
     async def __aexit__(self, *args) -> None:
         await self.close()
+
+    @abc.abstractmethod
+    async def init(self) -> None:
+        pass
 
     @abc.abstractmethod
     async def close(self) -> None:
@@ -41,6 +47,9 @@ class LocalFileSystem(FileSystem):
             **kwargs) -> None:
         self._executor_max_workers = executor_max_workers
         self._executor: Optional[ThreadPoolExecutor] = None
+
+        # TODO: consider moving up
+        self._loop = kwargs.pop('loop', None) or asyncio.get_event_loop()
 
     async def init(self) -> None:
         self._executor = ThreadPoolExecutor(
