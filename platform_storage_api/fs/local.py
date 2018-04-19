@@ -14,6 +14,12 @@ class FileSystem(metaclass=abc.ABCMeta):
         if type_ == StorageType.LOCAL:
             return LocalFileSystem(*args, **kwargs)
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        await self.close()
+
     @abc.abstractmethod
     async def close(self):
         pass
