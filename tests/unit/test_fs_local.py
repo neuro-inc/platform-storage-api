@@ -5,7 +5,21 @@ import uuid
 import pytest
 
 from platform_storage_api.fs.local import (
-    StorageType, FileSystem, copy_streams)
+    StorageType, FileSystem, LocalFileSystem, copy_streams)
+
+
+class TestFileSystem:
+    @pytest.mark.asyncio
+    async def test_create_local(self):
+        fs = FileSystem.create(StorageType.LOCAL)
+        try:
+            assert isinstance(fs, LocalFileSystem)
+        finally:
+            await fs.close()
+
+    def test_create_s3(self):
+        with pytest.raises(ValueError, match='Unsupported storage type: s3'):
+            FileSystem.create(StorageType.S3)
 
 
 class TestLocalFileSystem:
