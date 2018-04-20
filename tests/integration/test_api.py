@@ -1,0 +1,45 @@
+from typing import NamedTuple
+
+import aiohttp
+import aiohttp.web
+import pytest
+
+from platform_storage_api.api import create_app
+
+
+class ApiConfig(NamedTuple):
+    host: str
+    port: int
+
+    @property
+    def endpoint(self):
+        return f'http://{self.host}:{self.port}'
+
+    @property
+    def ping_url(self):
+        return self.endpoint + '/ping'
+
+
+@pytest.fixture
+async def api():
+    app = await create_app()
+    runner = aiohttp.web.AppRunner(app)
+    await runner.setup()
+    api_config = ApiConfig(host='localhost', port=8080)
+    site = aiohttp.web.TCPSite(runner, api_config.host, api_config.port)
+    await site.start()
+    yield api_config
+    await runner.cleanup()
+
+
+@pytest.fixture
+async def client():
+    async with aiohttp.ClientSession() as session:
+        yield session
+
+
+class TestApi:
+    @pytest.mark.asyncio
+    async def test_ping(self, api, client):
+        async with client.get(api.ping_url) as response:
+            assert response.status == 200
