@@ -25,7 +25,7 @@ async def api():
     app = await create_app()
     runner = aiohttp.web.AppRunner(app)
     await runner.setup()
-    api_config = ApiConfig(host='localhost', port=8080)
+    api_config = ApiConfig(host='0.0.0.0', port=8080)
     site = aiohttp.web.TCPSite(runner, api_config.host, api_config.port)
     await site.start()
     yield api_config
