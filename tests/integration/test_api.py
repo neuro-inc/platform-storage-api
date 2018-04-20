@@ -13,7 +13,7 @@ class ApiConfig(NamedTuple):
 
     @property
     def endpoint(self):
-        return f'http://{self.host}:{self.port}'
+        return f'http://{self.host}:{self.port}/api/v1'
 
     @property
     def ping_url(self):
