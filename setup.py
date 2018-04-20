@@ -1,7 +1,9 @@
 from setuptools import setup, find_packages
 
 
-install_requires = tuple()
+install_requires = (
+    'aiofiles==0.3.2'
+)
 
 setup(
     name='platform-storage-api',
