@@ -1,4 +1,6 @@
 import asyncio
+from pathlib import Path
+import tempfile
 
 import pytest
 
@@ -18,3 +20,9 @@ def event_loop():
 async def local_fs():
     async with LocalFileSystem() as fs:
         yield fs
+
+
+@pytest.fixture
+def local_tmp_dir_path():
+    with tempfile.TemporaryDirectory() as d:
+        yield Path(d)

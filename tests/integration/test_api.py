@@ -6,7 +6,6 @@ import aiohttp.web
 import pytest
 
 from platform_storage_api.api import create_app
-from platform_storage_api.fs.local import LocalFileSystem
 
 
 class ApiConfig(NamedTuple):

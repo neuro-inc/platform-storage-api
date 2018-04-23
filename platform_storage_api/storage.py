@@ -12,12 +12,12 @@ class Storage:
 
         # TODO (A Danshyn 04/23/18): implement StoragePathResolver
 
-    def _resolve_real_path(self, path: PurePath):
+    def _resolve_real_path(self, path: PurePath) -> PurePath:
         # TODO: (A Danshyn 04/23/18): validate paths
         return PurePath(self._base_path, path.relative_to('/'))
 
-    async def store(self, outstream, path):
-        real_path = self._resolve_real_path(path)
+    async def store(self, outstream, path: Union[PurePath, str]):
+        real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
         async with self._fs.open(real_path, 'wb') as f:
             await copy_streams(outstream, f)

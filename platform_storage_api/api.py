@@ -2,7 +2,7 @@ from pathlib import PurePath
 
 import aiohttp.web
 
-from .fs.local import FileSystem, copy_streams
+from .fs.local import FileSystem
 from .storage import Storage
 
 
