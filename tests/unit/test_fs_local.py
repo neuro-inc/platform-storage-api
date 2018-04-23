@@ -88,3 +88,11 @@ class TestLocalFileSystem:
     async def test_listdir_empty(self, fs, tmp_dir_path):
         files = await fs.listdir(tmp_dir_path)
         assert not files
+
+    @pytest.mark.asyncio
+    async def test_mkdir(self, fs, tmp_dir_path):
+        dir_name = 'new'
+        path = tmp_dir_path / dir_name
+        await fs.mkdir(path)
+        files = await fs.listdir(tmp_dir_path)
+        assert files == [path]
