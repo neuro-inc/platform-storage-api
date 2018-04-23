@@ -9,6 +9,7 @@ from typing import Optional, List
 import aiofiles
 
 
+# TODO (A Danshyn 04/23/18): likely should be revisited
 class StorageType(str, enum.Enum):
     LOCAL = 'local'
     S3 = 's3'
@@ -44,6 +45,10 @@ class FileSystem(metaclass=abc.ABCMeta):
     async def listdir(self, path: PurePath) -> List[PurePath]:
         pass
 
+    @abc.abstractmethod
+    async def mkdir(self, path: PurePath) -> None:
+        pass
+
 
 class LocalFileSystem(FileSystem):
     def __init__(
@@ -74,6 +79,13 @@ class LocalFileSystem(FileSystem):
 
     def open(self, path: PurePath, mode='r') -> io.FileIO:
         return aiofiles.open(path, mode=mode, executor=self._executor)
+
+    def _mkdir(self, path: PurePath):
+        # TODO (A Danshyn 04/23/18): consider setting mode
+        Path(path).mkdir(parents=True, exist_ok=True)
+
+    async def mkdir(self, path: PurePath) -> None:
+        await self._loop.run_in_executor(self._executor, self._mkdir, path)
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
