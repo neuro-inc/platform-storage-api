@@ -52,8 +52,13 @@ class TestApi:
 
 class TestStorage:
     @pytest.mark.asyncio
-    async def test_put(self, api, client):
+    async def test_put_get(self, api, client):
         url = api.storage_base_url + '/path/to/file'
-        payload = BytesIO(b'test')
-        async with client.put(url, data=payload) as response:
+        payload = b'test'
+        async with client.put(url, data=BytesIO(payload)) as response:
             assert response.status == 201
+
+        async with client.get(url) as response:
+            assert response.status == 200
+            result_payload = await response.read()
+            assert result_payload == payload

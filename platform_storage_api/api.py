@@ -6,6 +6,9 @@ from .fs.local import FileSystem
 from .storage import Storage
 
 
+# TODO (A Danshyn 04/23/18): investigate chunked encoding
+
+
 class ApiHandler:
     def register(self, app):
         app.add_routes((
@@ -24,8 +27,9 @@ class StorageHandler:
 
     def register(self, app):
         app.add_routes((
-            # TODO (A Danshyn 04/23/18): add some unit test for this
+            # TODO (A Danshyn 04/23/18): add some unit test for path matching
             aiohttp.web.put(r'/{path:.*}', self.handle_put),
+            aiohttp.web.get(r'/{path:.*}', self.handle_get),
         ))
 
     def _get_fs_path_from_request(self, request):
@@ -40,7 +44,13 @@ class StorageHandler:
     async def handle_get(self, request):
         # TODO (A Danshyn 04/23/18): check if exists (likely in some
         # middleware)
-        return aiohttp.web.Response(status=200)
+        storage_path = self._get_fs_path_from_request(request)
+        response = aiohttp.web.StreamResponse(status=200)
+        await response.prepare(request)
+        await self._storage.retrieve(response, storage_path)
+        await response.write_eof()
+
+        return response
 
 
 async def create_app(fs: FileSystem):
