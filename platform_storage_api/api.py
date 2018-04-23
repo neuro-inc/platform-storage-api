@@ -32,6 +32,7 @@ class StorageHandler:
         return PurePath('/', request.match_info['path'])
 
     async def handle_put(self, request):
+        # TODO (A Danshyn 04/23/18): check aiohttp default limits
         storage_path = self._get_fs_path_from_request(request)
         await self._storage.store(request.content, storage_path)
         return aiohttp.web.Response(status=201)

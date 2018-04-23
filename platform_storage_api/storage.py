@@ -16,8 +16,13 @@ class Storage:
         # TODO: (A Danshyn 04/23/18): validate paths
         return PurePath(self._base_path, path.relative_to('/'))
 
-    async def store(self, outstream, path: Union[PurePath, str]):
+    async def store(self, outstream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
         async with self._fs.open(real_path, 'wb') as f:
             await copy_streams(outstream, f)
+
+    async def retrieve(self, instream, path: Union[PurePath, str]):
+        real_path = self._resolve_real_path(PurePath(path))
+        async with self._fs.open(real_path, 'rb') as f:
+            await copy_streams(f, instream)
