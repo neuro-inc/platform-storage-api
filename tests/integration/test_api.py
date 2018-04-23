@@ -1,3 +1,4 @@
+from io import BytesIO
 from typing import NamedTuple
 
 import aiohttp
@@ -5,6 +6,7 @@ import aiohttp.web
 import pytest
 
 from platform_storage_api.api import create_app
+from platform_storage_api.fs.local import LocalFileSystem
 
 
 class ApiConfig(NamedTuple):
@@ -16,13 +18,17 @@ class ApiConfig(NamedTuple):
         return f'http://{self.host}:{self.port}/api/v1'
 
     @property
+    def storage_base_url(self):
+        return self.endpoint + '/storage'
+
+    @property
     def ping_url(self):
         return self.endpoint + '/ping'
 
 
 @pytest.fixture
-async def api():
-    app = await create_app()
+async def api(local_fs):
+    app = await create_app(local_fs)
     runner = aiohttp.web.AppRunner(app)
     await runner.setup()
     api_config = ApiConfig(host='0.0.0.0', port=8080)
@@ -43,3 +49,12 @@ class TestApi:
     async def test_ping(self, api, client):
         async with client.get(api.ping_url) as response:
             assert response.status == 200
+
+
+class TestStorage:
+    @pytest.mark.asyncio
+    async def test_put(self, api, client):
+        url = api.storage_base_url + '/path/to/file'
+        payload = BytesIO(b'test')
+        async with client.put(url, data=payload) as response:
+            assert response.status == 201
