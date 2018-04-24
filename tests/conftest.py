@@ -1,6 +1,10 @@
 import asyncio
+from pathlib import Path
+import tempfile
 
 import pytest
+
+from platform_storage_api.fs.local import LocalFileSystem
 
 
 @pytest.fixture(scope='session')
@@ -10,3 +14,15 @@ def event_loop():
     loop.set_debug(True)
     yield loop
     loop.close()
+
+
+@pytest.fixture
+async def local_fs():
+    async with LocalFileSystem() as fs:
+        yield fs
+
+
+@pytest.fixture
+def local_tmp_dir_path():
+    with tempfile.TemporaryDirectory() as d:
+        yield Path(d)
