@@ -22,7 +22,7 @@ class Storage:
         async with self._fs.open(real_path, 'wb') as f:
             await copy_streams(outstream, f)
 
-    async def retrieve(self, instream, path: Union[PurePath, str]):
+    async def retrieve(self, instream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         async with self._fs.open(real_path, 'rb') as f:
             await copy_streams(f, instream)

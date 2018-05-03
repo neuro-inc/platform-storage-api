@@ -112,7 +112,7 @@ class LocalFileSystem(FileSystem):
             self, entry: os.DirEntry) -> FileStatus:
         is_dir = entry.is_dir()
         size = 0 if is_dir else entry.stat().st_size
-        return FileStatus(
+        return FileStatus(  # type: ignore
             path=PurePath(entry.name), size=size, is_dir=is_dir)
 
     async def liststatus(self, path: PurePath) -> List[FileStatus]:
