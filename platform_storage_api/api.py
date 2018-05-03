@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import PurePath
 
 import aiohttp.web
@@ -17,6 +18,12 @@ class ApiHandler:
 
     async def handle_ping(self, request):
         return aiohttp.web.Response()
+
+
+class StorageOperation(str, Enum):
+    CREATE = 'CREATE'
+    OPEN = 'OPEN'
+    LISTSTATUS = 'LISTSTATUS'
 
 
 class StorageHandler:
