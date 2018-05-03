@@ -116,6 +116,7 @@ class LocalFileSystem(FileSystem):
             path=PurePath(entry.name), size=size, is_dir=is_dir)
 
     async def liststatus(self, path: PurePath) -> List[FileStatus]:
+        # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
         return await self._loop.run_in_executor(
             self._executor, self._scandir, path)
 

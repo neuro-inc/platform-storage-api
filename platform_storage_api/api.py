@@ -48,7 +48,20 @@ class StorageHandler:
         await self._storage.store(request.content, storage_path)
         return aiohttp.web.Response(status=201)
 
+    def _parse_operation(self, request) -> StorageOperation:
+        operation = request.query.get('op', StorageOperation.OPEN.value)
+        return StorageOperation(operation)
+
     async def handle_get(self, request):
+        operation = self._parse_operation(request)
+        if operation == StorageOperation.OPEN:
+            return await self._handle_open(request)
+        elif operation == StorageOperation.LISTSTATUS:
+            return await self._handle_liststatus(request)
+        return aiohttp.web.Response(
+            status=aiohttp.web.HTTPBadRequest.status_code)
+
+    async def _handle_open(self, request):
         # TODO (A Danshyn 04/23/18): check if exists (likely in some
         # middleware)
         storage_path = self._get_fs_path_from_request(request)
@@ -58,6 +71,9 @@ class StorageHandler:
         await response.write_eof()
 
         return response
+
+    async def _handle_liststatus(self, request):
+        pass
 
 
 async def create_app(fs: FileSystem):
