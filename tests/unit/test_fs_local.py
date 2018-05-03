@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from platform_storage_api.fs.local import (
-    StorageType, FileSystem, LocalFileSystem, copy_streams)
+    StorageType, FileStatus, FileSystem, LocalFileSystem, copy_streams)
 
 
 class TestFileSystem:
@@ -107,3 +107,22 @@ class TestLocalFileSystem:
 
         # should not fail
         await fs.mkdir(path)
+
+    @pytest.mark.asyncio
+    async def test_liststatus_single_empty_file(
+            self, fs, tmp_dir_path, tmp_file):
+        expected_path = Path(Path(tmp_file.name).name)
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == [
+            FileStatus(expected_path, size=0, is_dir=False)]
+
+    @pytest.mark.asyncio
+    async def test_liststatus_single_dir(self, fs, tmp_dir_path):
+        expected_path = Path('nested')
+        path = tmp_dir_path / expected_path
+        await fs.mkdir(path)
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == [
+            FileStatus(expected_path, size=0, is_dir=True)]
