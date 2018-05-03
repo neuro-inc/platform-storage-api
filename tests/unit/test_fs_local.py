@@ -118,6 +118,20 @@ class TestLocalFileSystem:
             FileStatus(expected_path, size=0, is_dir=False)]
 
     @pytest.mark.asyncio
+    async def test_liststatus_single_file(
+            self, fs, tmp_dir_path, tmp_file):
+        expected_path = Path(Path(tmp_file.name).name)
+        expected_payload = b'test'
+        expected_size = len(expected_payload)
+        async with fs.open(Path(tmp_file.name), 'wb') as f:
+            await f.write(expected_payload)
+            await f.flush()
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == [
+            FileStatus(expected_path, size=expected_size, is_dir=False)]
+
+    @pytest.mark.asyncio
     async def test_liststatus_single_dir(self, fs, tmp_dir_path):
         expected_path = Path('nested')
         path = tmp_dir_path / expected_path
