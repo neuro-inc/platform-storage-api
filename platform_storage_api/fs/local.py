@@ -1,8 +1,10 @@
 import abc
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 import enum
 import io
+import os
 from pathlib import PurePath, Path
 from typing import Optional, List
 
@@ -13,6 +15,13 @@ import aiofiles
 class StorageType(str, enum.Enum):
     LOCAL = 'local'
     S3 = 's3'
+
+
+@dataclass(frozen=True)
+class FileStatus:
+    path: PurePath
+    size: int = 0
+    is_dir: bool = False
 
 
 class FileSystem(metaclass=abc.ABCMeta):
@@ -47,6 +56,10 @@ class FileSystem(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def mkdir(self, path: PurePath) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def liststatus(self, path: PurePath) -> List[FileStatus]:
         pass
 
 
@@ -86,6 +99,25 @@ class LocalFileSystem(FileSystem):
 
     async def mkdir(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._mkdir, path)
+
+    def _scandir(self, path: PurePath) -> List[FileStatus]:
+        statuses = []
+        with os.scandir(path) as dir_iter:
+            for entry in dir_iter:
+                status = self._convert_dir_entry_to_file_status(entry)
+                statuses.append(status)
+        return statuses
+
+    def _convert_dir_entry_to_file_status(
+            self, entry: os.DirEntry) -> FileStatus:
+        is_dir = entry.is_dir()
+        size = 0 if is_dir else entry.stat().st_size
+        return FileStatus(
+            path=PurePath(entry.name), size=size, is_dir=is_dir)
+
+    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+        return await self._loop.run_in_executor(
+            self._executor, self._scandir, path)
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
