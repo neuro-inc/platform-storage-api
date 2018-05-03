@@ -17,11 +17,28 @@ class StorageType(str, enum.Enum):
     S3 = 's3'
 
 
+class FileStatusType(str, enum.Enum):
+    FILE = 'FILE'
+    DIRECTORY = 'DIRECTORY'
+
+
 @dataclass(frozen=True)
 class FileStatus:
     path: PurePath
     size: int = 0
-    is_dir: bool = False
+    type: FileStatusType = FileStatusType.FILE
+
+    @property
+    def is_dir(self):
+        return self.type == FileStatusType.DIRECTORY
+
+    @classmethod
+    def create_file(cls, path: PurePath, size: int) -> 'FileStatus':
+        return cls(path, size)  # type: ignore
+
+    @classmethod
+    def create_dir(cls, path: PurePath) -> 'FileStatus':
+        return cls(path, type=FileStatusType.DIRECTORY)  # type: ignore
 
 
 class FileSystem(metaclass=abc.ABCMeta):
@@ -110,10 +127,11 @@ class LocalFileSystem(FileSystem):
 
     def _convert_dir_entry_to_file_status(
             self, entry: os.DirEntry) -> FileStatus:
-        is_dir = entry.is_dir()
-        size = 0 if is_dir else entry.stat().st_size
-        return FileStatus(  # type: ignore
-            path=PurePath(entry.name), size=size, is_dir=is_dir)
+        path = PurePath(entry.name)
+        if entry.is_dir():
+            return FileStatus.create_dir(path)
+        else:
+            return FileStatus.create_file(path, size=entry.stat().st_size)
 
     async def liststatus(self, path: PurePath) -> List[FileStatus]:
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
