@@ -143,3 +143,10 @@ class TestLocalFileSystem:
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
             FileStatus(expected_path, size=0, type=FileStatusType.DIRECTORY)]
+
+    @pytest.mark.asyncio
+    async def test_liststatus_non_existent_dir(self, fs, tmp_dir_path):
+        path = tmp_dir_path / 'nested'
+
+        with pytest.raises(FileNotFoundError):
+            await fs.liststatus(path)
