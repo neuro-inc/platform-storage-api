@@ -1,8 +1,9 @@
+from enum import Enum
 from pathlib import PurePath
 
 import aiohttp.web
 
-from .fs.local import FileSystem
+from .fs.local import FileStatus, FileSystem
 from .storage import Storage
 
 
@@ -17,6 +18,18 @@ class ApiHandler:
 
     async def handle_ping(self, request):
         return aiohttp.web.Response()
+
+
+class StorageOperation(str, Enum):
+    """Represent all available operations on storage that are exposed via API.
+
+    The CREATE operation handles opening files for writing.
+    The OPEN operation handles opening files for reading.
+    The LISTSTATUS operation handles non-recursive listing of directories.
+    """
+    CREATE = 'CREATE'
+    OPEN = 'OPEN'
+    LISTSTATUS = 'LISTSTATUS'
 
 
 class StorageHandler:
@@ -41,7 +54,20 @@ class StorageHandler:
         await self._storage.store(request.content, storage_path)
         return aiohttp.web.Response(status=201)
 
+    def _parse_operation(self, request) -> StorageOperation:
+        operation = request.query.get('op', StorageOperation.OPEN.value)
+        return StorageOperation(operation)
+
     async def handle_get(self, request):
+        operation = self._parse_operation(request)
+        if operation == StorageOperation.OPEN:
+            return await self._handle_open(request)
+        elif operation == StorageOperation.LISTSTATUS:
+            return await self._handle_liststatus(request)
+        return aiohttp.web.Response(
+            status=aiohttp.web.HTTPMethodNotAllowed.status_code)
+
+    async def _handle_open(self, request):
         # TODO (A Danshyn 04/23/18): check if exists (likely in some
         # middleware)
         storage_path = self._get_fs_path_from_request(request)
@@ -51,6 +77,26 @@ class StorageHandler:
         await response.write_eof()
 
         return response
+
+    async def _handle_liststatus(self, request):
+        storage_path = self._get_fs_path_from_request(request)
+        try:
+            statuses = await self._storage.liststatus(storage_path)
+        except FileNotFoundError:
+            return aiohttp.web.Response(
+                status=aiohttp.web.HTTPNotFound.status_code)
+
+        primitive_statuses = [
+            self._convert_file_status_to_primitive(status)
+            for status in statuses]
+        return aiohttp.web.json_response(primitive_statuses)
+
+    def _convert_file_status_to_primitive(self, status: FileStatus):
+        return {
+            'path': str(status.path),
+            'size': status.size,
+            'type': status.type,
+        }
 
 
 async def create_app(fs: FileSystem):

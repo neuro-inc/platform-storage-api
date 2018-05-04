@@ -1,8 +1,10 @@
 import abc
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 import enum
 import io
+import os
 from pathlib import PurePath, Path
 from typing import Optional, List
 
@@ -15,11 +17,35 @@ class StorageType(str, enum.Enum):
     S3 = 's3'
 
 
+class FileStatusType(str, enum.Enum):
+    FILE = 'FILE'
+    DIRECTORY = 'DIRECTORY'
+
+
+@dataclass(frozen=True)
+class FileStatus:
+    path: PurePath
+    size: int = 0
+    type: FileStatusType = FileStatusType.FILE
+
+    @property
+    def is_dir(self):
+        return self.type == FileStatusType.DIRECTORY
+
+    @classmethod
+    def create_file_status(cls, path: PurePath, size: int) -> 'FileStatus':
+        return cls(path, size)  # type: ignore
+
+    @classmethod
+    def create_dir_status(cls, path: PurePath) -> 'FileStatus':
+        return cls(path, type=FileStatusType.DIRECTORY)  # type: ignore
+
+
 class FileSystem(metaclass=abc.ABCMeta):
     @classmethod
     def create(cls, type_: StorageType, *args, **kwargs) -> 'FileSystem':
         if type_ == StorageType.LOCAL:
-            return LocalFileSystem(*args, **kwargs)
+            return LocalFileSystem(**kwargs)
         raise ValueError(f'Unsupported storage type: {type_}')
 
     async def __aenter__(self) -> 'FileSystem':
@@ -49,16 +75,19 @@ class FileSystem(metaclass=abc.ABCMeta):
     async def mkdir(self, path: PurePath) -> None:
         pass
 
+    @abc.abstractmethod
+    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+        pass
+
 
 class LocalFileSystem(FileSystem):
     def __init__(
-            self, *args, executor_max_workers: Optional[int]=None,
-            **kwargs) -> None:
+            self, *, executor_max_workers: Optional[int]=None,
+            loop=None, **kwargs) -> None:
         self._executor_max_workers = executor_max_workers
         self._executor: Optional[ThreadPoolExecutor] = None
 
-        # TODO: consider moving up
-        self._loop = kwargs.pop('loop', None) or asyncio.get_event_loop()
+        self._loop = loop or asyncio.get_event_loop()
 
     async def init(self) -> None:
         self._executor = ThreadPoolExecutor(
@@ -86,6 +115,28 @@ class LocalFileSystem(FileSystem):
 
     async def mkdir(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._mkdir, path)
+
+    def _scandir(self, path: PurePath) -> List[FileStatus]:
+        statuses = []
+        with os.scandir(path) as dir_iter:
+            for entry in dir_iter:
+                status = self._convert_dir_entry_to_file_status(entry)
+                statuses.append(status)
+        return statuses
+
+    def _convert_dir_entry_to_file_status(
+            self, entry: os.DirEntry) -> FileStatus:
+        path = PurePath(entry.name)
+        if entry.is_dir():
+            return FileStatus.create_dir_status(path)
+        else:
+            return FileStatus.create_file_status(
+                path, size=entry.stat().st_size)
+
+    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+        # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
+        return await self._loop.run_in_executor(
+            self._executor, self._scandir, path)
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB

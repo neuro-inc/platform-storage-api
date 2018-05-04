@@ -62,3 +62,35 @@ class TestStorage:
             assert response.status == 200
             result_payload = await response.read()
             assert result_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_get_illegal_op(self, api, client):
+        url = api.storage_base_url + '/path/to/file'
+        params = {'op': 'CREATE'}
+        async with client.get(url, params=params) as response:
+            assert response.status == 405
+
+    @pytest.mark.asyncio
+    async def test_liststatus(self, api, client):
+        dir_url = api.storage_base_url + '/path/to'
+        url = dir_url + '/file'
+        payload = b'test'
+        async with client.put(url, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        params = {'op': 'LISTSTATUS'}
+        async with client.get(dir_url, params=params) as response:
+            statuses = await response.json()
+            assert statuses == [{
+                'path': 'file',
+                'size': len(payload),
+                'type': 'FILE',
+            }]
+
+    @pytest.mark.asyncio
+    async def test_liststatus_non_existent_dir(self, api, client):
+        dir_url = api.storage_base_url + '/non-existent'
+
+        params = {'op': 'LISTSTATUS'}
+        async with client.get(dir_url, params=params) as response:
+            assert response.status == 404

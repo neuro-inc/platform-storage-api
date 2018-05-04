@@ -1,7 +1,7 @@
 from pathlib import PurePath
-from typing import Union
+from typing import List, Union
 
-from .fs.local import FileSystem, copy_streams
+from .fs.local import FileStatus, FileSystem, copy_streams
 
 
 class Storage:
@@ -22,7 +22,12 @@ class Storage:
         async with self._fs.open(real_path, 'wb') as f:
             await copy_streams(outstream, f)
 
-    async def retrieve(self, instream, path: Union[PurePath, str]):
+    async def retrieve(self, instream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         async with self._fs.open(real_path, 'rb') as f:
             await copy_streams(f, instream)
+
+    async def liststatus(
+            self, path: Union[PurePath, str]) -> List[FileStatus]:
+        real_path = self._resolve_real_path(PurePath(path))
+        return await self._fs.liststatus(real_path)

@@ -6,6 +6,7 @@ install_requires = (
     'cchardet==2.1.1',
     'aiodns==1.1.1',
     'aiohttp==3.1.3',
+    'dataclasses==0.5',  # backport from 3.7 stdlib
     # TODO (A Danshyn 04/20/18): add uvloop at some point
 )
 
