@@ -45,7 +45,7 @@ class FileSystem(metaclass=abc.ABCMeta):
     @classmethod
     def create(cls, type_: StorageType, *args, **kwargs) -> 'FileSystem':
         if type_ == StorageType.LOCAL:
-            return LocalFileSystem(*args, **kwargs)
+            return LocalFileSystem(**kwargs)
         raise ValueError(f'Unsupported storage type: {type_}')
 
     async def __aenter__(self) -> 'FileSystem':
