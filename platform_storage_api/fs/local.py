@@ -33,11 +33,11 @@ class FileStatus:
         return self.type == FileStatusType.DIRECTORY
 
     @classmethod
-    def create_file(cls, path: PurePath, size: int) -> 'FileStatus':
+    def create_file_status(cls, path: PurePath, size: int) -> 'FileStatus':
         return cls(path, size)  # type: ignore
 
     @classmethod
-    def create_dir(cls, path: PurePath) -> 'FileStatus':
+    def create_dir_status(cls, path: PurePath) -> 'FileStatus':
         return cls(path, type=FileStatusType.DIRECTORY)  # type: ignore
 
 
@@ -129,9 +129,10 @@ class LocalFileSystem(FileSystem):
             self, entry: os.DirEntry) -> FileStatus:
         path = PurePath(entry.name)
         if entry.is_dir():
-            return FileStatus.create_dir(path)
+            return FileStatus.create_dir_status(path)
         else:
-            return FileStatus.create_file(path, size=entry.stat().st_size)
+            return FileStatus.create_file_status(
+                path, size=entry.stat().st_size)
 
     async def liststatus(self, path: PurePath) -> List[FileStatus]:
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
