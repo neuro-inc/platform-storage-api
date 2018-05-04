@@ -22,6 +22,12 @@ class ApiHandler:
 
 
 class StorageOperation(str, Enum):
+    """Represent all available operations on storage that are exposed via API.
+
+    The CREATE operation handles opening files for writing.
+    The OPEN operation handles opening files for reading.
+    The LISTSTATUS operation handles non-recursive listing of directories.
+    """
     CREATE = 'CREATE'
     OPEN = 'OPEN'
     LISTSTATUS = 'LISTSTATUS'
