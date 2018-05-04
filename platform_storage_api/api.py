@@ -75,7 +75,12 @@ class StorageHandler:
 
     async def _handle_liststatus(self, request):
         storage_path = self._get_fs_path_from_request(request)
-        statuses = await self._storage.liststatus(storage_path)
+        try:
+            statuses = await self._storage.liststatus(storage_path)
+        except FileNotFoundError:
+            return aiohttp.web.Response(
+                status=aiohttp.web.HTTPNotFound.status_code)
+
         primitive_statuses = self._convert_file_statuses_to_primitive(
             statuses)
         return aiohttp.web.json_response(primitive_statuses)

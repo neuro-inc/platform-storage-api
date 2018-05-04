@@ -150,3 +150,8 @@ class TestLocalFileSystem:
 
         with pytest.raises(FileNotFoundError):
             await fs.liststatus(path)
+
+    @pytest.mark.asyncio
+    async def test_liststatus_empty_dir(self, fs, tmp_dir_path):
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == []

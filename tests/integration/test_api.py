@@ -86,3 +86,11 @@ class TestStorage:
                 'size': len(payload),
                 'type': 'FILE',
             }]
+
+    @pytest.mark.asyncio
+    async def test_liststatus_non_existent_dir(self, api, client):
+        dir_url = api.storage_base_url + '/non-existent'
+
+        params = {'op': 'LISTSTATUS'}
+        async with client.get(dir_url, params=params) as response:
+            assert response.status == 404
