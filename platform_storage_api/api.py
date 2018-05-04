@@ -1,6 +1,5 @@
 from enum import Enum
 from pathlib import PurePath
-from typing import List
 
 import aiohttp.web
 
