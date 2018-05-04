@@ -82,13 +82,12 @@ class FileSystem(metaclass=abc.ABCMeta):
 
 class LocalFileSystem(FileSystem):
     def __init__(
-            self, *args, executor_max_workers: Optional[int]=None,
-            **kwargs) -> None:
+            self, *, executor_max_workers: Optional[int]=None,
+            loop=None, **kwargs) -> None:
         self._executor_max_workers = executor_max_workers
         self._executor: Optional[ThreadPoolExecutor] = None
 
-        # TODO: consider moving up
-        self._loop = kwargs.pop('loop', None) or asyncio.get_event_loop()
+        self._loop = loop or asyncio.get_event_loop()
 
     async def init(self) -> None:
         self._executor = ThreadPoolExecutor(
