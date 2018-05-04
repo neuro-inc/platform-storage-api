@@ -64,6 +64,13 @@ class TestStorage:
             assert result_payload == payload
 
     @pytest.mark.asyncio
+    async def test_get_illegal_op(self, api, client):
+        url = api.storage_base_url + '/path/to/file'
+        params = {'op': 'CREATE'}
+        async with client.get(url, params=params) as response:
+            assert response.status == 405
+
+    @pytest.mark.asyncio
     async def test_liststatus(self, api, client):
         dir_url = api.storage_base_url + '/path/to'
         url = dir_url + '/file'
