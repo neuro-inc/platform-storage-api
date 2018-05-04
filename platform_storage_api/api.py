@@ -1,9 +1,10 @@
 from enum import Enum
 from pathlib import PurePath
+from typing import List
 
 import aiohttp.web
 
-from .fs.local import FileSystem
+from .fs.local import FileStatus, FileSystem
 from .storage import Storage
 
 
@@ -58,6 +59,7 @@ class StorageHandler:
             return await self._handle_open(request)
         elif operation == StorageOperation.LISTSTATUS:
             return await self._handle_liststatus(request)
+        # TODO (A Danshyn 05/03/18): method not allowed?
         return aiohttp.web.Response(
             status=aiohttp.web.HTTPBadRequest.status_code)
 
@@ -73,7 +75,24 @@ class StorageHandler:
         return response
 
     async def _handle_liststatus(self, request):
-        pass
+        storage_path = self._get_fs_path_from_request(request)
+        statuses = await self._storage.liststatus(storage_path)
+        primitive_statuses = self._convert_file_statuses_to_primitive(
+            statuses)
+        return aiohttp.web.json_response(primitive_statuses)
+
+    def _convert_file_statuses_to_primitive(
+            self, statuses: List[FileStatus]):
+        return [
+            self._convert_file_status_to_primitive(status)
+            for status in statuses]
+
+    def _convert_file_status_to_primitive(self, status: FileStatus):
+        return {
+            'path': str(status.path),
+            'size': status.size,
+            'type': status.type,
+        }
 
 
 async def create_app(fs: FileSystem):
