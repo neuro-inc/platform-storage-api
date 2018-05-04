@@ -81,15 +81,10 @@ class StorageHandler:
             return aiohttp.web.Response(
                 status=aiohttp.web.HTTPNotFound.status_code)
 
-        primitive_statuses = self._convert_file_statuses_to_primitive(
-            statuses)
-        return aiohttp.web.json_response(primitive_statuses)
-
-    def _convert_file_statuses_to_primitive(
-            self, statuses: List[FileStatus]):
-        return [
+        primitive_statuses = [
             self._convert_file_status_to_primitive(status)
             for status in statuses]
+        return aiohttp.web.json_response(primitive_statuses)
 
     def _convert_file_status_to_primitive(self, status: FileStatus):
         return {
