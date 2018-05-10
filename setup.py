@@ -17,5 +17,6 @@ setup(
     packages=find_packages(),
     install_requires=install_requires,
     entry_points={
+        'console_scripts': 'platform-storage-api=platform_storage_api.api:main'
     },
 )

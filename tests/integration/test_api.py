@@ -6,6 +6,8 @@ import aiohttp.web
 import pytest
 
 from platform_storage_api.api import create_app
+from platform_storage_api.config import Config, ServerConfig, StorageConfig
+from platform_storage_api.storage import Storage
 
 
 class ApiConfig(NamedTuple):
@@ -26,8 +28,20 @@ class ApiConfig(NamedTuple):
 
 
 @pytest.fixture
-async def api(local_fs):
-    app = await create_app(local_fs)
+def config():
+    server_config = ServerConfig()
+    storage_config = StorageConfig(fs_local_base_path='/tmp/np_storage')
+    return Config(server=server_config, storage=storage_config)
+
+
+@pytest.fixture
+async def storage(local_fs, config):
+    return Storage(fs=local_fs, base_path=config.storage.fs_local_base_path)
+
+
+@pytest.fixture
+async def api(config, storage):
+    app = await create_app(config, storage)
     runner = aiohttp.web.AppRunner(app)
     await runner.setup()
     api_config = ApiConfig(host='0.0.0.0', port=8080)
