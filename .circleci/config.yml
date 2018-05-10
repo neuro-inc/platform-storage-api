@@ -32,9 +32,32 @@ jobs:
             source venv/bin/activate
             PYTHONPATH=$(pwd) pytest -vv tests
 
+  deploy:
+    working_directory: ~/workspace
+    machine:
+      image: circleci/classic:201711-01
+      docker_layer_caching: true
+
+    steps:
+      - checkout
+
+      - run:
+          name: Building docker images
+          command: |
+            make build
+
+      - run:
+          name: Pushing docker images
+          command: |
+            make push
+
 workflows:
   version: 2
   main:
     jobs:
       - test:
           context: org-global
+      - deploy:
+          context: org-global
+          requires:
+            - test
