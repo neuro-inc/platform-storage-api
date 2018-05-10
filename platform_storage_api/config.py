@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 import os
 
-from fs.local import StorageType
+from .fs.local import StorageType
 
 
 @dataclass(frozen=True)
