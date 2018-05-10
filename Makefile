@@ -12,3 +12,10 @@ build:
 
 push: _docker_login
 	docker push $(IMAGE)
+
+run:
+	docker run -it --rm --name platformstorageapi \
+	    -p 8080:8080 \
+	    -v /tmp/np_storage:/tmp/np_storage \
+	    -e NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage \
+	    $(IMAGE)
