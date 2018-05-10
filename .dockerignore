@@ -1,0 +1,4 @@
+*
+!setup.py
+!platform_storage_api
+**/*.pyc
