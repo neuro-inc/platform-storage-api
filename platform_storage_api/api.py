@@ -6,7 +6,7 @@ import logging
 import aiohttp.web
 
 from .config import Config
-from .fs.local import FileStatus, FileSystem, LocalFileSystem
+from .fs.local import FileStatus, LocalFileSystem
 from .storage import Storage
 
 
