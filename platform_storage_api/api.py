@@ -1,9 +1,12 @@
+import asyncio
 from enum import Enum
 from pathlib import PurePath
+import logging
 
 import aiohttp.web
 
-from .fs.local import FileStatus, FileSystem
+from .config import Config
+from .fs.local import FileStatus, FileSystem, LocalFileSystem
 from .storage import Storage
 
 
@@ -33,10 +36,8 @@ class StorageOperation(str, Enum):
 
 
 class StorageHandler:
-    def __init__(self, fs):
-        self._fs = fs
-        # TODO (A Danshyn 04/23/18): drop the hardcoded path
-        self._storage = Storage(fs, '/tmp/np_storage')
+    def __init__(self, storage):
+        self._storage = storage
 
     def register(self, app):
         app.add_routes((
@@ -99,17 +100,45 @@ class StorageHandler:
         }
 
 
-async def create_app(fs: FileSystem):
+async def create_app(config: Config, storage: Storage):
     app = aiohttp.web.Application()
+    app['config'] = config
 
     api_v1_app = aiohttp.web.Application()
     api_v1_handler = ApiHandler()
     api_v1_handler.register(api_v1_app)
 
     storage_app = aiohttp.web.Application()
-    storage_handler = StorageHandler(fs=fs)
+    storage_handler = StorageHandler(storage)
     storage_handler.register(storage_app)
 
     api_v1_app.add_subapp('/storage', storage_app)
     app.add_subapp('/api/v1', api_v1_app)
     return app
+
+
+def init_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+
+def main():
+    init_logging()
+    config = Config.from_environ()
+    logging.info('Loaded config: %r', config)
+
+    loop = asyncio.get_event_loop()
+
+    fs = LocalFileSystem()
+    storage = Storage(fs, config.storage.fs_local_base_path)
+
+    async def _init_storage(app):
+        async with fs:
+            logging.info('Initializing the storage file system')
+            yield
+            logging.info('Closing the storage file system')
+
+    app = loop.run_until_complete(create_app(config, storage))
+    app.cleanup_ctx.append(_init_storage)
+    aiohttp.web.run_app(app, host=config.server.host, port=config.server.port)

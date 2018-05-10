@@ -2,11 +2,10 @@ from dataclasses import dataclass
 from pathlib import PurePath
 import os
 
-from .fs.local import StorageType
-
 
 @dataclass(frozen=True)
 class ServerConfig:
+    host: str = '0.0.0.0'
     port: int = 8080
 
     @classmethod
