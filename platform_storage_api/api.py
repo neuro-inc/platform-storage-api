@@ -100,8 +100,26 @@ class StorageHandler:
         }
 
 
+@aiohttp.web.middleware
+async def handle_exceptions(request, handler):
+    try:
+        return await handler(request)
+    except ValueError as e:
+        payload = {'error': str(e)}
+        return aiohttp.web.json_response(
+            payload, status=aiohttp.web.HTTPBadRequest.status_code)
+    except Exception as e:
+        msg_str = (
+            f'Unexpected exception: {str(e)}. '
+            f'Path with query: {request.path_qs}.')
+        logging.exception(msg_str)
+        payload = {'error': msg_str}
+        return aiohttp.web.json_response(
+            payload, status=aiohttp.web.HTTPInternalServerError.status_code)
+
+
 async def create_app(config: Config, storage: Storage):
-    app = aiohttp.web.Application()
+    app = aiohttp.web.Application(middlewares=[handle_exceptions])
     app['config'] = config
 
     api_v1_app = aiohttp.web.Application()
