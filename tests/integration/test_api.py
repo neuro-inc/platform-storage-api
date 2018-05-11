@@ -102,6 +102,47 @@ class TestStorage:
             }]
 
     @pytest.mark.asyncio
+    async def test_liststatus_no_op_param_no_equals(self, api, client):
+        dir_url = api.storage_base_url + '/path/to'
+        url = dir_url + '/file'
+        payload = b'test'
+        async with client.put(url, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        async with client.get(dir_url + '?liststatus') as response:
+            statuses = await response.json()
+            assert statuses == [{
+                'path': 'file',
+                'size': len(payload),
+                'type': 'FILE',
+            }]
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_operations_with_op(self, api, client):
+        dir_url = api.storage_base_url + '/'
+        async with client.get(dir_url + '?op=liststatus&open') as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert 'Ambiguous operations' in payload['error']
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_operations(self, api, client):
+        dir_url = api.storage_base_url + '/'
+        async with client.get(dir_url + '?liststatus&open') as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert 'Ambiguous operations' in payload['error']
+
+    @pytest.mark.asyncio
+    async def test_unknown_operation(self, api, client):
+        dir_url = api.storage_base_url + '/'
+        async with client.get(dir_url + '?op=unknown') as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            expected_error = '\'UNKNOWN\' is not a valid StorageOperation'
+            assert payload['error'] == expected_error
+
+    @pytest.mark.asyncio
     async def test_liststatus_non_existent_dir(self, api, client):
         dir_url = api.storage_base_url + '/non-existent'
 
