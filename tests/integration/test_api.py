@@ -82,7 +82,10 @@ class TestStorage:
         url = api.storage_base_url + '/path/to/file'
         params = {'op': 'CREATE'}
         async with client.get(url, params=params) as response:
-            assert response.status == 405
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            expected_error = 'Illegal operation: CREATE'
+            assert payload['error'] == expected_error
 
     @pytest.mark.asyncio
     async def test_liststatus(self, api, client):

@@ -83,8 +83,7 @@ class StorageHandler:
             return await self._handle_open(request)
         elif operation == StorageOperation.LISTSTATUS:
             return await self._handle_liststatus(request)
-        return aiohttp.web.Response(
-            status=aiohttp.web.HTTPMethodNotAllowed.status_code)
+        raise ValueError(f'Illegal operation: {operation}')
 
     async def _handle_open(self, request):
         # TODO (A Danshyn 04/23/18): check if exists (likely in some
