@@ -34,6 +34,10 @@ class StorageOperation(str, Enum):
     OPEN = 'OPEN'
     LISTSTATUS = 'LISTSTATUS'
 
+    @classmethod
+    def values(cls):
+        return [item.value for item in cls]
+
 
 class StorageHandler:
     def __init__(self, storage):
@@ -56,8 +60,22 @@ class StorageHandler:
         return aiohttp.web.Response(status=201)
 
     def _parse_operation(self, request) -> StorageOperation:
-        operation = request.query.get('op', StorageOperation.OPEN.value)
-        return StorageOperation(operation)
+        ops = []
+
+        if 'op' in request.query:
+            ops.append(request.query['op'].upper())
+
+        op_values = set(StorageOperation.values())
+        param_names = set(name.upper() for name in request.query)
+        ops += op_values & param_names
+
+        if len(ops) > 1:
+            ops_str = ', '.join(ops)
+            raise ValueError(f'Ambiguous operations: {ops_str}')
+
+        if ops:
+            return StorageOperation(ops[0])
+        return StorageOperation.OPEN
 
     async def handle_get(self, request):
         operation = self._parse_operation(request)
@@ -65,8 +83,7 @@ class StorageHandler:
             return await self._handle_open(request)
         elif operation == StorageOperation.LISTSTATUS:
             return await self._handle_liststatus(request)
-        return aiohttp.web.Response(
-            status=aiohttp.web.HTTPMethodNotAllowed.status_code)
+        raise ValueError(f'Illegal operation: {operation}')
 
     async def _handle_open(self, request):
         # TODO (A Danshyn 04/23/18): check if exists (likely in some
@@ -100,8 +117,26 @@ class StorageHandler:
         }
 
 
+@aiohttp.web.middleware
+async def handle_exceptions(request, handler):
+    try:
+        return await handler(request)
+    except ValueError as e:
+        payload = {'error': str(e)}
+        return aiohttp.web.json_response(
+            payload, status=aiohttp.web.HTTPBadRequest.status_code)
+    except Exception as e:
+        msg_str = (
+            f'Unexpected exception: {str(e)}. '
+            f'Path with query: {request.path_qs}.')
+        logging.exception(msg_str)
+        payload = {'error': msg_str}
+        return aiohttp.web.json_response(
+            payload, status=aiohttp.web.HTTPInternalServerError.status_code)
+
+
 async def create_app(config: Config, storage: Storage):
-    app = aiohttp.web.Application()
+    app = aiohttp.web.Application(middlewares=[handle_exceptions])
     app['config'] = config
 
     api_v1_app = aiohttp.web.Application()
