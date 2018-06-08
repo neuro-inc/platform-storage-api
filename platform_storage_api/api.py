@@ -29,10 +29,12 @@ class StorageOperation(str, Enum):
     The CREATE operation handles opening files for writing.
     The OPEN operation handles opening files for reading.
     The LISTSTATUS operation handles non-recursive listing of directories.
+    The MKDIRS operation handles recursive creation of directories.
     """
     CREATE = 'CREATE'
     OPEN = 'OPEN'
     LISTSTATUS = 'LISTSTATUS'
+    MKDIRS = 'MKDIRS'
 
     @classmethod
     def values(cls):
@@ -57,6 +59,8 @@ class StorageHandler:
         operation = self._parse_operation(request)
         if operation == StorageOperation.CREATE:
             return await self._handle_create(request)
+        elif operation == StorageOperation.MKDIRS:
+            return await self._handle_mkdir(request)
         raise ValueError(f'Illegal operation: {operation}')
 
     async def _handle_create(self, request):
@@ -114,6 +118,11 @@ class StorageHandler:
             self._convert_file_status_to_primitive(status)
             for status in statuses]
         return aiohttp.web.json_response(primitive_statuses)
+
+    async def _handle_mkdir(self, request):
+        storage_path = self._get_fs_path_from_request(request)
+        await self._storage.mkdir(storage_path)
+        return aiohttp.web.HTTPCreated()
 
     def _convert_file_status_to_primitive(self, status: FileStatus):
         return {
