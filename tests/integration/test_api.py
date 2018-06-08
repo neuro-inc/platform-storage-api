@@ -1,5 +1,6 @@
 from io import BytesIO
 from typing import NamedTuple
+import uuid
 
 import aiohttp
 import aiohttp.web
@@ -155,7 +156,7 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_mkdirs(self, api, client):
-        path_str = '/new/nested'
+        path_str = f'/new/nested/{uuid.uuid4()}'
         dir_url = api.storage_base_url + path_str
 
         params = {'op': 'LISTSTATUS'}
@@ -169,3 +170,14 @@ class TestStorage:
         params = {'op': 'LISTSTATUS'}
         async with client.get(dir_url, params=params) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
+
+    @pytest.mark.asyncio
+    async def test_mkdirs_existent(self, api, client):
+        path_str = f'/new/nested/{uuid.uuid4()}'
+        dir_url = api.storage_base_url + path_str
+
+        params = {'op': 'MKDIRS'}
+        async with client.put(dir_url, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+        async with client.put(dir_url, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
