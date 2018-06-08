@@ -79,6 +79,16 @@ class TestStorage:
             assert result_payload == payload
 
     @pytest.mark.asyncio
+    async def test_put_illegal_op(self, api, client):
+        url = api.storage_base_url + '/path/to/file'
+        params = {'op': 'OPEN'}
+        async with client.put(url, params=params) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            expected_error = 'Illegal operation: OPEN'
+            assert payload['error'] == expected_error
+
+    @pytest.mark.asyncio
     async def test_get_illegal_op(self, api, client):
         url = api.storage_base_url + '/path/to/file'
         params = {'op': 'CREATE'}
