@@ -61,7 +61,7 @@ class StorageHandler:
         if operation == StorageOperation.CREATE:
             return await self._handle_create(request)
         elif operation == StorageOperation.MKDIRS:
-            return await self._handle_mkdir(request)
+            return await self._handle_mkdirs(request)
         raise ValueError(f'Illegal operation: {operation}')
 
     async def _handle_create(self, request):
@@ -126,7 +126,7 @@ class StorageHandler:
             for status in statuses]
         return aiohttp.web.json_response(primitive_statuses)
 
-    async def _handle_mkdir(self, request):
+    async def _handle_mkdirs(self, request):
         storage_path = self._get_fs_path_from_request(request)
         await self._storage.mkdir(storage_path)
         return aiohttp.web.HTTPCreated()
