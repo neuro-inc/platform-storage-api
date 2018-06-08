@@ -128,7 +128,12 @@ class StorageHandler:
 
     async def _handle_mkdirs(self, request):
         storage_path = self._get_fs_path_from_request(request)
-        await self._storage.mkdir(storage_path)
+        try:
+            await self._storage.mkdir(storage_path)
+        except FileExistsError:
+            return aiohttp.web.json_response(
+                {'error': 'File exists'},
+                status=aiohttp.web.HTTPBadRequest.status_code)
         return aiohttp.web.HTTPCreated()
 
     def _convert_file_status_to_primitive(self, status: FileStatus):

@@ -172,7 +172,7 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPOk.status_code
 
     @pytest.mark.asyncio
-    async def test_mkdirs_existent(self, api, client):
+    async def test_mkdirs_existent_dir(self, api, client):
         path_str = f'/new/nested/{uuid.uuid4()}'
         dir_url = api.storage_base_url + path_str
 
@@ -181,3 +181,17 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPCreated.status_code
         async with client.put(dir_url, params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
+
+    @pytest.mark.asyncio
+    async def test_mkdirs_existent_file(self, api, client):
+        path_str = f'/new/nested/{uuid.uuid4()}'
+        url = api.storage_base_url + path_str
+        payload = b'test'
+        async with client.put(url, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        params = {'op': 'MKDIRS'}
+        async with client.put(url, params=params) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert payload['error'] == 'File exists'
