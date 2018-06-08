@@ -2,6 +2,7 @@ import asyncio
 from enum import Enum
 from pathlib import PurePath
 import logging
+from typing import Optional
 
 import aiohttp.web
 
@@ -56,7 +57,7 @@ class StorageHandler:
         return PurePath('/', request.match_info['path'])
 
     async def handle_put(self, request):
-        operation = self._parse_operation(request)
+        operation = self._parse_put_operation(request)
         if operation == StorageOperation.CREATE:
             return await self._handle_create(request)
         elif operation == StorageOperation.MKDIRS:
@@ -69,7 +70,7 @@ class StorageHandler:
         await self._storage.store(request.content, storage_path)
         return aiohttp.web.Response(status=201)
 
-    def _parse_operation(self, request) -> StorageOperation:
+    def _parse_operation(self, request) -> Optional[StorageOperation]:
         ops = []
 
         if 'op' in request.query:
@@ -85,10 +86,16 @@ class StorageHandler:
 
         if ops:
             return StorageOperation(ops[0])
-        return StorageOperation.OPEN
+        return None
+
+    def _parse_put_operation(self, request):
+        return self._parse_operation(request) or StorageOperation.CREATE
+
+    def _parse_get_operation(self, request):
+        return self._parse_operation(request) or StorageOperation.OPEN
 
     async def handle_get(self, request):
-        operation = self._parse_operation(request)
+        operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
             return await self._handle_open(request)
         elif operation == StorageOperation.LISTSTATUS:
