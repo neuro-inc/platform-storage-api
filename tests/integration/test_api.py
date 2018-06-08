@@ -152,3 +152,20 @@ class TestStorage:
         params = {'op': 'LISTSTATUS'}
         async with client.get(dir_url, params=params) as response:
             assert response.status == 404
+
+    @pytest.mark.asyncio
+    async def test_mkdirs(self, api, client):
+        path_str = '/new/nested'
+        dir_url = api.storage_base_url + path_str
+
+        params = {'op': 'LISTSTATUS'}
+        async with client.get(dir_url, params=params) as response:
+            assert response.status == aiohttp.web.HTTPNotFound.status_code
+
+        params = {'op': 'MKDIRS'}
+        async with client.put(dir_url, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        params = {'op': 'LISTSTATUS'}
+        async with client.get(dir_url, params=params) as response:
+            assert response.status == aiohttp.web.HTTPOk.status_code
