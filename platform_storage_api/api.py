@@ -54,6 +54,12 @@ class StorageHandler:
         return PurePath('/', request.match_info['path'])
 
     async def handle_put(self, request):
+        operation = self._parse_operation(request)
+        if operation == StorageOperation.CREATE:
+            return await self._handle_create(request)
+        raise ValueError(f'Illegal operation: {operation}')
+
+    async def _handle_create(self, request):
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
         storage_path = self._get_fs_path_from_request(request)
         await self._storage.store(request.content, storage_path)
