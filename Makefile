@@ -32,7 +32,7 @@ gke_login:
 	sudo chown -R circleci: $(HOME)/.kube
 
 gke_docker_push: build
-	docker tag $(IMAGE) $(IMAGE_K8S):latest .
+	docker tag $(IMAGE) $(IMAGE_K8S):latest
 	docker tag $(IMAGE_K8S):latest $(IMAGE_K8S):$(CIRCLE_SHA1)
 	sudo /opt/google-cloud-sdk/bin/gcloud docker -- push $(IMAGE_K8S)
 
