@@ -6,6 +6,7 @@ import enum
 import io
 import os
 from pathlib import PurePath, Path
+import shutil
 from typing import Optional, List
 
 import aiofiles
@@ -137,6 +138,16 @@ class LocalFileSystem(FileSystem):
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
         return await self._loop.run_in_executor(
             self._executor, self._scandir, path)
+
+    def _remove(self, path: PurePath) -> None:
+        concrete_path = Path(path)
+        if concrete_path.is_dir():
+            shutil.rmtree(concrete_path)
+        else:
+            concrete_path.unlink()
+
+    async def remove(self, path: PurePath) -> None:
+        await self._loop.run_in_executor(self._executor, self._remove, path)
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
