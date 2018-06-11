@@ -95,4 +95,4 @@ workflows:
           filters:
             branches:
               only:
-                - P20-145/setup_gcr
+                - master
