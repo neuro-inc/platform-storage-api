@@ -205,3 +205,22 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload['error'] == 'File exists'
+
+    @pytest.mark.asyncio
+    async def test_delete_non_existent(self, api, client):
+        path_str = f'/new/nested/{uuid.uuid4()}'
+        url = api.storage_base_url + path_str
+        async with client.delete(url) as response:
+            assert response.status == aiohttp.web.HTTPNotFound.status_code
+
+    @pytest.mark.asyncio
+    async def test_delete_file(self, api, client):
+        path_str = f'/new/nested/{uuid.uuid4()}'
+        url = api.storage_base_url + path_str
+        payload = b'test'
+
+        async with client.put(url, data=BytesIO(payload)) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        async with client.delete(url) as response:
+            assert response.status == aiohttp.web.HTTPNoContent.status_code
