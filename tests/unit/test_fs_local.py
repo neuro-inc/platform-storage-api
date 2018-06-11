@@ -155,3 +155,62 @@ class TestLocalFileSystem:
     async def test_liststatus_empty_dir(self, fs, tmp_dir_path):
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
+
+    @pytest.mark.asyncio
+    async def test_rm_non_existent(self, fs, tmp_dir_path):
+        path = tmp_dir_path / 'nested'
+        with pytest.raises(FileNotFoundError):
+            await fs.remove(path)
+
+    @pytest.mark.asyncio
+    async def test_rm_empty_dir(self, fs, tmp_dir_path):
+        expected_path = Path('nested')
+        path = tmp_dir_path / expected_path
+        await fs.mkdir(path)
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == [
+            FileStatus(expected_path, size=0, type=FileStatusType.DIRECTORY)]
+
+        await fs.remove(path)
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == []
+
+    @pytest.mark.asyncio
+    async def test_rm_dir(self, fs, tmp_dir_path):
+        expected_path = Path('nested')
+        dir_path = tmp_dir_path / expected_path
+        file_path = dir_path / 'file'
+        await fs.mkdir(dir_path)
+
+        async with fs.open(file_path, mode='wb') as f:
+            await f.write(b'test')
+            await f.flush()
+
+        statuses = await fs.liststatus(dir_path)
+        assert statuses == [
+            FileStatus(Path('file'), size=4, type=FileStatusType.FILE)]
+
+        await fs.remove(dir_path)
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == []
+
+    @pytest.mark.asyncio
+    async def test_rm_file(self, fs, tmp_dir_path):
+        expected_path = Path('nested')
+        path = tmp_dir_path / expected_path
+
+        async with fs.open(path, mode='wb') as f:
+            await f.write(b'test')
+            await f.flush()
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == [
+            FileStatus(expected_path, size=4, type=FileStatusType.FILE)]
+
+        await fs.remove(path)
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == []

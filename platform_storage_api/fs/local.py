@@ -80,6 +80,10 @@ class FileSystem(metaclass=abc.ABCMeta):
     async def liststatus(self, path: PurePath) -> List[FileStatus]:
         pass
 
+    @abc.abstractmethod
+    async def remove(self, path: PurePath) -> None:
+        pass
+
 
 class LocalFileSystem(FileSystem):
     def __init__(
