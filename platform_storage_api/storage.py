@@ -32,6 +32,10 @@ class Storage:
         real_path = self._resolve_real_path(PurePath(path))
         return await self._fs.liststatus(real_path)
 
-    async def mkdir(self, path: Union[PurePath, str]):
+    async def mkdir(self, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path)
+
+    async def remove(self, path: Union[PurePath, str]) -> None:
+        real_path = self._resolve_real_path(PurePath(path))
+        await self._fs.remove(real_path)

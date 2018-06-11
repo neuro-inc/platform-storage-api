@@ -36,6 +36,7 @@ class StorageOperation(str, Enum):
     OPEN = 'OPEN'
     LISTSTATUS = 'LISTSTATUS'
     MKDIRS = 'MKDIRS'
+    DELETE = 'DELETE'
 
     @classmethod
     def values(cls):
@@ -51,6 +52,7 @@ class StorageHandler:
             # TODO (A Danshyn 04/23/18): add some unit test for path matching
             aiohttp.web.put(r'/{path:.*}', self.handle_put),
             aiohttp.web.get(r'/{path:.*}', self.handle_get),
+            aiohttp.web.delete(r'/{path:.*}', self.handle_delete),
         ))
 
     def _get_fs_path_from_request(self, request):
@@ -94,12 +96,21 @@ class StorageHandler:
     def _parse_get_operation(self, request):
         return self._parse_operation(request) or StorageOperation.OPEN
 
+    def _parse_delete_operation(self, request):
+        return self._parse_operation(request) or StorageOperation.DELETE
+
     async def handle_get(self, request):
         operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
             return await self._handle_open(request)
         elif operation == StorageOperation.LISTSTATUS:
             return await self._handle_liststatus(request)
+        raise ValueError(f'Illegal operation: {operation}')
+
+    async def handle_delete(self, request):
+        operation = self._parse_delete_operation(request)
+        if operation == StorageOperation.DELETE:
+            return await self._handle_delete(request)
         raise ValueError(f'Illegal operation: {operation}')
 
     async def _handle_open(self, request):
@@ -135,6 +146,14 @@ class StorageHandler:
                 {'error': 'File exists'},
                 status=aiohttp.web.HTTPBadRequest.status_code)
         return aiohttp.web.HTTPCreated()
+
+    async def _handle_delete(self, request):
+        storage_path = self._get_fs_path_from_request(request)
+        try:
+            await self._storage.remove(storage_path)
+        except FileNotFoundError:
+            return aiohttp.web.HTTPNotFound()
+        return aiohttp.web.HTTPNoContent()
 
     def _convert_file_status_to_primitive(self, status: FileStatus):
         return {
