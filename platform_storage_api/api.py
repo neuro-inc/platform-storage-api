@@ -2,6 +2,7 @@ import asyncio
 from enum import Enum
 from pathlib import PurePath
 import logging
+from typing import Optional
 
 import aiohttp.web
 
@@ -29,10 +30,12 @@ class StorageOperation(str, Enum):
     The CREATE operation handles opening files for writing.
     The OPEN operation handles opening files for reading.
     The LISTSTATUS operation handles non-recursive listing of directories.
+    The MKDIRS operation handles recursive creation of directories.
     """
     CREATE = 'CREATE'
     OPEN = 'OPEN'
     LISTSTATUS = 'LISTSTATUS'
+    MKDIRS = 'MKDIRS'
 
     @classmethod
     def values(cls):
@@ -54,12 +57,20 @@ class StorageHandler:
         return PurePath('/', request.match_info['path'])
 
     async def handle_put(self, request):
+        operation = self._parse_put_operation(request)
+        if operation == StorageOperation.CREATE:
+            return await self._handle_create(request)
+        elif operation == StorageOperation.MKDIRS:
+            return await self._handle_mkdirs(request)
+        raise ValueError(f'Illegal operation: {operation}')
+
+    async def _handle_create(self, request):
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
         storage_path = self._get_fs_path_from_request(request)
         await self._storage.store(request.content, storage_path)
         return aiohttp.web.Response(status=201)
 
-    def _parse_operation(self, request) -> StorageOperation:
+    def _parse_operation(self, request) -> Optional[StorageOperation]:
         ops = []
 
         if 'op' in request.query:
@@ -75,10 +86,16 @@ class StorageHandler:
 
         if ops:
             return StorageOperation(ops[0])
-        return StorageOperation.OPEN
+        return None
+
+    def _parse_put_operation(self, request):
+        return self._parse_operation(request) or StorageOperation.CREATE
+
+    def _parse_get_operation(self, request):
+        return self._parse_operation(request) or StorageOperation.OPEN
 
     async def handle_get(self, request):
-        operation = self._parse_operation(request)
+        operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
             return await self._handle_open(request)
         elif operation == StorageOperation.LISTSTATUS:
@@ -108,6 +125,16 @@ class StorageHandler:
             self._convert_file_status_to_primitive(status)
             for status in statuses]
         return aiohttp.web.json_response(primitive_statuses)
+
+    async def _handle_mkdirs(self, request):
+        storage_path = self._get_fs_path_from_request(request)
+        try:
+            await self._storage.mkdir(storage_path)
+        except FileExistsError:
+            return aiohttp.web.json_response(
+                {'error': 'File exists'},
+                status=aiohttp.web.HTTPBadRequest.status_code)
+        return aiohttp.web.HTTPCreated()
 
     def _convert_file_status_to_primitive(self, status: FileStatus):
         return {
