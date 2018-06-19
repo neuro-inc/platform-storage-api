@@ -37,7 +37,6 @@ gke_docker_push: build
 	sudo /opt/google-cloud-sdk/bin/gcloud docker -- push $(IMAGE_K8S)
 
 gke_k8s_deploy:
-	kubectl patch replicaset platformstorageapi -p '{"spec":{"template":{"spec":{"containers":[{"name":"platformstorageapi","image":"$(IMAGE_K8S):$(CIRCLE_SHA1)"}]}}}}'	        
-	kubectl scale --replicas=0 replicaset/platformstorageapi
-	sleep 2s;
-	kubectl scale --replicas=1 replicaset/platformstorageapi
+	kubectl patch deployment platformstorageapi -p '{"spec":{"template":{"spec":{"containers":[{"name":"platformstorageapi","image":"$(IMAGE_K8S):$(CIRCLE_SHA1)"}]}}}}'	        
+	kubectl rollout status deployment/platformstorageapi
+	
