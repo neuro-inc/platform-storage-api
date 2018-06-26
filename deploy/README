@@ -1,0 +1,6 @@
+
+Dev : 
+	- helm --set "global.env=dev" install platformstorageapi --name=platformstorageapi
+
+Stage : 
+	- helm --set "global.env=stage" install platformstorageapi --name=platformstorageapi
