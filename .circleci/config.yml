@@ -119,7 +119,7 @@ workflows:
             branches:
               only:
                 - master
-      - gke_stage_deploy:
+      - gke_staging_deploy:
           context: org-global
           requires:
             - test
