@@ -126,4 +126,4 @@ workflows:
           filters:
             branches:
               only:
-                - gke_staging_deploy
+                - gke_stage_deploy
