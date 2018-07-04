@@ -38,10 +38,10 @@ gke_docker_push: build
 gke_k8s_deploy_dev:
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME)
 	sudo chown -R circleci: $(HOME)/.kube
-	helm --set "global.env=dev" --set "values.IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" --wait --timeout 600 upgrade platformstorageapi deploy/platformstorageapi/
+	helm --set "global.env=dev" --set "IMAGE.dev=$(IMAGE_K8S):$(CIRCLE_SHA1)" --wait --timeout 600 upgrade platformstorageapi deploy/platformstorageapi/
 	
 gke_k8s_deploy_staging:
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_STAGE_CLUSTER_NAME)
 	sudo chown -R circleci: $(HOME)/.kube
-	helm --set "global.env=staging" --set "values.IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" --wait --timeout 600 upgrade platformstorageapi deploy/platformstorageapi/	
+	helm --set "global.env=staging" --set "IMAGE.staging=$(IMAGE_K8S):$(CIRCLE_SHA1)" --wait --timeout 600 upgrade platformstorageapi deploy/platformstorageapi/	
   
