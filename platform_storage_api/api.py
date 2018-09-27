@@ -110,7 +110,7 @@ class StorageHandler:
     async def handle_delete(self, request):
         operation = self._parse_delete_operation(request)
         if operation == StorageOperation.DELETE:
-            return await self._handle_delete(request)
+            await self._handle_delete(request)
         raise ValueError(f'Illegal operation: {operation}')
 
     async def _handle_open(self, request):
@@ -145,15 +145,15 @@ class StorageHandler:
             return aiohttp.web.json_response(
                 {'error': 'File exists'},
                 status=aiohttp.web.HTTPBadRequest.status_code)
-        return aiohttp.web.HTTPCreated()
+        raise aiohttp.web.HTTPCreated()
 
     async def _handle_delete(self, request):
         storage_path = self._get_fs_path_from_request(request)
         try:
             await self._storage.remove(storage_path)
         except FileNotFoundError:
-            return aiohttp.web.HTTPNotFound()
-        return aiohttp.web.HTTPNoContent()
+            raise aiohttp.web.HTTPNotFound()
+        raise aiohttp.web.HTTPNoContent()
 
     def _convert_file_status_to_primitive(self, status: FileStatus):
         return {
@@ -171,6 +171,8 @@ async def handle_exceptions(request, handler):
         payload = {'error': str(e)}
         return aiohttp.web.json_response(
             payload, status=aiohttp.web.HTTPBadRequest.status_code)
+    except aiohttp.web.HTTPException:
+        raise
     except Exception as e:
         msg_str = (
             f'Unexpected exception: {str(e)}. '
