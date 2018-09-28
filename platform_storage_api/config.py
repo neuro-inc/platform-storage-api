@@ -43,14 +43,13 @@ class Config:
         return EnvironConfigFactory(environ).create()
 
 
-
 class EnvironConfigFactory:
     def __init__(self, environ: Optional[Dict[str, str]] = None) -> None:
         self._environ = environ or os.environ
 
     def create_storage(self) -> StorageConfig:
         fs_local_base_path = self._environ['NP_STORAGE_LOCAL_BASE_PATH']
-        return StorageConfig(fs_local_base_path=fs_local_base_path)
+        return StorageConfig(fs_local_base_path=PurePath(fs_local_base_path))
 
     def create_server(self) -> ServerConfig:
         port = int(self._environ.get('NP_STORAGE_API_PORT', ServerConfig.port))

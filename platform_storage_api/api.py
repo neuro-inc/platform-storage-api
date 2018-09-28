@@ -52,7 +52,7 @@ class StorageOperation(str, Enum):
 
 
 class StorageHandler:
-    def __init__(self, storage: Storage, config: Config):
+    def __init__(self, storage: Storage, config: Config) -> None:
         self._storage = storage
         self._config = config
 
@@ -251,8 +251,10 @@ async def create_app(config: Config, storage: Storage):
             logger.info(f"Auth Client for Storage API Initialized. "
                         f"URL={config.auth.server_endpoint_url}")
 
-            # TODO (Rafa Zubairov): configured service shall ensure that pre-requisites are up and running
-            # TODO here we shall test whether AuthClient properly initialized - perform ping
+            # TODO (Rafa Zubairov): configured service shall ensure that
+            # pre-requisites are up and running
+            # TODO here we shall test whether AuthClient properly
+            # initialized - perform ping
             # TODO here we shall test whether secured-ping works as well
             # TODO in a spin loop we shall do that
 

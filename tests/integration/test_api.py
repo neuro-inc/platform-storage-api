@@ -46,6 +46,7 @@ def token_factory():
     def _factory(name: str):
         payload = {'identity': name}
         return jwt.encode(payload, 'secret', algorithm='HS256')
+
     return _factory
 
 
@@ -88,7 +89,7 @@ def config(in_docker, admin_token):
 @pytest.fixture
 async def auth_client(config, admin_token):
     async with AuthClient(
-        url=config.auth.server_endpoint_url, token=admin_token
+            url=config.auth.server_endpoint_url, token=admin_token
     ) as client:
         yield client
 
@@ -103,6 +104,7 @@ async def regular_user_factory(auth_client, token_factory):
         return _User(  # type: ignore
             name=user.name, token=token_factory(user.name)
         )
+
     return _factory
 
 
@@ -138,13 +140,15 @@ class TestApi:
 
 class TestStorage:
     @pytest.mark.asyncio
-    async def test_put_get(self, server_url, client, regular_user_factory, api):
+    async def test_put_get(self, server_url,
+                           client, regular_user_factory, api):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         url = f'{server_url}/{user.name}/path/to/file'
         payload = b'test'
 
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=BytesIO(payload)) \
+                as response:
             assert response.status == 201
 
         async with client.get(url, headers=headers) as response:
@@ -153,7 +157,8 @@ class TestStorage:
             assert result_payload == payload
 
     @pytest.mark.asyncio
-    async def test_put_illegal_op(self, server_url, api, client, regular_user_factory):
+    async def test_put_illegal_op(self, server_url, api, client,
+                                  regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         url = f'{server_url}/{user.name}/path/to/file'
@@ -165,7 +170,8 @@ class TestStorage:
             assert payload['error'] == expected_error
 
     @pytest.mark.asyncio
-    async def test_get_illegal_op(self, server_url, api, client, regular_user_factory):
+    async def test_get_illegal_op(self, server_url, api, client,
+                                  regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         url = f'{server_url}/{user.name}/path/to/file'
@@ -177,17 +183,20 @@ class TestStorage:
             assert payload['error'] == expected_error
 
     @pytest.mark.asyncio
-    async def test_liststatus(self, server_url, api, client, regular_user_factory):
+    async def test_liststatus(self, server_url, api, client,
+                              regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         dir_url = f'{server_url}/{user.name}/path/to'
         url = dir_url + '/file'
         payload = b'test'
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=BytesIO(payload)) \
+                as response:
             assert response.status == 201
 
         params = {'op': 'LISTSTATUS'}
-        async with client.get(dir_url, headers=headers, params=params) as response:
+        async with client.get(dir_url, headers=headers, params=params) \
+                as response:
             statuses = await response.json()
             assert statuses == [{
                 'path': 'file',
@@ -196,16 +205,20 @@ class TestStorage:
             }]
 
     @pytest.mark.asyncio
-    async def test_liststatus_no_op_param_no_equals(self, server_url, api, client, regular_user_factory):
+    async def test_liststatus_no_op_param_no_equals(self, server_url, api,
+                                                    client,
+                                                    regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         dir_url = f'{server_url}/{user.name}/path/to'
         url = dir_url + '/file'
         payload = b'test'
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=BytesIO(payload)) \
+                as response:
             assert response.status == 201
 
-        async with client.get(dir_url + '?liststatus', headers=headers) as response:
+        async with client.get(dir_url + '?liststatus', headers=headers) \
+                as response:
             statuses = await response.json()
             assert statuses == [{
                 'path': 'file',
@@ -214,44 +227,52 @@ class TestStorage:
             }]
 
     @pytest.mark.asyncio
-    async def test_ambiguous_operations_with_op(self, server_url, api, client, regular_user_factory):
+    async def test_ambiguous_operations_with_op(self, server_url, api,
+                                                client, regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         dir_url = f'{server_url}/{user.name}/'
-        async with client.get(dir_url + '?op=liststatus&open', headers=headers) as response:
+        async with client.get(dir_url + '?op=liststatus&open',
+                              headers=headers) as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert 'Ambiguous operations' in payload['error']
 
     @pytest.mark.asyncio
-    async def test_ambiguous_operations(self, server_url, api, client, regular_user_factory):
+    async def test_ambiguous_operations(self, server_url, api,
+                                        client, regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         dir_url = f'{server_url}/{user.name}/'
-        async with client.get(dir_url + '?liststatus&open', headers=headers) as response:
+        async with client.get(dir_url + '?liststatus&open',
+                              headers=headers) as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert 'Ambiguous operations' in payload['error']
 
     @pytest.mark.asyncio
-    async def test_unknown_operation(self, server_url, api, client, regular_user_factory):
+    async def test_unknown_operation(self, server_url, api, client,
+                                     regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         dir_url = f'{server_url}/{user.name}/'
-        async with client.get(dir_url + '?op=unknown', headers=headers) as response:
+        async with client.get(dir_url + '?op=unknown',
+                              headers=headers) as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             expected_error = '\'UNKNOWN\' is not a valid StorageOperation'
             assert payload['error'] == expected_error
 
     @pytest.mark.asyncio
-    async def test_liststatus_non_existent_dir(self, server_url, api, client, regular_user_factory):
+    async def test_liststatus_non_existent_dir(self, server_url, api, client,
+                                               regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         dir_url = f'{server_url}/{user.name}/non-existent'
 
         params = {'op': 'LISTSTATUS'}
-        async with client.get(dir_url, headers=headers, params=params) as response:
+        async with client.get(dir_url, headers=headers,
+                              params=params) as response:
             assert response.status == 404
 
     @pytest.mark.asyncio
@@ -262,38 +283,46 @@ class TestStorage:
         dir_url = f'{server_url}{path_str}'
 
         params = {'op': 'LISTSTATUS'}
-        async with client.get(dir_url, headers=headers, params=params) as response:
+        async with client.get(dir_url, headers=headers,
+                              params=params) as response:
             assert response.status == aiohttp.web.HTTPNotFound.status_code
 
         params = {'op': 'MKDIRS'}
-        async with client.put(dir_url, headers=headers, params=params) as response:
+        async with client.put(dir_url, headers=headers,
+                              params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
         params = {'op': 'LISTSTATUS'}
-        async with client.get(dir_url, headers=headers, params=params) as response:
+        async with client.get(dir_url, headers=headers,
+                              params=params) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
 
     @pytest.mark.asyncio
-    async def test_mkdirs_existent_dir(self, server_url, api, client, regular_user_factory):
+    async def test_mkdirs_existent_dir(self, server_url, api, client,
+                                       regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         path_str = f'/{user.name}/new/nested/{uuid.uuid4()}'
         dir_url = f'{server_url}{path_str}'
 
         params = {'op': 'MKDIRS'}
-        async with client.put(dir_url, headers=headers, params=params) as response:
+        async with client.put(dir_url, headers=headers,
+                              params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
-        async with client.put(dir_url, headers=headers, params=params) as response:
+        async with client.put(dir_url, headers=headers,
+                              params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
     @pytest.mark.asyncio
-    async def test_mkdirs_existent_file(self, server_url, api, client, regular_user_factory):
+    async def test_mkdirs_existent_file(self, server_url, api, client,
+                                        regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         path_str = f'/{user.name}/new/nested/{uuid.uuid4()}'
         url = f'{server_url}{path_str}'
         payload = b'test'
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers,
+                              data=BytesIO(payload)) as response:
             assert response.status == 201
 
         params = {'op': 'MKDIRS'}
@@ -303,7 +332,8 @@ class TestStorage:
             assert payload['error'] == 'File exists'
 
     @pytest.mark.asyncio
-    async def test_delete_non_existent(self, server_url, api, client, regular_user_factory):
+    async def test_delete_non_existent(self, server_url, api, client,
+                                       regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         path_str = f'/{user.name}/new/nested/{uuid.uuid4()}'
@@ -312,14 +342,16 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPNotFound.status_code
 
     @pytest.mark.asyncio
-    async def test_delete_file(self, server_url, api, client, regular_user_factory):
+    async def test_delete_file(self, server_url, api, client,
+                               regular_user_factory):
         user = await regular_user_factory()
         headers = {'Authorization': 'Bearer ' + user.token}
         path_str = f'/{user.name}/new/nested/{uuid.uuid4()}'
         url = f'{server_url}{path_str}'
         payload = b'test'
 
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers,
+                              data=BytesIO(payload)) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
         async with client.delete(url, headers=headers) as response:
