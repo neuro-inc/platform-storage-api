@@ -1,22 +1,21 @@
 import asyncio
+import logging
 from enum import Enum
 from pathlib import PurePath
-import logging
 from typing import Optional
 
 import aiohttp.web
 import aiohttp_remotes
-from aiohttp.web_exceptions import HTTPUnauthorized, HTTPBadRequest
+from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
 from aiohttp_security import check_authorized, check_permission
 from async_exit_stack import AsyncExitStack
-from neuro_auth_client import AuthClient, User, Permission
-from neuro_auth_client.security import setup_security, AuthScheme
+from neuro_auth_client import AuthClient, Permission, User
+from neuro_auth_client.security import AuthScheme, setup_security
 
 from .config import Config
 from .fs.local import FileStatus, LocalFileSystem
 from .storage import Storage
-
 
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
 

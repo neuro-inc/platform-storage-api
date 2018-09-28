@@ -1,9 +1,8 @@
-from typing import Optional, Dict
+import os
+from pathlib import PurePath
+from typing import Dict, Optional
 
 from dataclasses import dataclass, field
-from pathlib import PurePath
-import os
-
 from yarl import URL
 
 

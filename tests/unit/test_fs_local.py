@@ -1,12 +1,12 @@
 import tempfile
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 import pytest
 
-from platform_storage_api.fs.local import (
-    StorageType, FileStatus, FileStatusType, FileSystem, LocalFileSystem,
-    copy_streams)
+from platform_storage_api.fs.local import (FileStatus, FileStatusType,
+                                           FileSystem, LocalFileSystem,
+                                           StorageType, copy_streams)
 
 
 class TestFileSystem:
