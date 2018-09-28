@@ -33,12 +33,7 @@ services:
     - NP_STORAGE_API_PORT=5000
     - NP_STORAGE_AUTH_URL=http://auth_server:5003
     - NP_STORAGE_AUTH_TOKEN=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6ImFkbWluIn0.ZWS9jwSdIbCxWfihvJfKwMkO27-R1Q5X7fQUwYbuO_E
-    - NP_STORAGE_UPSTREAM_URL=http://upstream:5002
-    - NP_STORAGE_UPSTREAM_PROJECT=testproject
-    - NP_STORAGE_UPSTREAM_TOKEN_URL=http://auth:5001/auth
-    - NP_STORAGE_UPSTREAM_TOKEN_SERVICE=upstream
-    - NP_STORAGE_UPSTREAM_TOKEN_USERNAME=testuser
-    - NP_STORAGE_UPSTREAM_TOKEN_PASSWORD=testpassword
+    - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
     links:
     - auth
     - upstream
@@ -50,12 +45,7 @@ services:
     - NP_STORAGE_API_PORT=5000
     - NP_STORAGE_AUTH_URL=http://auth_server:5003
     - NP_STORAGE_AUTH_TOKEN=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6ImFkbWluIn0.ZWS9jwSdIbCxWfihvJfKwMkO27-R1Q5X7fQUwYbuO_E
-    - NP_STORAGE_UPSTREAM_URL=http://upstream:5002
-    - NP_STORAGE_UPSTREAM_PROJECT=testproject
-    - NP_STORAGE_UPSTREAM_TOKEN_URL=http://auth:5001/auth
-    - NP_STORAGE_UPSTREAM_TOKEN_SERVICE=upstream
-    - NP_STORAGE_UPSTREAM_TOKEN_USERNAME=testuser
-    - NP_STORAGE_UPSTREAM_TOKEN_PASSWORD=testpassword
+    - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
     links:
     - auth
     - upstream
