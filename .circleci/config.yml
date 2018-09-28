@@ -22,15 +22,30 @@ jobs:
             pip install -r requirements-test.txt
 
       - run:
+          name: Configuring Docker Client
+          command: |
+            make -s gke_login
+
+      - run:
           name: Running static code analysis
           command: |
             source venv/bin/activate
             PYTHONPATH=$(pwd) flake8 platform_storage_api tests
-      - run:
-          name: Running test suite
-          command: |
-            source venv/bin/activate
-            PYTHONPATH=$(pwd) pytest -vv tests
+
+       - run:
+           name: Running Unit Test Suite
+           command: |
+             make test_unit
+
+       - run:
+           name: Running Integration Test Suite
+           command: |
+             make test_integration
+
+       - run:
+           name: Running E2E Test Suite
+           command: |
+             make test_e2e
 
   deploy:
     working_directory: ~/workspace
