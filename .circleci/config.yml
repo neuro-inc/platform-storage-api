@@ -32,12 +32,12 @@ jobs:
             source venv/bin/activate
             PYTHONPATH=$(pwd) flake8 platform_storage_api tests
 
-       - run:
+      - run:
            name: Running Unit Test Suite
            command: |
              make test_unit
 
-       - run:
+      - run:
            name: Running Integration Test Suite
            command: |
              make test_integration
@@ -68,7 +68,7 @@ jobs:
       docker_layer_caching: true
     steps:
       - checkout
-      
+
       - run:
           name: GKE Auth
           command: |
@@ -91,7 +91,7 @@ jobs:
       docker_layer_caching: true
     steps:
       - checkout
-      
+
       - run:
           name: GKE Auth
           command: |
