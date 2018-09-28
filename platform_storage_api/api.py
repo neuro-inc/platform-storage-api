@@ -6,6 +6,8 @@ from typing import Optional
 
 import aiohttp.web
 import aiohttp_remotes
+from aiohttp.web_exceptions import HTTPUnauthorized, HTTPBadRequest
+from aiohttp.web_request import Request
 from aiohttp_security import check_authorized, check_permission
 from async_exit_stack import AsyncExitStack
 from neuro_auth_client import AuthClient, User, Permission
@@ -63,7 +65,7 @@ class StorageHandler:
             aiohttp.web.delete(r'/{path:.*}', self.handle_delete),
         ))
 
-    async def handle_put(self, request):
+    async def handle_put(self, request: Request):
         operation = self._parse_put_operation(request)
         if operation == StorageOperation.CREATE:
             storage_path = self._get_fs_path_from_request(request)
@@ -72,10 +74,10 @@ class StorageHandler:
         elif operation == StorageOperation.MKDIRS:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, str(storage_path))
-            return await self._handle_mkdirs(request, storage_path)
+            return await self._handle_mkdirs(storage_path)
         raise ValueError(f'Illegal operation: {operation}')
 
-    async def handle_get(self, request):
+    async def handle_get(self, request: Request):
         operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
             storage_path = self._get_fs_path_from_request(request)
@@ -84,10 +86,10 @@ class StorageHandler:
         elif operation == StorageOperation.LISTSTATUS:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, str(storage_path))
-            return await self._handle_liststatus(request, storage_path)
+            return await self._handle_liststatus(storage_path)
         raise ValueError(f'Illegal operation: {operation}')
 
-    async def handle_delete(self, request: aiohttp.Request):
+    async def handle_delete(self, request: Request):
         operation = self._parse_delete_operation(request)
         if operation == StorageOperation.DELETE:
             storage_path: PurePath = self._get_fs_path_from_request(request)
@@ -121,16 +123,16 @@ class StorageHandler:
             return StorageOperation(ops[0])
         return None
 
-    def _parse_put_operation(self, request):
+    def _parse_put_operation(self, request: Request):
         return self._parse_operation(request) or StorageOperation.CREATE
 
-    def _parse_get_operation(self, request):
+    def _parse_get_operation(self, request: Request):
         return self._parse_operation(request) or StorageOperation.OPEN
 
-    def _parse_delete_operation(self, request):
+    def _parse_delete_operation(self, request: Request):
         return self._parse_operation(request) or StorageOperation.DELETE
 
-    async def _handle_open(self, request, storage_path: PurePath):
+    async def _handle_open(self, request: Request, storage_path: PurePath):
         # TODO (A Danshyn 04/23/18): check if exists (likely in some
         # middleware)
         response = aiohttp.web.StreamResponse(status=200)
@@ -140,7 +142,7 @@ class StorageHandler:
 
         return response
 
-    async def _handle_liststatus(self, request, storage_path: PurePath):
+    async def _handle_liststatus(self, storage_path: PurePath):
         try:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
@@ -152,7 +154,7 @@ class StorageHandler:
             for status in statuses]
         return aiohttp.web.json_response(primitive_statuses)
 
-    async def _handle_mkdirs(self, request, storage_path: PurePath):
+    async def _handle_mkdirs(self, storage_path: PurePath):
         try:
             await self._storage.mkdir(storage_path)
         except FileExistsError:
@@ -187,21 +189,21 @@ class StorageHandler:
         # then use JWT token claims
         try:
             await check_permission(request, action, [permission])
-        except aiohttp.HTTPUnauthorized:
+        except HTTPUnauthorized:
             # TODO (Rafa Zubairov): Use tree based approach here
             self._raise_unauthorized()
 
     def _raise_unauthorized(self) -> None:
-        raise aiohttp.HTTPUnauthorized(headers={
+        raise HTTPUnauthorized(headers={
             'WWW-Authenticate': f'Basic realm="{self._config.server.name}"',
         })
 
-    async def _get_user_from_request(self, request: aiohttp.Request) -> User:
+    async def _get_user_from_request(self, request: Request) -> User:
         try:
             user_name = await check_authorized(request)
         except ValueError:
-            raise aiohttp.HTTPBadRequest()
-        except aiohttp.HTTPUnauthorized:
+            raise HTTPBadRequest()
+        except HTTPUnauthorized:
             self._raise_unauthorized()
         return User(name=user_name)
 
@@ -244,7 +246,7 @@ async def create_app(config: Config, storage: Storage):
             await setup_security(
                 app=app,
                 auth_client=auth_client,
-                auth_scheme=AuthScheme.BASIC
+                auth_scheme=AuthScheme.BEARER
             )
 
             logger.info(f"Auth Client for Storage API Initialized. "
