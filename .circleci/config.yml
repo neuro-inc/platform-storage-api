@@ -42,11 +42,6 @@ jobs:
            command: |
              make test_integration
 
-       - run:
-           name: Running E2E Test Suite
-           command: |
-             make test_e2e
-
   deploy:
     working_directory: ~/workspace
     machine:
