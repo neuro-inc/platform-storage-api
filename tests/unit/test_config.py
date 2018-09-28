@@ -1,4 +1,5 @@
 import pytest
+from yarl import URL
 
 from platform_storage_api.config import Config, ServerConfig, StorageConfig
 
@@ -35,7 +36,11 @@ class TestConfig:
     def test_from_environ(self):
         environ = {
             'NP_STORAGE_LOCAL_BASE_PATH': '/path/to/dir',
+            'NP_STORAGE_AUTH_URL': 'http://127.0.0.1/',
+            'NP_STORAGE_AUTH_TOKEN': 'hello-token',
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
         assert config.storage.fs_local_base_path == '/path/to/dir'
+        assert config.auth.server_endpoint_url == URL('http://127.0.0.1/')
+        assert config.auth.service_token == 'hello-token'

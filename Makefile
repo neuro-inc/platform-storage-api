@@ -52,8 +52,7 @@ test_e2e_built: pull
 	exit $$exit_code
 
 test_integration_built: pull
-	docker-compose --project-directory=`pwd` \
-	    -f tests/docker/e2e.compose.yml run test make _test_integration; \
+	docker-compose --project-directory=`pwd` -f tests/docker/e2e.compose.yml run test make _test_integration; \
 	exit_code=$$?; \
 	docker-compose --project-directory=`pwd` \
 	    -f tests/docker/e2e.compose.yml kill; \
