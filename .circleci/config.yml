@@ -3,8 +3,9 @@ version: 2
 jobs:
   test:
     working_directory: ~/workspace
-    docker:
+    machine:
       - image: circleci/classic:201711-01
+      - docker_layer_caching: true
 
     steps:
       - checkout
