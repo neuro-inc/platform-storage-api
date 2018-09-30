@@ -12,11 +12,6 @@ jobs:
 
       # NOTE: these are temporary steps until moved to docker
       - run:
-          name: Creating a virtual environment
-          command: |
-            python -m venv venv
-
-      - run:
           name: Configuring Docker Client
           command: |
             make -s gke_login
