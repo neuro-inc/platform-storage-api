@@ -15,7 +15,7 @@ _docker_login:
 	@docker login -u "$(DOCKER_USER)" -p "$(DOCKER_PASS)" $(DOCKER_REGISTRY)
 
 build:
-	@docker build --build-arg PIP_INDEX_URL="$(PIP_INDEX_URL)" -t $(IMAGE_NAME):$(IMAGE_TAG) --no-cache .
+	@docker build --build-arg PIP_INDEX_URL="$(PIP_INDEX_URL)" -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
 push: _docker_login
 	docker push $(IMAGE)

@@ -7,7 +7,7 @@ from typing import NamedTuple, Optional
 import aiohttp
 import aiohttp.web
 import pytest
-from attr import dataclass
+from dataclasses import dataclass
 from jose import jwt
 from neuro_auth_client import AuthClient, User
 from yarl import URL

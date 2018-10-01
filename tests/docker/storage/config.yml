@@ -1,4 +1,3 @@
-version: 0.1
 log:
   fields:
     service: storage

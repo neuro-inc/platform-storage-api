@@ -5,7 +5,6 @@ from pathlib import PurePath
 from typing import Optional
 
 import aiohttp.web
-import aiohttp_remotes
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
 from aiohttp_security import check_authorized, check_permission
@@ -194,7 +193,7 @@ class StorageHandler:
 
     def _raise_unauthorized(self) -> None:
         raise HTTPUnauthorized(headers={
-            'WWW-Authenticate': f'Basic realm="{self._config.server.name}"',
+            'WWW-Authenticate': f'Basic bearer="{self._config.server.name}"',
         })
 
     async def _get_user_from_request(self, request: Request) -> User:
@@ -230,8 +229,6 @@ async def handle_exceptions(request, handler):
 async def create_app(config: Config, storage: Storage):
     app = aiohttp.web.Application(middlewares=[handle_exceptions])
     app['config'] = config
-
-    await aiohttp_remotes.setup(app, aiohttp_remotes.XForwardedRelaxed())
 
     async def _init_app(app: aiohttp.web.Application):
         async with AsyncExitStack() as exit_stack:
