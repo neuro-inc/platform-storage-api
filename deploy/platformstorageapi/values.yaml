@@ -6,3 +6,7 @@ IMAGE:
   _default: gcr.io/light-reality-205619/platformstorageapi-k8s:latest
   dev: gcr.io/light-reality-205619/platformstorageapi-k8s:latest
   staging: gcr.io/light-reality-205619/platformstorageapi-k8s:latest
+NP_STORAGE_AUTH_URL:
+  _default: https://platform.dev.neuromation.io
+  dev: https://platform.dev.neuromation.io
+  staging: https://platform.staging.neuromation.io

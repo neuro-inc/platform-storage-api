@@ -1,0 +1,32 @@
+version: "3"
+services:
+  auth_server:
+    image: gcr.io/light-reality-205619/platformauthapi:latest
+    ports:
+    - "5003:5003"
+    environment:
+    - NP_AUTH_API_PORT=5003
+    - NP_JWT_SECRET=secret
+
+  storage:
+    image: platformstorageapi:latest
+    ports:
+    - "5000:5000"
+    environment:
+    - NP_STORAGE_API_PORT=5000
+    - NP_STORAGE_AUTH_URL=http://auth_server:5003
+    - NP_STORAGE_AUTH_TOKEN=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6ImFkbWluIn0.ZWS9jwSdIbCxWfihvJfKwMkO27-R1Q5X7fQUwYbuO_E
+    - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
+    links:
+    - auth_server
+
+  test:
+    image: platformstorageapi-test
+    environment:
+    - NP_STORAGE_API_PORT=5000
+    - NP_STORAGE_AUTH_URL=http://auth_server:5003
+    - NP_STORAGE_AUTH_TOKEN=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6ImFkbWluIn0.ZWS9jwSdIbCxWfihvJfKwMkO27-R1Q5X7fQUwYbuO_E
+    - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
+    links:
+    - auth_server
+    - storage
