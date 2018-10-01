@@ -33,23 +33,11 @@ test_unit: build_test test_unit_built
 
 test_integration: build_test test_integration_built
 
-test_e2e: build test_e2e_built
-
 build_test: build
 	docker build -t platformstorageapi-test -f tests/Dockerfile .
 
 lint_built:
 	docker run --rm platformstorageapi-test make _lint
-
-test_e2e_built: pull
-	docker-compose --project-directory=`pwd` -p platformstorageapi \
-	    -f tests/docker/e2e.compose.yml up -d registry; \
-	tests/e2e/tests.sh; exit_code=$$?; \
-	docker-compose --project-directory=`pwd` \
-	    -f tests/docker/e2e.compose.yml kill; \
-	docker-compose --project-directory=`pwd` \
-	    -f tests/docker/e2e.compose.yml rm -f; \
-	exit $$exit_code
 
 test_integration_built: pull
 	docker-compose --project-directory=`pwd` -f tests/docker/e2e.compose.yml run test make _test_integration; \
