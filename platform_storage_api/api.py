@@ -193,7 +193,7 @@ class StorageHandler:
 
     def _raise_unauthorized(self) -> None:
         raise HTTPUnauthorized(headers={
-            'WWW-Authenticate': f'Basic bearer="{self._config.server.name}"',
+            'WWW-Authenticate': f'Bearer realm="{self._config.server.name}"',
         })
 
     async def _get_user_from_request(self, request: Request) -> User:
