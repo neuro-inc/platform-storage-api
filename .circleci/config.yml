@@ -85,7 +85,7 @@ workflows:
           filters:
             branches:
               only:
-                - fix_helm
+                - master
       - gke_staging_deploy:
           context: org-global
           requires:
