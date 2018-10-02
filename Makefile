@@ -1,8 +1,6 @@
-DOCKER_REGISTRY ?= registry.neuromation.io
-DOCKER_REPO ?= $(DOCKER_REGISTRY)/neuromationorg
 IMAGE_NAME ?= platformstorageapi
 IMAGE_TAG ?= latest
-IMAGE ?= $(DOCKER_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
+IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_K8S ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
 
 ifdef CIRCLECI
@@ -11,14 +9,8 @@ else
     PIP_INDEX_URL ?= "$(shell python pip_extra_index_url.py)"
 endif
 
-_docker_login:
-	@docker login -u "$(DOCKER_USER)" -p "$(DOCKER_PASS)" $(DOCKER_REGISTRY)
-
 build:
-	@docker build --build-arg PIP_INDEX_URL="$(PIP_INDEX_URL)" -t $(IMAGE_NAME):$(IMAGE_TAG) .
-
-push: _docker_login
-	docker push $(IMAGE)
+	@docker build --build-arg PIP_INDEX_URL="$(PIP_INDEX_URL)" -t $(IMAGE) .
 
 pull:
 	-docker-compose --project-directory=`pwd` -p platformregistryapi \

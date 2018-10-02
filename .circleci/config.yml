@@ -26,25 +26,6 @@ jobs:
            command: |
              make test_integration
 
-  deploy:
-    working_directory: ~/workspace
-    machine:
-      image: circleci/classic:201711-01
-      docker_layer_caching: true
-
-    steps:
-      - checkout
-
-      - run:
-          name: Building docker images
-          command: |
-            make build
-
-      - run:
-          name: Pushing docker images
-          command: |
-            make push
-
   gke_dev_deploy:
     working_directory: ~/workspace
     machine:
@@ -97,14 +78,6 @@ workflows:
     jobs:
       - test:
           context: org-global
-      - deploy:
-          context: org-global
-          requires:
-            - test
-          filters:
-            branches:
-              only:
-                - master
       - gke_dev_deploy:
           context: org-global
           requires:
