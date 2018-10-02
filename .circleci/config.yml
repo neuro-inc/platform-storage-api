@@ -3,34 +3,28 @@ version: 2
 jobs:
   test:
     working_directory: ~/workspace
-    docker:
-      - image: circleci/python:3.6.4-stretch
+    machine:
+      image: circleci/classic:201711-01
+      docker_layer_caching: true
 
     steps:
       - checkout
 
       # NOTE: these are temporary steps until moved to docker
       - run:
-          name: Creating a virtual environment
+          name: Configuring Docker Client
           command: |
-            python -m venv venv
+            make -s gke_login
 
       - run:
-          name: Installing dependencies
-          command: |
-            source venv/bin/activate
-            pip install -r requirements-test.txt
+           name: Running Unit Test Suite
+           command: |
+             make test_unit
 
       - run:
-          name: Running static code analysis
-          command: |
-            source venv/bin/activate
-            PYTHONPATH=$(pwd) flake8 platform_storage_api tests
-      - run:
-          name: Running test suite
-          command: |
-            source venv/bin/activate
-            PYTHONPATH=$(pwd) pytest -vv tests
+           name: Running Integration Test Suite
+           command: |
+             make test_integration
 
   gke_dev_deploy:
     working_directory: ~/workspace
@@ -39,7 +33,7 @@ jobs:
       docker_layer_caching: true
     steps:
       - checkout
-      
+
       - run:
           name: GKE Auth
           command: |
@@ -62,7 +56,7 @@ jobs:
       docker_layer_caching: true
     steps:
       - checkout
-      
+
       - run:
           name: GKE Auth
           command: |

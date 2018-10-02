@@ -1,15 +1,15 @@
 import abc
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 import enum
 import io
 import os
-from pathlib import PurePath, Path
 import shutil
-from typing import Optional, List
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path, PurePath
+from typing import List, Optional
 
 import aiofiles
+from dataclasses import dataclass
 
 
 # TODO (A Danshyn 04/23/18): likely should be revisited

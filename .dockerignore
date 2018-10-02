@@ -1,4 +1,10 @@
 *
 !setup.py
+!setup.cfg
 !platform_storage_api
+
+!Makefile
+!tests
+!requirements-test.txt
+
 **/*.pyc
