@@ -51,7 +51,10 @@ class StorageOperation(str, Enum):
 
 
 class StorageHandler:
-    def __init__(self, storage: Storage, config: Config) -> None:
+    def __init__(self, app: aiohttp.Application,
+                 storage: Storage,
+                 config: Config) -> None:
+        self._app = app
         self._storage = storage
         self._config = config
 
@@ -205,6 +208,9 @@ class StorageHandler:
             self._raise_unauthorized()
         return User(name=user_name)
 
+    def _get_auth_client(self) -> AuthClient:
+        return self._app['auth_client']
+
 
 @aiohttp.web.middleware
 async def handle_exceptions(request, handler):
@@ -245,6 +251,8 @@ async def create_app(config: Config, storage: Storage):
                 auth_scheme=AuthScheme.BEARER
             )
 
+            app['api_v1']['auth_client'] = auth_client
+
             logger.info(f"Auth Client for Storage API Initialized. "
                         f"URL={config.auth.server_endpoint_url}")
 
@@ -262,9 +270,10 @@ async def create_app(config: Config, storage: Storage):
     api_v1_app = aiohttp.web.Application()
     api_v1_handler = ApiHandler()
     api_v1_handler.register(api_v1_app)
+    app['api_v1'] = api_v1_app
 
     storage_app = aiohttp.web.Application()
-    storage_handler = StorageHandler(storage, config)
+    storage_handler = StorageHandler(api_v1_app, storage, config)
     storage_handler.register(storage_app)
 
     api_v1_app.add_subapp('/storage', storage_app)
