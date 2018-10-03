@@ -52,7 +52,8 @@ class StorageOperation(str, Enum):
 
 
 class StorageHandler:
-    def __init__(self, app: aiohttp.web.Application,
+
+    def __init__(self, app: aiohttp.Application,
                  storage: Storage,
                  config: Config) -> None:
         self._app = app
