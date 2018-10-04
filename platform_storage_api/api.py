@@ -104,9 +104,24 @@ class StorageHandler:
     def _get_fs_path_from_request(self, request):
         return PurePath('/', request.match_info['path'])
 
-    async def _handle_create(self, request, storage_path: PurePath):
+    async def _handle_create(self,
+                             request: Request,
+                             storage_path: PurePath):
+        if 'Content-Type' in request.headers
+            and request.headers['Content-Type']
+        # TODO check whether directory exists, and if not raise error
+        logger.info(f"Accepting data files. {storage_path}")
+        reader = await request.multipart()
+        data_file_stream = reader.next()
+        while data_file_stream:
+            logger.debug(f"Starting to store {data_file_stream.filename()}")
+            target_file_path = PurePath(str(storage_path), data_file_stream.filename())
+            await self._storage.store(data_file_stream, target_file_path)
+            data_file_stream = reader.next()
+
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
-        await self._storage.store(request.content, storage_path)
+        # await self._storage.store(request.content, storage_path)
+        logger.info(f"Files has been stored. {storage_path}")
         return aiohttp.web.Response(status=201)
 
     def _parse_operation(self, request) -> Optional[StorageOperation]:
