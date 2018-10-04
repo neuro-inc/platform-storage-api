@@ -213,6 +213,7 @@ class TestStorageListAndResourceSharing:
                 as response:
             assert response.status == 200
             statuses = await response.json()
+            statuses.sort(key=self.file_status_sort)
             assert statuses == [{
                 'path': 'file',
                 'size': len(payload),
