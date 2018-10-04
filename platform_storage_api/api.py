@@ -53,7 +53,7 @@ class StorageOperation(str, Enum):
 
 class StorageHandler:
 
-    def __init__(self, app: aiohttp.Application,
+    def __init__(self, app: aiohttp.web.Application,
                  storage: Storage,
                  config: Config) -> None:
         self._app = app
@@ -155,6 +155,8 @@ class StorageHandler:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
+
+        filtered_statuses = self._liststatus_filter(statuses, access_tree)
 
         filtered_statuses = self._liststatus_filter(statuses, access_tree)
 
