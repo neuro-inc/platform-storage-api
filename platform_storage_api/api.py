@@ -158,8 +158,6 @@ class StorageHandler:
 
         filtered_statuses = self._liststatus_filter(statuses, access_tree)
 
-        filtered_statuses = self._liststatus_filter(statuses, access_tree)
-
         primitive_statuses = [
             self._convert_file_status_to_primitive(status)
             for status in filtered_statuses]
