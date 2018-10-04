@@ -148,14 +148,12 @@ class StorageHandler:
     async def _handle_liststatus(self, storage_path: PurePath,
                                  access_tree: ClientSubTreeViewRoot):
         if access_tree.sub_tree.action == 'deny':
-            return aiohttp.web.Response(
-                status=aiohttp.web.HTTPNotFound.status_code)
+            raise aiohttp.web.HTTPNotFound
 
         try:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
-            return aiohttp.web.Response(
-                status=aiohttp.web.HTTPNotFound.status_code)
+            raise aiohttp.web.HTTPNotFound
 
         filtered_statuses = self._liststatus_filter(statuses, access_tree)
 
@@ -201,7 +199,7 @@ class StorageHandler:
         }
 
     async def _get_user_permissions_tree(self,
-                                         request,
+                                         request: Request,
                                          target_path: str
                                          ) -> ClientSubTreeViewRoot:
         username = await self._get_user_from_request(request)
