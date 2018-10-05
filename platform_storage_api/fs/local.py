@@ -9,6 +9,7 @@ from pathlib import Path, PurePath
 from typing import List, Optional
 
 import aiofiles
+import aiohttp
 from dataclasses import dataclass
 
 
@@ -162,8 +163,15 @@ async def copy_streams(outstream, instream, chunk_size=DEFAULT_CHUNK_SIZE):
 
     It is assumed that stream implementations would handle retries themselves.
     """
-    while True:
-        chunk = await outstream.read(chunk_size)
-        if not chunk:
-            break
-        await instream.write(chunk)
+    if isinstance(outstream, aiohttp.BodyPartReader):
+        while True:
+            chunk = await outstream.read_chunk(chunk_size)
+            if not chunk:
+                break
+            await instream.write(chunk)
+    else:
+        while True:
+            chunk = await outstream.read(chunk_size)
+            if not chunk:
+                break
+            await instream.write(chunk)

@@ -112,13 +112,13 @@ class StorageHandler:
             # TODO check whether directory exists, and if not raise error
             logger.info(f"Accepting data files. {storage_path}")
             reader = await request.multipart()
-            data_file_stream = reader.next()
+            data_file_stream = await reader.next()
             while data_file_stream:
-                logger.debug(f"Starting to store {data_file_stream.filename()}")
+                logger.debug(f"Starting to store {data_file_stream.filename}")
                 target_file_path = PurePath(str(storage_path),
-                                            data_file_stream.filename())
+                                            data_file_stream.filename)
                 await self._storage.store(data_file_stream, target_file_path)
-                data_file_stream = reader.next()
+                data_file_stream = await reader.next()
 
             logger.info(f"Files has been stored. {storage_path}")
         else:
