@@ -39,7 +39,7 @@ spec:
         - name: storage
           nfs:
             server: {{ printf "%s" (pluck .Values.global.env .Values.NP_STORAGE_NFS_SERVER | first | default .Values.NP_STORAGE_NFS_SERVER._default) }}
-            path: /nfs
+            path: {{ printf "%s" (pluck .Values.global.env .Values.NP_STORAGE_NFS_PATH | first | default .Values.NP_STORAGE_NFS_PATH._default) }}
 ---
 apiVersion: v1
 kind: Service
