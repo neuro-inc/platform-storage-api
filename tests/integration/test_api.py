@@ -378,16 +378,16 @@ class TestFileStatus:
             assert response.status == aiohttp.web.HTTPNotFound.status_code
 
     @pytest.mark.asyncio
-    async def test_filestatus_alice_shares_file_in_read_mode(self, server_url,
-                                                             api, client,
-                                                             alice, bob,
-                                                             granter):
+    @pytest.mark.parametrize('permission', ['read', 'write', 'manage'])
+    async def test_filestatus_alice_shares_file(self, server_url, api, client,
+                                                alice, bob, granter,
+                                                permission):
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
         # Alice shares with Bob in READ mode file1.txt
         await granter(bob.name, [
             {'uri': f'storage://{alice.name}/{self.file1_path}',
-             'action': 'read'}], alice)
+             'action': permission}], alice)
 
         async with self.get_filestatus(bob, self.file1_path, server_url,
                                        client, file_owner=alice) \
@@ -397,73 +397,19 @@ class TestFileStatus:
                                     type=FileStatusType.FILE,
                                     modificationTime=mtime_min,
                                     length=self.len_payload,
-                                    permission='read')
-
-
-    @pytest.mark.asyncio
-    async def test_filestatus_alice_shares_file_in_write_mode(self, server_url,
-                                                         api, client,
-                                                         alice, bob,
-                                                         granter):
-        mtime_min = await self.init_test_stat(server_url, client, alice)
-
-        # Alice shares with Bob in WRITE mode file1.txt
-        await granter(bob.name, [
-            {'uri': f'storage://{alice.name}/{self.file1_path}',
-             'action': 'write'}], alice)
-
-        async with self.get_filestatus(bob, self.file1_path, server_url,
-                                       client, file_owner=alice) \
-                as response:
-            assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(response,
-                                    type=FileStatusType.FILE,
-                                    modificationTime=mtime_min,
-                                    length=self.len_payload,
-                                    permission='write')
+                                    permission=permission)
 
     @pytest.mark.asyncio
-    async def test_filestatus_alice_shares_file_in_manage_mode(self,
-                                                         server_url,
-                                                         api, client,
-                                                         alice, bob,
-                                                         granter):
-        mtime_min = await self.init_test_stat(server_url, client, alice)
-
-        # Alice shares with Bob in MANAGE mode file1.txt
-        await granter(bob.name, [
-            {'uri': f'storage://{alice.name}/{self.file1_path}',
-             'action': 'manage'}], alice)
-
-        # Bob checks status of Alice's "file1.txt"
-        file1_url = self.url(server_url, alice, self.file1_path)
-        async with self.get_filestatus(bob, self.file1_path, server_url,
-                                       client, file_owner=alice) \
-                as response:
-            assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(response,
-                                    type=FileStatusType.FILE,
-                                    modificationTime=mtime_min,
-                                    length=self.len_payload,
-                                    permission='manage')
-
-        # Bob checks status of Alice's "dir3/file3.txt" -- NOT FOUND
-        async with self.get_filestatus(bob, self.file3_path, server_url,
-                                       client, file_owner=alice) \
-                as response:
-            assert response.status == aiohttp.web.HTTPNotFound.status_code
-
-    @pytest.mark.asyncio
-    async def test_filestatus_alice_shares_dir_in_read_mode(self, server_url,
-                                                        api, client,
-                                                        alice, bob,
-                                                        granter):
+    @pytest.mark.parametrize('permission', ['read', 'write', 'manage'])
+    async def test_filestatus_alice_shares_dir(self, server_url, api, client,
+                                               alice, bob, granter,
+                                               permission):
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
         # Alice shares with Bob in READ mode dir3
         await granter(bob.name, [
             {'uri': f'storage://{alice.name}/{self.dir3_path}',
-             'action': 'read'}], alice)
+             'action': permission}], alice)
 
         # then Bob checks status dir3 (OK)
         async with self.get_filestatus(bob, self.dir3_path, server_url,
@@ -474,7 +420,7 @@ class TestFileStatus:
                                     type=FileStatusType.DIRECTORY,
                                     modificationTime=mtime_min,
                                     length=0,
-                                    permission='read')
+                                    permission=permission)
 
         # then Bob checks status dir3/file3.txt (OK)
         async with self.get_filestatus(bob, self.file3_path, server_url,
@@ -485,73 +431,6 @@ class TestFileStatus:
                                     type=FileStatusType.FILE,
                                     modificationTime=mtime_min,
                                     length=self.len_payload,
-                                    permission='read')
+                                    permission=permission)
 
-    @pytest.mark.asyncio
-    async def test_filestatus_alice_shares_dir_in_write_mode(self, server_url,
-                                                         api, client,
-                                                         alice, bob,
-                                                         granter):
-        mtime_min = await self.init_test_stat(server_url, client, alice)
 
-        # Alice shares with Bob in WRITE mode file1.txt
-        await granter(bob.name, [
-            {'uri': f'storage://{alice.name}/{self.dir3_path}',
-             'action': 'write'}], alice)
-
-        # then Bob checks status dir3 (OK)
-        async with self.get_filestatus(bob, self.dir3_path, server_url,
-                                       client, file_owner=alice) \
-                as response:
-            assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(response,
-                                    type=FileStatusType.DIRECTORY,
-                                    modificationTime=mtime_min,
-                                    length=0,
-                                    permission='write')
-
-        # then Bob checks status dir3/file3.txt (OK)
-        async with self.get_filestatus(bob, self.file3_path, server_url,
-                                       client, file_owner=alice) \
-                as response:
-            assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(response,
-                                    type=FileStatusType.FILE,
-                                    modificationTime=mtime_min,
-                                    length=self.len_payload,
-                                    permission='write')
-
-    @pytest.mark.asyncio
-    async def test_filestatus_alice_shares_dir_in_manage_mode(self,
-                                                         server_url,
-                                                         api, client,
-                                                         alice, bob,
-                                                         granter):
-        mtime_min = await self.init_test_stat(server_url, client, alice)
-
-        # Alice shares with Bob in MANAGE mode dir3
-        await granter(bob.name, [
-            {'uri': f'storage://{alice.name}/{self.dir3_path}',
-             'action': 'manage'}], alice)
-
-        # then Bob checks status dir3 (OK)
-        async with self.get_filestatus(bob, self.dir3_path, server_url,
-                                       client, file_owner=alice) \
-                as response:
-            assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(response,
-                                    type=FileStatusType.DIRECTORY,
-                                    modificationTime=mtime_min,
-                                    length=0,
-                                    permission='manage')
-
-        # then Bob checks status dir3/file3.txt (OK)
-        async with self.get_filestatus(bob, self.file3_path, server_url,
-                                       client, file_owner=alice) \
-                as response:
-            assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(response,
-                                    type=FileStatusType.FILE,
-                                    modificationTime=mtime_min,
-                                    length=self.len_payload,
-                                    permission='manage')
