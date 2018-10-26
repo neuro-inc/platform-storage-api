@@ -2,7 +2,7 @@ import asyncio
 import logging
 from enum import Enum
 from pathlib import PurePath
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
@@ -38,11 +38,13 @@ class StorageOperation(str, Enum):
     The CREATE operation handles opening files for writing.
     The OPEN operation handles opening files for reading.
     The LISTSTATUS operation handles non-recursive listing of directories.
+    The FILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     """
     CREATE = 'CREATE'
     OPEN = 'OPEN'
     LISTSTATUS = 'LISTSTATUS'
+    FILESTATUS = 'FILESTATUS'
     MKDIRS = 'MKDIRS'
     DELETE = 'DELETE'
 
@@ -90,6 +92,10 @@ class StorageHandler:
             tree = await self._get_user_permissions_tree(request,
                                                          str(storage_path))
             return await self._handle_liststatus(storage_path, tree)
+        elif operation == StorageOperation.FILESTATUS:
+            storage_path = self._get_fs_path_from_request(request)
+            tree = await self._get_user_permissions_tree(request, str(storage_path))
+            return await self._handle_filestatus(storage_path, tree)
         raise ValueError(f'Illegal operation: {operation}')
 
     async def handle_delete(self, request: Request):
@@ -175,6 +181,20 @@ class StorageHandler:
                 if str(status.path) in visible_children
                 ]
 
+    async def _handle_filestatus(self, storage_path: PurePath,
+                                 access_tree: ClientSubTreeViewRoot):
+        action = access_tree.sub_tree.action
+        if action == 'deny':
+            raise aiohttp.web.HTTPNotFound
+
+        try:
+            filestatus = await self._storage.get_filestatus(storage_path)
+        except FileNotFoundError:
+            raise aiohttp.web.HTTPNotFound
+
+        stat_dict = self.stat_to_dict(filestatus, action)
+        return aiohttp.web.json_response(stat_dict)
+
     async def _handle_mkdirs(self, storage_path: PurePath):
         try:
             await self._storage.mkdir(storage_path)
@@ -190,6 +210,17 @@ class StorageHandler:
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound()
         raise aiohttp.web.HTTPNoContent()
+
+    @classmethod
+    def stat_to_dict(cls, stat: FileStatus, action: str) -> Dict[str, Any]:
+        # TODO (A Yushkovskiy, 26.10.2018) Refact: re-use the method
+        # `_convert_file_status_to_primitive` , see issue #41
+        return {"FileStatus": {
+            "length"           : stat.size,
+            "modificationTime" : stat.modification_time,
+            "permission"       : action,
+            "type"             : ("DIRECTORY" if stat.is_dir else "FILE")
+        }}
 
     def _convert_file_status_to_primitive(self, status: FileStatus):
         return {

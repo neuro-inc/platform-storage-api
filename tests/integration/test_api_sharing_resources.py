@@ -141,7 +141,7 @@ class TestStorageListAndResourceSharing:
         headers2 = {'Authorization': 'Bearer ' + user2.token}
 
         # create file /path/to/file by user1
-        dir_url = f'{server_url}/{user1.name}/path/to/'
+        dir_url = f'{server_url}/{user1.name}/path/to'
         url = dir_url + '/file'
         payload = b'test'
         async with client.put(url, headers=headers1, data=BytesIO(payload)) \

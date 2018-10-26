@@ -5,11 +5,11 @@ import io
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import List, Optional
 
 import aiofiles
-from dataclasses import dataclass
 
 
 # TODO (A Danshyn 04/23/18): likely should be revisited
@@ -19,27 +19,42 @@ class StorageType(str, enum.Enum):
 
 
 class FileStatusType(str, enum.Enum):
-    FILE = 'FILE'
     DIRECTORY = 'DIRECTORY'
+    FILE = 'FILE'
+
+    def __str__(self):
+        return self.value
 
 
 @dataclass(frozen=True)
 class FileStatus:
     path: PurePath
-    size: int = 0
-    type: FileStatusType = FileStatusType.FILE
+    size: int
+    type: FileStatusType
+    modification_time: Optional[int] = None
 
     @property
     def is_dir(self):
         return self.type == FileStatusType.DIRECTORY
 
     @classmethod
-    def create_file_status(cls, path: PurePath, size: int) -> 'FileStatus':
-        return cls(path, size)  # type: ignore
+    def create_file_status(cls,
+                           path: PurePath,
+                           size: int,
+                           modification_time: int=None) -> 'FileStatus':
+        return cls(path=path,
+                   type=FileStatusType.FILE,
+                   size=size,
+                   modification_time=modification_time)
 
     @classmethod
-    def create_dir_status(cls, path: PurePath) -> 'FileStatus':
-        return cls(path, type=FileStatusType.DIRECTORY)  # type: ignore
+    def create_dir_status(cls,
+                          path: PurePath,
+                          modification_time: int=None) -> 'FileStatus':
+        return cls(path=path,
+                   type=FileStatusType.DIRECTORY,
+                   size=0,
+                   modification_time=modification_time)
 
 
 class FileSystem(metaclass=abc.ABCMeta):
@@ -81,6 +96,10 @@ class FileSystem(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    async def get_filestatus(self, path: PurePath) -> FileStatus:
+        pass
+
+    @abc.abstractmethod
     async def remove(self, path: PurePath) -> None:
         pass
 
@@ -98,6 +117,7 @@ class LocalFileSystem(FileSystem):
         self._executor = ThreadPoolExecutor(
             max_workers=self._executor_max_workers,
             thread_name_prefix='LocalFileSystemThread')
+
 
     async def close(self) -> None:
         if self._executor:
@@ -131,6 +151,8 @@ class LocalFileSystem(FileSystem):
 
     def _convert_dir_entry_to_file_status(
             self, entry: os.DirEntry) -> FileStatus:
+        # TODO (A Yushkovskiy, 26.10.2018) Refact: re-use `_get_filedir_status`
+        # see issue #41
         path = PurePath(entry.name)
         if entry.is_dir():
             return FileStatus.create_dir_status(path)
@@ -143,6 +165,27 @@ class LocalFileSystem(FileSystem):
         return await self._loop.run_in_executor(
             self._executor, self._scandir, path)
 
+    @classmethod
+    def _get_filedir_status(cls, path: PurePath, name_only: bool=False) \
+            -> FileStatus:
+        with Path(path) as real_path:
+            stat = real_path.stat()
+            mtime = int(stat.st_mtime)  # converting float to int
+            path = PurePath(path.name) if name_only else path
+            if real_path.is_dir():
+                return FileStatus.create_dir_status(path,
+                                                    modification_time=mtime)
+            else:
+                return FileStatus.create_file_status(path,
+                                                     size=stat.st_size,
+                                                     modification_time=mtime)
+        # TODO: raise FileNotFoundError here ?
+
+    async def get_filestatus(self, path: PurePath) -> FileStatus:
+        return await self._loop.run_in_executor(self._executor,
+                                                self._get_filedir_status,
+                                                path)
+
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)
         if concrete_path.is_dir():
@@ -152,6 +195,7 @@ class LocalFileSystem(FileSystem):
 
     async def remove(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path)
+
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB

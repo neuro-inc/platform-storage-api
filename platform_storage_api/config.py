@@ -1,8 +1,8 @@
 import os
+from dataclasses import dataclass, field
 from pathlib import PurePath
 from typing import Dict, Optional
 
-from dataclasses import dataclass, field
 from yarl import URL
 
 

@@ -1,11 +1,11 @@
 import os
 import uuid
+from dataclasses import dataclass
 from pathlib import PurePath
 from typing import NamedTuple, Optional
 
 import aiohttp
 import pytest
-from dataclasses import dataclass
 from jose import jwt
 from neuro_auth_client import AuthClient, User
 from yarl import URL

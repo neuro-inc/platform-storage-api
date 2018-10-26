@@ -1,7 +1,10 @@
+import os
 from io import BytesIO
+from pathlib import PurePath
 
 import pytest
 
+from platform_storage_api.fs.local import FileStatusType, LocalFileSystem
 from platform_storage_api.storage import Storage
 
 
@@ -49,3 +52,42 @@ class TestStorage:
         instream.seek(0)
         payload = await instream.read()
         assert payload == expected_payload
+
+
+    @pytest.mark.asyncio
+    async def test_filestatus_file(self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath):
+        base_path = local_tmp_dir_path
+        storage = Storage(fs=local_fs, base_path=base_path)
+
+        file_name = 'file.txt'
+        real_file_path = local_tmp_dir_path / file_name
+        async with local_fs.open(real_file_path, 'wb') as f:
+            await f.write(b'test')
+
+        storage_stat = await storage.get_filestatus(f'/{file_name}')
+
+        real_stat = os.stat(str(real_file_path))
+
+        assert storage_stat.type == FileStatusType.FILE
+        assert storage_stat.path == real_file_path
+        assert storage_stat.size == real_stat.st_size
+        assert storage_stat.modification_time == int(real_stat.st_mtime)
+
+
+    @pytest.mark.asyncio
+    async def test_filestatus_dir(self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath):
+        base_path = local_tmp_dir_path
+        storage = Storage(fs=local_fs, base_path=base_path)
+
+        dir_name = 'dir/'
+        real_dir_path = local_tmp_dir_path / dir_name
+        await local_fs.mkdir(real_dir_path)
+
+        storage_stat = await storage.get_filestatus(f'/{dir_name}')
+
+        real_stat = os.stat(str(real_dir_path))
+
+        assert storage_stat.type == FileStatusType.DIRECTORY
+        assert storage_stat.path == real_dir_path
+        assert storage_stat.size == 0
+        assert storage_stat.modification_time == int(real_stat.st_mtime)
