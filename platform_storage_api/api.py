@@ -186,6 +186,8 @@ class StorageHandler:
         action = access_tree.sub_tree.action
         if action == 'deny':
             raise aiohttp.web.HTTPNotFound
+        elif action == 'list':
+            action = 'read'
 
         try:
             filestatus = await self._storage.get_filestatus(storage_path)

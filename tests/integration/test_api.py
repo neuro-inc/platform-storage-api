@@ -451,9 +451,9 @@ class TestFileStatus:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('perm_file,perm_parent_dir',
                              [
-                                 ('read', 'list'),
-                                 ('write', 'list'),
-                                 ('manage', 'list'),
+                                 ('read', 'read'),
+                                 ('write', 'read'),
+                                 ('manage', 'read'),
                              ])
     async def test_filestatus_share_file_then_check_parent_dir(self,
                                                                server_url, api,
@@ -483,9 +483,9 @@ class TestFileStatus:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('perm_dir,perm_parent_dir',
                              [
-                                 ('read', 'list'),
-                                 ('write', 'list'),
-                                 ('manage', 'list'),
+                                 ('read', 'read'),
+                                 ('write', 'read'),
+                                 ('manage', 'read'),
                              ])
     async def test_filestatus_share_dir_then_check_parent_dir(self, server_url,
                                                               api, client,
