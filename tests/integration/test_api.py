@@ -1,13 +1,15 @@
 import uuid
 from io import BytesIO
 from time import time as current_time
+from typing import Dict
 
 import aiohttp
 import aiohttp.web
 import pytest
 
-from platform_storage_api.fs.local import FileStatusType
-
+from platform_storage_api.fs.local import FileStatusType, FileStatus
+from .conftest import assert_filestatus
+from ..conftest import get_liststatus_dict, get_filestatus_dict
 
 class TestApi:
     @pytest.mark.asyncio
@@ -17,6 +19,7 @@ class TestApi:
 
 
 class TestStorage:
+
     @pytest.mark.asyncio
     async def test_put_get(self, server_url, client, regular_user_factory, api):
         user = await regular_user_factory()
@@ -59,33 +62,51 @@ class TestStorage:
     @pytest.mark.asyncio
     async def test_liststatus(self, server_url, api, client, regular_user_factory):
         user = await regular_user_factory()
-        headers = {"Authorization": "Bearer " + user.token}
-        dir_url = f"{server_url}/{user.name}/path/to"
-        url = dir_url + "/file"
-        payload = b"test"
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        headers = {'Authorization': 'Bearer ' + user.token}
+        dir_path = f'{user.name}/path/to'
+        dir_url = f'{server_url}/{dir_path}'
+        url = dir_url + '/file'
+        payload = b'test'
+        mtime_min = int(current_time())
+        async with client.put(url, headers=headers, data=BytesIO(payload)) \
+                as response:
             assert response.status == 201
 
-        params = {"op": "LISTSTATUS"}
-        async with client.get(dir_url, headers=headers, params=params) as response:
-            statuses = await response.json()
-            assert statuses == [{"path": "file", "size": len(payload), "type": "FILE"}]
+        params = {'op': 'LISTSTATUS'}
+        async with client.get(dir_url, headers=headers, params=params) \
+                as response:
+            assert response.status == 200
+            statuses = get_liststatus_dict(await response.json())
+            assert_filestatus(statuses[0],
+                              path=dir_path,
+                              length=len(payload),
+                              type=FileStatusType.FILE,
+                              modification_time_min=mtime_min)
 
     @pytest.mark.asyncio
     async def test_liststatus_no_op_param_no_equals(
         self, server_url, api, client, regular_user_factory
     ):
         user = await regular_user_factory()
-        headers = {"Authorization": "Bearer " + user.token}
-        dir_url = f"{server_url}/{user.name}/path/to"
-        url = dir_url + "/file"
-        payload = b"test"
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        headers = {'Authorization': 'Bearer ' + user.token}
+        dir_path = f'{user.name}/path/to'
+        dir_url = f'{server_url}/{dir_path}'
+        url = dir_url + '/file'
+        payload = b'test'
+
+        mtime_min = int(current_time())
+        async with client.put(url, headers=headers, data=BytesIO(payload)) \
+                as response:
             assert response.status == 201
 
-        async with client.get(dir_url + "?liststatus", headers=headers) as response:
-            statuses = await response.json()
-            assert statuses == [{"path": "file", "size": len(payload), "type": "FILE"}]
+        async with client.get(dir_url + '?liststatus', headers=headers) \
+                as response:
+            statuses = get_liststatus_dict(await response.json())
+            assert_filestatus(statuses[0],
+                              path=dir_path,
+                              length=len(payload),
+                              type=FileStatusType.FILE,
+                              modification_time_min=mtime_min)
 
     @pytest.mark.asyncio
     async def test_ambiguous_operations_with_op(
@@ -265,17 +286,6 @@ class TestFileStatus:
         return client.get(url, headers=headers, params=params)
 
     @classmethod
-    async def assert_filestatus(
-        cls, response: aiohttp.web.Response, **expected
-    ) -> None:
-        values_root = await response.json()
-        values = values_root["FileStatus"]
-        for strict_key in ["type", "length", "permission"]:
-            assert values[strict_key] == expected[strict_key]
-        assert values["modificationTime"] >= expected["modificationTime"]
-        assert len(values) == 4  # no more extra keys
-
-    @classmethod
     async def init_test_stat(self, server_url, client, alice):
         expected_mtime_min = int(current_time())
         # Alice creates a file in her home "file1.txt"
@@ -298,38 +308,35 @@ class TestFileStatus:
             alice, self.file1, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.FILE,
-                modificationTime=mtime_min,
-                length=self.len_payload,
-                permission="manage",
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                              type=FileStatusType.FILE,
+                              modification_time_min=mtime_min,
+                              length=self.len_payload,
+                              permission='manage')
 
         # check that directory was created
         async with self.get_filestatus(
             alice, self.dir3, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.DIRECTORY,
-                modificationTime=mtime_min,
-                length=0,
-                permission="manage",
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                    type=FileStatusType.DIRECTORY,
+                                    modification_time_min=mtime_min,
+                                    length=0,
+                                    permission='manage')
 
         async with self.get_filestatus(
             alice, self.dir3_file3, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.FILE,
-                modificationTime=mtime_min,
-                length=self.len_payload,
-                permission="manage",
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                              type=FileStatusType.FILE,
+                              modification_time_min=mtime_min,
+                              length=self.len_payload,
+                              permission='manage')
 
     @pytest.mark.asyncio
     async def test_filestatus_check_non_existing_file(
@@ -393,13 +400,12 @@ class TestFileStatus:
             bob, self.file1, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.FILE,
-                modificationTime=mtime_min,
-                length=self.len_payload,
-                permission=permission,
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                         type=FileStatusType.FILE,
+                                         modification_time_min=mtime_min,
+                                         length=self.len_payload,
+                                         permission=permission)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
@@ -420,26 +426,24 @@ class TestFileStatus:
             bob, self.dir3, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.DIRECTORY,
-                modificationTime=mtime_min,
-                length=0,
-                permission=permission,
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                    type=FileStatusType.DIRECTORY,
+                                    modification_time_min=mtime_min,
+                                    length=0,
+                                    permission=permission)
 
         # then Bob checks status dir3/file3.txt (OK)
         async with self.get_filestatus(
             bob, self.dir3_file3, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.FILE,
-                modificationTime=mtime_min,
-                length=self.len_payload,
-                permission=permission,
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                    type=FileStatusType.FILE,
+                                    modification_time_min=mtime_min,
+                                    length=self.len_payload,
+                                    permission=permission)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -464,13 +468,12 @@ class TestFileStatus:
             bob, self.dir3, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.DIRECTORY,
-                modificationTime=mtime_min,
-                length=0,
-                permission=perm_parent_dir,
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                         type=FileStatusType.DIRECTORY,
+                                         modification_time_min=mtime_min,
+                                         length=0,
+                                         permission=perm_parent_dir)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -494,26 +497,24 @@ class TestFileStatus:
             bob, self.dir3_dir4, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.DIRECTORY,
-                modificationTime=mtime_min,
-                length=0,
-                permission=perm_dir,
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                    type=FileStatusType.DIRECTORY,
+                                    modification_time_min=mtime_min,
+                                    length=0,
+                                    permission=perm_dir)
 
         # then Bob checks status 'dir3' (permission=list)
         async with self.get_filestatus(
             bob, self.dir3, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.DIRECTORY,
-                modificationTime=mtime_min,
-                length=0,
-                permission=perm_parent_dir,
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                    type=FileStatusType.DIRECTORY,
+                                    modification_time_min=mtime_min,
+                                    length=0,
+                                    permission=perm_parent_dir)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -537,23 +538,21 @@ class TestFileStatus:
             bob, self.dir3, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.DIRECTORY,
-                modificationTime=mtime_min,
-                length=0,
-                permission=perm_dir,
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                    type=FileStatusType.DIRECTORY,
+                                    modification_time_min=mtime_min,
+                                    length=0,
+                                    permission=perm_dir)
 
         # then Bob checks status 'dir3/dir4' (permission=P)
         async with self.get_filestatus(
             bob, self.dir3_dir4, server_url, client, file_owner=alice
         ) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
-            await self.assert_filestatus(
-                response,
-                type=FileStatusType.DIRECTORY,
-                modificationTime=mtime_min,
-                length=0,
-                permission=perm_child_dir,
-            )
+            response_json = get_filestatus_dict(await response.json())
+            assert_filestatus(response_json,
+                                    type=FileStatusType.DIRECTORY,
+                                    modification_time_min=mtime_min,
+                                    length=0,
+                                    permission=perm_child_dir)

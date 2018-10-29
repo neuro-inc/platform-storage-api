@@ -2,14 +2,14 @@ import os
 import uuid
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Dict, List
 
 import aiohttp
 import pytest
 from neuro_auth_client import AuthClient, User
 from yarl import URL
 
-from jose import jwt
+from platform_storage_api.fs.local import FileStatus
 from platform_storage_api.api import create_app
 from platform_storage_api.config import (
     AuthConfig,
@@ -138,3 +138,22 @@ async def granter(auth_client, admin_token):
             assert p.status == 201
 
     return f
+
+
+def assert_filestatus(response_json: Dict, **expected) -> None:
+    actual = FileStatus.from_primitive(**response_json)
+    for strict_key in ['type', 'length', 'permission']:
+        if strict_key in expected:
+            assert actual.__getattribute__(strict_key) == expected[strict_key]
+
+    if 'modification_time_min' in expected:
+        assert actual.__getattribute__('modification_time') >= \
+               expected['modification_time_min']
+
+
+def assert_filestatus_list(actual_json_list: List,
+                           actual_sort_key,
+                           expected_list: List) -> None:
+    actual_json_list = sorted(actual_json_list, key=actual_sort_key)
+    for (actual, expected) in zip(actual_json_list, expected_list):
+        assert_filestatus(actual, **expected)
