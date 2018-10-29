@@ -179,7 +179,6 @@ class LocalFileSystem(FileSystem):
                 return FileStatus.create_file_status(path,
                                                      size=stat.st_size,
                                                      modification_time=mtime)
-        # TODO: raise FileNotFoundError here ?
 
     async def get_filestatus(self, path: PurePath) -> FileStatus:
         return await self._loop.run_in_executor(self._executor,

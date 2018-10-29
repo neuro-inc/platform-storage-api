@@ -194,7 +194,7 @@ class StorageHandler:
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
 
-        stat_dict = self.stat_to_dict(filestatus, action)
+        stat_dict = self._stat_to_dict(filestatus, action)
         return aiohttp.web.json_response(stat_dict)
 
     async def _handle_mkdirs(self, storage_path: PurePath):
@@ -214,7 +214,7 @@ class StorageHandler:
         raise aiohttp.web.HTTPNoContent()
 
     @classmethod
-    def stat_to_dict(cls, stat: FileStatus, action: str) -> Dict[str, Any]:
+    def _stat_to_dict(cls, stat: FileStatus, action: str) -> Dict[str, Any]:
         # TODO (A Yushkovskiy, 26.10.2018) Refact: re-use the method
         # `_convert_file_status_to_primitive` , see issue #41
         return {"FileStatus": {
