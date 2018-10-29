@@ -1,6 +1,7 @@
 import tempfile
 import uuid
 from pathlib import Path
+from time import time as current_time
 
 import pytest
 
@@ -214,3 +215,49 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
+
+
+    @classmethod
+    def assert_filestatus(cls, actual: FileStatus, **expected):
+        for key in ['path', 'size', 'type']:
+            assert actual.__getattribute__(key) == expected[key]
+        mkey = 'modification_time'
+        assert actual.__getattribute__(mkey) >= expected[mkey]
+
+    @pytest.mark.asyncio
+    async def test_get_filestatus_file(self, fs, tmp_dir_path):
+        expected_mtime_min = int(current_time())
+        file_relative = Path('nested')
+        expected_file_path = tmp_dir_path / file_relative
+
+        payload = b'test'
+        async with fs.open(expected_file_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        status = await fs.get_filestatus(expected_file_path)
+        self.assert_filestatus(status, path=expected_file_path,
+                                       size=len(payload),
+                                       type=FileStatusType.FILE,
+                                       modification_time=expected_mtime_min)
+
+        await fs.remove(expected_file_path)
+
+    @pytest.mark.asyncio
+    async def test_get_filestatus_dir(self, fs, tmp_dir_path):
+        expected_mtime_min = int(current_time())
+        file_relative = Path('nested')
+        expected_file_path = tmp_dir_path / file_relative
+
+        payload = b'test'
+        async with fs.open(expected_file_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        status = await fs.get_filestatus(tmp_dir_path)
+        self.assert_filestatus(status, path=tmp_dir_path,
+                                       size=0,
+                                       type=FileStatusType.DIRECTORY,
+                                       modification_time=expected_mtime_min)
+
+        await fs.remove(expected_file_path)

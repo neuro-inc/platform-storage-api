@@ -32,6 +32,10 @@ class Storage:
         real_path = self._resolve_real_path(PurePath(path))
         return await self._fs.liststatus(real_path)
 
+    async def get_filestatus(self, path: Union[PurePath, str]) -> FileStatus:
+        real_path = self._resolve_real_path(PurePath(path))
+        return await self._fs.get_filestatus(real_path)
+
     async def mkdir(self, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path)

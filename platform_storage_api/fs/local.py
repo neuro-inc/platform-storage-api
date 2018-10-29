@@ -5,11 +5,11 @@ import io
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import List, Optional
 
 import aiofiles
-from dataclasses import dataclass
 
 
 # TODO (A Danshyn 04/23/18): likely should be revisited
@@ -19,27 +19,44 @@ class StorageType(str, enum.Enum):
 
 
 class FileStatusType(str, enum.Enum):
-    FILE = 'FILE'
     DIRECTORY = 'DIRECTORY'
+    FILE = 'FILE'
+
+    def __str__(self):
+        return self.value
 
 
 @dataclass(frozen=True)
 class FileStatus:
     path: PurePath
-    size: int = 0
-    type: FileStatusType = FileStatusType.FILE
+    size: int
+    type: FileStatusType
+    modification_time: Optional[int] = None
 
     @property
     def is_dir(self):
         return self.type == FileStatusType.DIRECTORY
 
     @classmethod
-    def create_file_status(cls, path: PurePath, size: int) -> 'FileStatus':
-        return cls(path, size)  # type: ignore
+    def create_file_status(cls,
+                           path: PurePath,
+                           size: int,
+                           modification_time: Optional[int]=None
+                           ) -> 'FileStatus':
+        return cls(path=path,
+                   type=FileStatusType.FILE,
+                   size=size,
+                   modification_time=modification_time)
 
     @classmethod
-    def create_dir_status(cls, path: PurePath) -> 'FileStatus':
-        return cls(path, type=FileStatusType.DIRECTORY)  # type: ignore
+    def create_dir_status(cls,
+                          path: PurePath,
+                          modification_time: Optional[int]=None
+                          ) -> 'FileStatus':
+        return cls(path=path,
+                   type=FileStatusType.DIRECTORY,
+                   size=0,
+                   modification_time=modification_time)
 
 
 class FileSystem(metaclass=abc.ABCMeta):
@@ -78,6 +95,10 @@ class FileSystem(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def liststatus(self, path: PurePath) -> List[FileStatus]:
+        pass
+
+    @abc.abstractmethod
+    async def get_filestatus(self, path: PurePath) -> FileStatus:
         pass
 
     @abc.abstractmethod
@@ -131,6 +152,8 @@ class LocalFileSystem(FileSystem):
 
     def _convert_dir_entry_to_file_status(
             self, entry: os.DirEntry) -> FileStatus:
+        # TODO (A Yushkovskiy, 26.10.2018) Refact: re-use `_get_filedir_status`
+        # see issue #41
         path = PurePath(entry.name)
         if entry.is_dir():
             return FileStatus.create_dir_status(path)
@@ -142,6 +165,26 @@ class LocalFileSystem(FileSystem):
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
         return await self._loop.run_in_executor(
             self._executor, self._scandir, path)
+
+    @classmethod
+    def _get_filedir_status(cls, path: PurePath, name_only: bool=False) \
+            -> FileStatus:
+        with Path(path) as real_path:
+            stat = real_path.stat()
+            mtime = int(stat.st_mtime)  # converting float to int
+            path = PurePath(path.name) if name_only else path
+            if real_path.is_dir():
+                return FileStatus.create_dir_status(path,
+                                                    modification_time=mtime)
+            else:
+                return FileStatus.create_file_status(path,
+                                                     size=stat.st_size,
+                                                     modification_time=mtime)
+
+    async def get_filestatus(self, path: PurePath) -> FileStatus:
+        return await self._loop.run_in_executor(self._executor,
+                                                self._get_filedir_status,
+                                                path)
 
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)
