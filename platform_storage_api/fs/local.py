@@ -41,7 +41,8 @@ class FileStatus:
     def create_file_status(cls,
                            path: PurePath,
                            size: int,
-                           modification_time: int=None) -> 'FileStatus':
+                           modification_time: Optional[int]=None
+                           ) -> 'FileStatus':
         return cls(path=path,
                    type=FileStatusType.FILE,
                    size=size,
@@ -50,7 +51,8 @@ class FileStatus:
     @classmethod
     def create_dir_status(cls,
                           path: PurePath,
-                          modification_time: int=None) -> 'FileStatus':
+                          modification_time: Optional[int]=None
+                          ) -> 'FileStatus':
         return cls(path=path,
                    type=FileStatusType.DIRECTORY,
                    size=0,
