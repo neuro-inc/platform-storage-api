@@ -244,7 +244,7 @@ class TestLocalFileSystem:
         await fs.remove(expected_file_path)
 
     @pytest.mark.asyncio
-    async def test_get_filestatus_file(self, fs, tmp_dir_path):
+    async def test_get_filestatus_dir(self, fs, tmp_dir_path):
         expected_mtime_min = int(current_time())
         file_relative = Path('nested')
         expected_file_path = tmp_dir_path / file_relative

@@ -118,7 +118,6 @@ class LocalFileSystem(FileSystem):
             max_workers=self._executor_max_workers,
             thread_name_prefix='LocalFileSystemThread')
 
-
     async def close(self) -> None:
         if self._executor:
             self._executor.shutdown()
@@ -194,7 +193,6 @@ class LocalFileSystem(FileSystem):
 
     async def remove(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path)
-
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
