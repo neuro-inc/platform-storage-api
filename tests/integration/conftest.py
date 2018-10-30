@@ -136,9 +136,17 @@ async def granter(auth_client, admin_token):
 
 
 def assert_filestatus(actual: Dict, **expected) -> None:
-    for key, val in StorageHandler.filestatus_members_name_render_map.items():
-        if key in expected:
-            assert actual[key] == expected[val]
+    # same mapping as in `StorageHandler._convert_filestatus_to_primitive`
+    filestatus_members_render_map = {
+        'path':       'path',
+        'length':     'size',
+        'permission': 'permission',
+        'type':       'type',
+    }
+    for key_actual, key_expected in filestatus_members_render_map.items():
+        if key_expected in expected:
+            assert actual[key_actual] == expected[key_expected]
+
     if 'modification_time_min' in expected:
         assert actual['modificationTime'] >= expected['modification_time_min']
 
