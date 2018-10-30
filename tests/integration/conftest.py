@@ -9,15 +9,10 @@ import pytest
 from neuro_auth_client import AuthClient, User
 from yarl import URL
 
-from platform_storage_api.fs.local import FileStatus
-from platform_storage_api.api import create_app
-from platform_storage_api.config import (
-    AuthConfig,
-    Config,
-    EnvironConfigFactory,
-    ServerConfig,
-    StorageConfig,
-)
+from platform_storage_api.api import create_app, StorageHandler
+from platform_storage_api.config import (AuthConfig, Config,
+                                         EnvironConfigFactory, ServerConfig,
+                                         StorageConfig)
 from platform_storage_api.storage import Storage
 
 
@@ -140,15 +135,12 @@ async def granter(auth_client, admin_token):
     return f
 
 
-def assert_filestatus(response_json: Dict, **expected) -> None:
-    actual = FileStatus.from_primitive(**response_json)
-    for strict_key in ['type', 'length', 'permission']:
-        if strict_key in expected:
-            assert actual.__getattribute__(strict_key) == expected[strict_key]
-
+def assert_filestatus(actual: Dict, **expected) -> None:
+    for key, val in StorageHandler.filestatus_members_name_render_map.items():
+        if key in expected:
+            assert actual[key] == expected[val]
     if 'modification_time_min' in expected:
-        assert actual.__getattribute__('modification_time') >= \
-               expected['modification_time_min']
+        assert actual['modificationTime'] >= expected['modification_time_min']
 
 
 def assert_filestatus_list(actual_json_list: List,

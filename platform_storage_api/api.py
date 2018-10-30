@@ -167,7 +167,9 @@ class StorageHandler:
         filtered_statuses = self._liststatus_filter(statuses, access_tree)
         primitive_statuses = \
             {'FileStatuses':
-                 {'FileStatus': [s.to_primitive() for s in filtered_statuses]}
+                 {'FileStatus': [self._convert_filestatus_to_primitive(s)
+                                 for s in filtered_statuses]
+                 }
             }
 
         return aiohttp.web.json_response(primitive_statuses)
@@ -190,12 +192,12 @@ class StorageHandler:
             permission = 'read'
 
         try:
-            filestatus = await self._storage.get_filestatus(storage_path)
+            fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
 
-        filestatus = filestatus.with_permission(permission)
-        stat_dict = {'FileStatus': filestatus.to_primitive()}
+        fstat = fstat.with_permission(permission)
+        stat_dict = {'FileStatus': self._convert_filestatus_to_primitive(fstat)}
         return aiohttp.web.json_response(stat_dict)
 
     async def _handle_mkdirs(self, storage_path: PurePath):
@@ -213,6 +215,31 @@ class StorageHandler:
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound()
         raise aiohttp.web.HTTPNoContent()
+
+    filestatus_members_name_render_map = {
+        # 'object-member-name': 'api-member-name'
+        'path':              'path',
+        'size':              'length',
+        'modification_time': 'modificationTime',
+        'permission':        'permission',
+        'type':              'type',
+    }
+
+    @classmethod
+    def render_filestatus_member_name(cls, member_name: str):
+        if member_name in cls.filestatus_members_name_render_map:
+            return cls.filestatus_members_name_render_map[member_name]
+
+    @classmethod
+    def _convert_filestatus_to_primitive(cls, status: FileStatus):
+        names_map = cls.filestatus_members_name_render_map
+        return {
+            names_map['path']: str(status.path),
+            names_map['size']: status.size,
+            names_map['modification_time']: status.modification_time,
+            names_map['permission']: status.permission,
+            names_map['type']: str(status.type),
+        }
 
     async def _get_user_permissions_tree(self,
                                          request: Request,

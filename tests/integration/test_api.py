@@ -1,7 +1,6 @@
 import uuid
 from io import BytesIO
 from time import time as current_time
-from typing import Dict
 
 import aiohttp
 import aiohttp.web
@@ -65,7 +64,9 @@ class TestStorage:
         headers = {'Authorization': 'Bearer ' + user.token}
         dir_path = f'{user.name}/path/to'
         dir_url = f'{server_url}/{dir_path}'
-        url = dir_url + '/file'
+        file_name = 'file.txt'
+        url = f'{dir_url}/{file_name}'
+
         payload = b'test'
         mtime_min = int(current_time())
         async with client.put(url, headers=headers, data=BytesIO(payload)) \
@@ -77,8 +78,9 @@ class TestStorage:
                 as response:
             assert response.status == 200
             statuses = get_liststatus_dict(await response.json())
-            assert_filestatus(statuses[0],
-                              path=dir_path,
+            file_status = statuses[0]
+            assert_filestatus(file_status,
+                              path=file_name,
                               length=len(payload),
                               type=FileStatusType.FILE,
                               modification_time_min=mtime_min)
@@ -91,7 +93,8 @@ class TestStorage:
         headers = {'Authorization': 'Bearer ' + user.token}
         dir_path = f'{user.name}/path/to'
         dir_url = f'{server_url}/{dir_path}'
-        url = dir_url + '/file'
+        file_name = 'file.txt'
+        url = f'{dir_url}/{file_name}'
         payload = b'test'
 
         mtime_min = int(current_time())
@@ -103,7 +106,7 @@ class TestStorage:
                 as response:
             statuses = get_liststatus_dict(await response.json())
             assert_filestatus(statuses[0],
-                              path=dir_path,
+                              path=file_name,
                               length=len(payload),
                               type=FileStatusType.FILE,
                               modification_time_min=mtime_min)

@@ -123,7 +123,7 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
-            FileStatus(expected_path, length=0,
+            FileStatus(expected_path, size=0,
                        type=FileStatusType.FILE,
                        modification_time=expected_mtime)]
 
@@ -141,7 +141,7 @@ class TestLocalFileSystem:
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
             FileStatus(
-                expected_path, length=expected_size,
+                expected_path, size=expected_size,
                 type=FileStatusType.FILE,
                 modification_time=expected_mtime)]
 
@@ -155,7 +155,7 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
-            FileStatus(expected_path, length=0,
+            FileStatus(expected_path, size=0,
                        type=FileStatusType.DIRECTORY,
                        modification_time=expected_mtime)]
 
@@ -187,7 +187,7 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
-            FileStatus(expected_path, length=0,
+            FileStatus(expected_path, size=0,
                        type=FileStatusType.DIRECTORY,
                        modification_time=expected_mtime)]
 
@@ -211,7 +211,7 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(dir_path)
         assert statuses == [
-            FileStatus(Path('file'), length=4,
+            FileStatus(Path('file'), size=4,
                        type=FileStatusType.FILE,
                        modification_time=expected_mtime)]
 
@@ -232,7 +232,7 @@ class TestLocalFileSystem:
         expected_mtime = int(stat.st_mtime)
 
         statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [FileStatus(expected_path, length=4,
+        assert statuses == [FileStatus(expected_path, size=4,
                                        type=FileStatusType.FILE,
                                        modification_time=expected_mtime)]
 
@@ -255,7 +255,7 @@ class TestLocalFileSystem:
 
         status = await fs.get_filestatus(expected_file_path)
         assert status == FileStatus(path=expected_file_path,
-                                    length=len(payload),
+                                    size=len(payload),
                                     type=FileStatusType.FILE,
                                     modification_time=expected_mtime)
 
@@ -275,7 +275,7 @@ class TestLocalFileSystem:
 
         status = await fs.get_filestatus(tmp_dir_path)
         assert status == FileStatus(path=tmp_dir_path,
-                                    length=0,
+                                    size=0,
                                     type=FileStatusType.DIRECTORY,
                                     modification_time=expected_mtime)
 

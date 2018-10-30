@@ -71,7 +71,7 @@ class TestStorage:
 
         assert storage_stat.type == FileStatusType.FILE
         assert storage_stat.path == real_file_path
-        assert storage_stat.length == real_stat.st_size
+        assert storage_stat.size == real_stat.st_size
         assert storage_stat.modification_time == int(real_stat.st_mtime)
 
     @pytest.mark.asyncio
@@ -91,5 +91,5 @@ class TestStorage:
 
         assert storage_stat.type == FileStatusType.DIRECTORY
         assert storage_stat.path == real_dir_path
-        assert storage_stat.length == 0
+        assert storage_stat.size == 0
         assert storage_stat.modification_time == int(real_stat.st_mtime)
