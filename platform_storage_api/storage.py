@@ -5,8 +5,7 @@ from .fs.local import FileStatus, FileSystem, copy_streams
 
 
 class Storage:
-    def __init__(
-            self, fs: FileSystem, base_path: Union[PurePath, str]) -> None:
+    def __init__(self, fs: FileSystem, base_path: Union[PurePath, str]) -> None:
         self._fs = fs
         self._base_path = PurePath(base_path)
 
@@ -14,21 +13,20 @@ class Storage:
 
     def _resolve_real_path(self, path: PurePath) -> PurePath:
         # TODO: (A Danshyn 04/23/18): validate paths
-        return PurePath(self._base_path, path.relative_to('/'))
+        return PurePath(self._base_path, path.relative_to("/"))
 
     async def store(self, outstream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
-        async with self._fs.open(real_path, 'wb') as f:
+        async with self._fs.open(real_path, "wb") as f:
             await copy_streams(outstream, f)
 
     async def retrieve(self, instream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
-        async with self._fs.open(real_path, 'rb') as f:
+        async with self._fs.open(real_path, "rb") as f:
             await copy_streams(f, instream)
 
-    async def liststatus(
-            self, path: Union[PurePath, str]) -> List[FileStatus]:
+    async def liststatus(self, path: Union[PurePath, str]) -> List[FileStatus]:
         real_path = self._resolve_real_path(PurePath(path))
         return await self._fs.liststatus(real_path)
 
