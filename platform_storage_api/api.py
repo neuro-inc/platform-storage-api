@@ -7,15 +7,17 @@ from typing import Any, Dict, List, Optional
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
-from aiohttp_security import check_authorized, check_permission
-from async_exit_stack import AsyncExitStack
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
 
+from aiohttp_security import check_authorized, check_permission
+from async_exit_stack import AsyncExitStack
+
 from .config import Config
 from .fs.local import FileStatus, LocalFileSystem
 from .storage import Storage
+
 
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
 
@@ -24,9 +26,7 @@ logger = logging.getLogger(__name__)
 
 class ApiHandler:
     def register(self, app):
-        app.add_routes((
-            aiohttp.web.get('/ping', self.handle_ping),
-        ))
+        app.add_routes((aiohttp.web.get("/ping", self.handle_ping),))
 
     async def handle_ping(self, request):
         return aiohttp.web.Response()
@@ -41,12 +41,13 @@ class StorageOperation(str, Enum):
     The FILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     """
-    CREATE = 'CREATE'
-    OPEN = 'OPEN'
-    LISTSTATUS = 'LISTSTATUS'
-    FILESTATUS = 'FILESTATUS'
-    MKDIRS = 'MKDIRS'
-    DELETE = 'DELETE'
+
+    CREATE = "CREATE"
+    OPEN = "OPEN"
+    LISTSTATUS = "LISTSTATUS"
+    FILESTATUS = "FILESTATUS"
+    MKDIRS = "MKDIRS"
+    DELETE = "DELETE"
 
     @classmethod
     def values(cls):
@@ -54,20 +55,22 @@ class StorageOperation(str, Enum):
 
 
 class StorageHandler:
-    def __init__(self, app: aiohttp.web.Application,
-                 storage: Storage,
-                 config: Config) -> None:
+    def __init__(
+        self, app: aiohttp.web.Application, storage: Storage, config: Config
+    ) -> None:
         self._app = app
         self._storage = storage
         self._config = config
 
     def register(self, app):
-        app.add_routes((
-            # TODO (A Danshyn 04/23/18): add some unit test for path matching
-            aiohttp.web.put(r'/{path:.*}', self.handle_put),
-            aiohttp.web.get(r'/{path:.*}', self.handle_get),
-            aiohttp.web.delete(r'/{path:.*}', self.handle_delete),
-        ))
+        app.add_routes(
+            (
+                # TODO (A Danshyn 04/23/18): add some unit test for path matching
+                aiohttp.web.put(r"/{path:.*}", self.handle_put),
+                aiohttp.web.get(r"/{path:.*}", self.handle_get),
+                aiohttp.web.delete(r"/{path:.*}", self.handle_delete),
+            )
+        )
 
     async def handle_put(self, request: Request):
         operation = self._parse_put_operation(request)
@@ -79,7 +82,7 @@ class StorageHandler:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, str(storage_path))
             return await self._handle_mkdirs(storage_path)
-        raise ValueError(f'Illegal operation: {operation}')
+        raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_get(self, request: Request):
         operation = self._parse_get_operation(request)
@@ -89,14 +92,13 @@ class StorageHandler:
             return await self._handle_open(request, storage_path)
         elif operation == StorageOperation.LISTSTATUS:
             storage_path = self._get_fs_path_from_request(request)
-            tree = await self._get_user_permissions_tree(request,
-                                                         str(storage_path))
+            tree = await self._get_user_permissions_tree(request, str(storage_path))
             return await self._handle_liststatus(storage_path, tree)
         elif operation == StorageOperation.FILESTATUS:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, str(storage_path))
             return await self._handle_filestatus(storage_path, tree)
-        raise ValueError(f'Illegal operation: {operation}')
+        raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_delete(self, request: Request):
         operation = self._parse_delete_operation(request)
@@ -104,10 +106,10 @@ class StorageHandler:
             storage_path: PurePath = self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, str(storage_path))
             await self._handle_delete(storage_path)
-        raise ValueError(f'Illegal operation: {operation}')
+        raise ValueError(f"Illegal operation: {operation}")
 
     def _get_fs_path_from_request(self, request):
-        return PurePath('/', request.match_info['path'])
+        return PurePath("/", request.match_info["path"])
 
     async def _handle_create(self, request, storage_path: PurePath):
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
@@ -117,16 +119,16 @@ class StorageHandler:
     def _parse_operation(self, request) -> Optional[StorageOperation]:
         ops = []
 
-        if 'op' in request.query:
-            ops.append(request.query['op'].upper())
+        if "op" in request.query:
+            ops.append(request.query["op"].upper())
 
         op_values = set(StorageOperation.values())
         param_names = set(name.upper() for name in request.query)
         ops += op_values & param_names
 
         if len(ops) > 1:
-            ops_str = ', '.join(ops)
-            raise ValueError(f'Ambiguous operations: {ops_str}')
+            ops_str = ", ".join(ops)
+            raise ValueError(f"Ambiguous operations: {ops_str}")
 
         if ops:
             return StorageOperation(ops[0])
@@ -151,9 +153,10 @@ class StorageHandler:
 
         return response
 
-    async def _handle_liststatus(self, storage_path: PurePath,
-                                 access_tree: ClientSubTreeViewRoot):
-        if access_tree.sub_tree.action == 'deny':
+    async def _handle_liststatus(
+        self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
+    ):
+        if access_tree.sub_tree.action == "deny":
             raise aiohttp.web.HTTPNotFound
 
         try:
@@ -165,29 +168,27 @@ class StorageHandler:
 
         primitive_statuses = [
             self._convert_file_status_to_primitive(status)
-            for status in filtered_statuses]
+            for status in filtered_statuses
+        ]
         return aiohttp.web.json_response(primitive_statuses)
 
-    def _liststatus_filter(self,
-                           statuses: List[FileStatus],
-                           access_tree: ClientSubTreeViewRoot
-                           ) -> List[FileStatus]:
-        if access_tree.sub_tree.action != 'list':
+    def _liststatus_filter(
+        self, statuses: List[FileStatus], access_tree: ClientSubTreeViewRoot
+    ) -> List[FileStatus]:
+        if access_tree.sub_tree.action != "list":
             return statuses
 
         visible_children = access_tree.sub_tree.children
-        return [status
-                for status in statuses
-                if str(status.path) in visible_children
-                ]
+        return [status for status in statuses if str(status.path) in visible_children]
 
-    async def _handle_filestatus(self, storage_path: PurePath,
-                                 access_tree: ClientSubTreeViewRoot):
+    async def _handle_filestatus(
+        self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
+    ):
         action = access_tree.sub_tree.action
-        if action == 'deny':
+        if action == "deny":
             raise aiohttp.web.HTTPNotFound
-        elif action == 'list':
-            action = 'read'
+        elif action == "list":
+            action = "read"
 
         try:
             filestatus = await self._storage.get_filestatus(storage_path)
@@ -202,8 +203,8 @@ class StorageHandler:
             await self._storage.mkdir(storage_path)
         except FileExistsError:
             return aiohttp.web.json_response(
-                {'error': 'File exists'},
-                status=aiohttp.web.HTTPBadRequest.status_code)
+                {"error": "File exists"}, status=aiohttp.web.HTTPBadRequest.status_code
+            )
         raise aiohttp.web.HTTPCreated()
 
     async def _handle_delete(self, storage_path: PurePath):
@@ -217,40 +218,35 @@ class StorageHandler:
     def _stat_to_dict(cls, stat: FileStatus, action: str) -> Dict[str, Any]:
         # TODO (A Yushkovskiy, 26.10.2018) Refact: re-use the method
         # `_convert_file_status_to_primitive` , see issue #41
-        return {"FileStatus": {
-            "length"           : stat.size,
-            "modificationTime" : stat.modification_time,
-            "permission"       : action,
-            "type"             : ("DIRECTORY" if stat.is_dir else "FILE")
-        }}
-
-    def _convert_file_status_to_primitive(self, status: FileStatus):
         return {
-            'path': str(status.path),
-            'size': status.size,
-            'type': status.type,
+            "FileStatus": {
+                "length": stat.size,
+                "modificationTime": stat.modification_time,
+                "permission": action,
+                "type": ("DIRECTORY" if stat.is_dir else "FILE"),
+            }
         }
 
-    async def _get_user_permissions_tree(self,
-                                         request: Request,
-                                         target_path: str
-                                         ) -> ClientSubTreeViewRoot:
+    def _convert_file_status_to_primitive(self, status: FileStatus):
+        return {"path": str(status.path), "size": status.size, "type": status.type}
+
+    async def _get_user_permissions_tree(
+        self, request: Request, target_path: str
+    ) -> ClientSubTreeViewRoot:
         username = await self._get_user_from_request(request)
         auth_client = self._get_auth_client()
-        target_path_uri = f'storage:/{target_path}'
-        tree = await auth_client.get_permissions_tree(
-            username.name,
-            target_path_uri)
+        target_path_uri = f"storage:/{target_path}"
+        tree = await auth_client.get_permissions_tree(username.name, target_path_uri)
         return tree
 
     async def _check_user_permissions(self, request, target_path: str) -> None:
-        uri = f'storage:/{target_path}'
-        if request.method in ('HEAD', 'GET'):
-            action = 'read'
+        uri = f"storage:/{target_path}"
+        if request.method in ("HEAD", "GET"):
+            action = "read"
         else:  # POST, PUT, PATCH, DELETE
-            action = 'write'
+            action = "write"
         permission = Permission(uri=uri, action=action)
-        logger.info(f'Checking {permission}')
+        logger.info(f"Checking {permission}")
         # TODO (Rafa Zubairov): test if user accessing his own data,
         # then use JWT token claims
         try:
@@ -260,9 +256,9 @@ class StorageHandler:
             self._raise_unauthorized()
 
     def _raise_unauthorized(self) -> None:
-        raise HTTPUnauthorized(headers={
-            'WWW-Authenticate': f'Bearer realm="{self._config.server.name}"',
-        })
+        raise HTTPUnauthorized(
+            headers={"WWW-Authenticate": f'Bearer realm="{self._config.server.name}"'}
+        )
 
     async def _get_user_from_request(self, request: Request) -> User:
         try:
@@ -274,7 +270,7 @@ class StorageHandler:
         return User(name=user_name)
 
     def _get_auth_client(self) -> AuthClient:
-        return self._app['auth_client']
+        return self._app["auth_client"]
 
 
 @aiohttp.web.middleware
@@ -282,44 +278,47 @@ async def handle_exceptions(request, handler):
     try:
         return await handler(request)
     except ValueError as e:
-        payload = {'error': str(e)}
+        payload = {"error": str(e)}
         return aiohttp.web.json_response(
-            payload, status=aiohttp.web.HTTPBadRequest.status_code)
+            payload, status=aiohttp.web.HTTPBadRequest.status_code
+        )
     except aiohttp.web.HTTPException:
         raise
     except Exception as e:
         msg_str = (
-            f'Unexpected exception: {str(e)}. '
-            f'Path with query: {request.path_qs}.')
+            f"Unexpected exception: {str(e)}. " f"Path with query: {request.path_qs}."
+        )
         logging.exception(msg_str)
-        payload = {'error': msg_str}
+        payload = {"error": msg_str}
         return aiohttp.web.json_response(
-            payload, status=aiohttp.web.HTTPInternalServerError.status_code)
+            payload, status=aiohttp.web.HTTPInternalServerError.status_code
+        )
 
 
 async def create_app(config: Config, storage: Storage):
     app = aiohttp.web.Application(middlewares=[handle_exceptions])
-    app['config'] = config
+    app["config"] = config
 
     async def _init_app(app: aiohttp.web.Application):
         async with AsyncExitStack() as exit_stack:
-            logger.info('Initializing Auth Client For Storage API')
+            logger.info("Initializing Auth Client For Storage API")
 
-            auth_client = await exit_stack.enter_async_context(AuthClient(
-                url=config.auth.server_endpoint_url,
-                token=config.auth.service_token,
-            ))
-
-            await setup_security(
-                app=app,
-                auth_client=auth_client,
-                auth_scheme=AuthScheme.BEARER
+            auth_client = await exit_stack.enter_async_context(
+                AuthClient(
+                    url=config.auth.server_endpoint_url, token=config.auth.service_token
+                )
             )
 
-            app['api_v1']['auth_client'] = auth_client
+            await setup_security(
+                app=app, auth_client=auth_client, auth_scheme=AuthScheme.BEARER
+            )
 
-            logger.info(f"Auth Client for Storage API Initialized. "
-                        f"URL={config.auth.server_endpoint_url}")
+            app["api_v1"]["auth_client"] = auth_client
+
+            logger.info(
+                f"Auth Client for Storage API Initialized. "
+                f"URL={config.auth.server_endpoint_url}"
+            )
 
             # TODO (Rafa Zubairov): configured service shall ensure that
             # pre-requisites are up and running
@@ -335,14 +334,14 @@ async def create_app(config: Config, storage: Storage):
     api_v1_app = aiohttp.web.Application()
     api_v1_handler = ApiHandler()
     api_v1_handler.register(api_v1_app)
-    app['api_v1'] = api_v1_app
+    app["api_v1"] = api_v1_app
 
     storage_app = aiohttp.web.Application()
     storage_handler = StorageHandler(api_v1_app, storage, config)
     storage_handler.register(storage_app)
 
-    api_v1_app.add_subapp('/storage', storage_app)
-    app.add_subapp('/api/v1', api_v1_app)
+    api_v1_app.add_subapp("/storage", storage_app)
+    app.add_subapp("/api/v1", api_v1_app)
 
     logger.info("Storage API has been initialized, ready to serve.")
 
@@ -352,13 +351,14 @@ async def create_app(config: Config, storage: Storage):
 def init_logging():
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
 
 
 def main():
     init_logging()
     config = Config.from_environ()
-    logging.info('Loaded config: %r', config)
+    logging.info("Loaded config: %r", config)
 
     loop = asyncio.get_event_loop()
 
@@ -367,9 +367,9 @@ def main():
 
     async def _init_storage(app):
         async with fs:
-            logging.info('Initializing the storage file system')
+            logging.info("Initializing the storage file system")
             yield
-            logging.info('Closing the storage file system')
+            logging.info("Closing the storage file system")
 
     app = loop.run_until_complete(create_app(config, storage))
     app.cleanup_ctx.append(_init_storage)
