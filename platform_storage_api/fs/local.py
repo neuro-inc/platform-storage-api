@@ -25,6 +25,7 @@ class FileStatusType(str, enum.Enum):
     def __str__(self):
         return self.value
 
+
 @dataclass(frozen=True)
 class FileStatus:
     path: PurePath

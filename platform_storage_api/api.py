@@ -220,7 +220,7 @@ class StorageHandler:
     def _convert_filestatus_to_primitive(cls, status: FileStatus):
         return {
             'path':              str(status.path),
-            'size':              status.size,
+            'length':            status.size,
             'modificationTime':  status.modification_time,
             'permission':        status.permission,
             'type':              str(status.type),

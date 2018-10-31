@@ -1,10 +1,11 @@
 from io import BytesIO
-
 from time import time as current_time
+from unittest import mock
+
 import pytest
 
 from platform_storage_api.fs.local import FileStatusType
-from .conftest import assert_filestatus, assert_filestatus_list
+
 from ..conftest import get_liststatus_dict
 
 
@@ -68,18 +69,23 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
             statuses = get_liststatus_dict(await response.json())
-            assert_filestatus_list(statuses, self.file_status_sort, [
+            statuses = sorted(statuses, key=self.file_status_sort)
+            assert statuses == [
                 {'path': 'file',
                  'length': len(payload),
-                 'type': FileStatusType.FILE,
-                 'modification_time_min': min_mtime_first,
+                 'type': str(FileStatusType.FILE),
+                 'modificationTime': mock.ANY,
+                 'permission': None,
                  },
                 {'path': 'second',
                  'length': 0,
-                 'type': FileStatusType.DIRECTORY,
-                 'modification_time_min': min_mtime_first,
-                }
-            ])
+                 'type': str(FileStatusType.DIRECTORY),
+                 'modificationTime': mock.ANY,
+                 'permission': None,
+                 },
+            ]
+            for status in statuses:
+                assert status['modificationTime'] >= min_mtime_first
 
     @pytest.mark.asyncio
     async def test_ls_other_user_data_exclude_files(
@@ -110,7 +116,6 @@ class TestStorageListAndResourceSharing:
         params = {"op": "LISTSTATUS"}
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 404
-            statuses = await response.text()
 
         await granter(
             user2.name,
@@ -121,13 +126,18 @@ class TestStorageListAndResourceSharing:
             assert response.status == 200
 
             statuses = get_liststatus_dict(await response.json())
-            assert_filestatus_list(statuses, self.file_status_sort, [
+            statuses = sorted(statuses, key=self.file_status_sort)
+            assert statuses == [
                 {'path': 'first',
                  'length': 0,
-                 'type': FileStatusType.DIRECTORY,
-                 'modification_time_min': min_mtime_first,
-                 }
-            ])
+                 'type': str(FileStatusType.DIRECTORY),
+                 'modificationTime': mock.ANY,
+                 'permission': None,
+                 },
+            ]
+            for status in statuses:
+                assert status['modificationTime'] >= min_mtime_first
+
 
     @pytest.mark.asyncio
     async def test_liststatus_other_user_data_two_subdirs(
@@ -184,15 +194,20 @@ class TestStorageListAndResourceSharing:
         ) as response:
             assert response.status == 200
             statuses = get_liststatus_dict(await response.json())
-            assert_filestatus_list(statuses, self.file_status_sort, [
+            statuses = sorted(statuses, key=self.file_status_sort)
+            assert statuses == [
                 {'path': 'second',
                  'length': 0,
-                 'type': FileStatusType.DIRECTORY,
-                 'modification_time_min': min_mtime_second,
+                 'type': str(FileStatusType.DIRECTORY),
+                 'modificationTime': mock.ANY,
+                 'permission': None,
                  },
                 {'path': 'third',
                  'length': 0,
-                 'type': FileStatusType.DIRECTORY,
-                 'modification_time_min': min_mtime_third,
+                 'type': str(FileStatusType.DIRECTORY),
+                 'modificationTime': mock.ANY,
+                 'permission': None,
                 },
-            ])
+            ]
+            assert statuses[0]['modificationTime'] >= min_mtime_second
+            assert statuses[1]['modificationTime'] >= min_mtime_third
