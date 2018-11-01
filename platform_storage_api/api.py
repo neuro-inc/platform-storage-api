@@ -2,7 +2,7 @@ import asyncio
 import logging
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, Dict, List, Optional
+from typing import List, Optional, Iterator
 
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
@@ -176,21 +176,29 @@ class StorageHandler:
 
     def _liststatus_filter(
         self, statuses: List[FileStatus], access_tree: ClientSubTreeViewRoot
-    ) -> List[FileStatus]:
-        if access_tree.sub_tree.action != "list":
-            return statuses
+    ) -> Iterator[FileStatus]:
+        tree = access_tree.sub_tree
+        is_list_action = tree.action == "list"
+        for status in statuses:
+            sub_tree = tree.children.get(str(status.path))
+            if is_list_action and not sub_tree:
+                continue
 
-        visible_children = access_tree.sub_tree.children
-        return [status for status in statuses if str(status.path) in visible_children]
+            action = sub_tree.action if sub_tree else tree.action
+            yield status.with_permission(self._convert_action_to_permission(action))
+
+    def _convert_action_to_permission(self, action: str) -> str:
+        if action == "list":
+            return "read"
+        return action
 
     async def _handle_filestatus(
         self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
     ):
-        permission = access_tree.sub_tree.action
-        if permission == "deny":
+        action = access_tree.sub_tree.action
+        if action == "deny":
             raise aiohttp.web.HTTPNotFound
-        elif permission == "list":
-            permission = "read"
+        permission = self._convert_action_to_permission(action)
 
         try:
             fstat = await self._storage.get_filestatus(storage_path)
