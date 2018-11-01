@@ -7,12 +7,11 @@ from typing import Any, Dict, List, Optional
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
+from aiohttp_security import check_authorized, check_permission
+from async_exit_stack import AsyncExitStack
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
-
-from aiohttp_security import check_authorized, check_permission
-from async_exit_stack import AsyncExitStack
 
 from .config import Config
 from .fs.local import FileStatus, LocalFileSystem
@@ -165,11 +164,14 @@ class StorageHandler:
             raise aiohttp.web.HTTPNotFound
 
         filtered_statuses = self._liststatus_filter(statuses, access_tree)
+        primitive_statuses = {
+            "FileStatuses": {
+                "FileStatus": [
+                    self._convert_filestatus_to_primitive(s) for s in filtered_statuses
+                ]
+            }
+        }
 
-        primitive_statuses = [
-            self._convert_file_status_to_primitive(status)
-            for status in filtered_statuses
-        ]
         return aiohttp.web.json_response(primitive_statuses)
 
     def _liststatus_filter(
@@ -184,18 +186,19 @@ class StorageHandler:
     async def _handle_filestatus(
         self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
     ):
-        action = access_tree.sub_tree.action
-        if action == "deny":
+        permission = access_tree.sub_tree.action
+        if permission == "deny":
             raise aiohttp.web.HTTPNotFound
-        elif action == "list":
-            action = "read"
+        elif permission == "list":
+            permission = "read"
 
         try:
-            filestatus = await self._storage.get_filestatus(storage_path)
+            fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
 
-        stat_dict = self._stat_to_dict(filestatus, action)
+        fstat = fstat.with_permission(permission)
+        stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
         return aiohttp.web.json_response(stat_dict)
 
     async def _handle_mkdirs(self, storage_path: PurePath):
@@ -215,20 +218,14 @@ class StorageHandler:
         raise aiohttp.web.HTTPNoContent()
 
     @classmethod
-    def _stat_to_dict(cls, stat: FileStatus, action: str) -> Dict[str, Any]:
-        # TODO (A Yushkovskiy, 26.10.2018) Refact: re-use the method
-        # `_convert_file_status_to_primitive` , see issue #41
+    def _convert_filestatus_to_primitive(cls, status: FileStatus):
         return {
-            "FileStatus": {
-                "length": stat.size,
-                "modificationTime": stat.modification_time,
-                "permission": action,
-                "type": ("DIRECTORY" if stat.is_dir else "FILE"),
-            }
+            "path": str(status.path),
+            "length": status.size,
+            "modificationTime": status.modification_time,
+            "permission": status.permission,
+            "type": str(status.type),
         }
-
-    def _convert_file_status_to_primitive(self, status: FileStatus):
-        return {"path": str(status.path), "size": status.size, "type": status.type}
 
     async def _get_user_permissions_tree(
         self, request: Request, target_path: str

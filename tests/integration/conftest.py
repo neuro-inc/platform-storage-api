@@ -6,10 +6,10 @@ from typing import NamedTuple, Optional
 
 import aiohttp
 import pytest
+from jose import jwt
 from neuro_auth_client import AuthClient, User
 from yarl import URL
 
-from jose import jwt
 from platform_storage_api.api import create_app
 from platform_storage_api.config import (
     AuthConfig,

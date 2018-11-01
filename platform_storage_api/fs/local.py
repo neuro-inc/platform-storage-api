@@ -29,17 +29,18 @@ class FileStatusType(str, enum.Enum):
 @dataclass(frozen=True)
 class FileStatus:
     path: PurePath
-    size: int
     type: FileStatusType
+    size: int
     modification_time: Optional[int] = None
-
-    @property
-    def is_dir(self):
-        return self.type == FileStatusType.DIRECTORY
+    # TODO (A Yushkovskiy 29.10.2018): permission should be Action, not a string
+    permission: Optional[str] = None
 
     @classmethod
     def create_file_status(
-        cls, path: PurePath, size: int, modification_time: Optional[int] = None
+        cls,
+        path: PurePath,
+        size: Optional[int] = None,
+        modification_time: Optional[int] = None,
     ) -> "FileStatus":
         return cls(
             path=path,
@@ -57,6 +58,15 @@ class FileStatus:
             type=FileStatusType.DIRECTORY,
             size=0,
             modification_time=modification_time,
+        )
+
+    def with_permission(self, permission: str) -> "FileStatus":
+        return FileStatus(
+            path=self.path,
+            type=self.type,
+            size=self.size,
+            modification_time=self.modification_time,
+            permission=permission,
         )
 
 
@@ -143,43 +153,43 @@ class LocalFileSystem(FileSystem):
     async def mkdir(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._mkdir, path)
 
-    def _scandir(self, path: PurePath) -> List[FileStatus]:
+    @classmethod
+    def _create_filestatus(
+        cls, path: PurePath, basename_only: Optional[bool] = False
+    ) -> "FileStatus":
+        with Path(path) as real_path:
+            stat = real_path.stat()
+            mod_time = int(stat.st_mtime)  # converting float to int
+            path = PurePath(path.name) if basename_only else path
+            if real_path.is_dir():
+                return FileStatus.create_dir_status(path, modification_time=mod_time)
+            else:
+                size = stat.st_size
+                return FileStatus.create_file_status(
+                    path, size, modification_time=mod_time
+                )
+
+    @classmethod
+    def _scandir(cls, path: PurePath) -> List[FileStatus]:
         statuses = []
         with os.scandir(path) as dir_iter:
             for entry in dir_iter:
-                status = self._convert_dir_entry_to_file_status(entry)
+                entry_path = PurePath(entry)
+                status = cls._create_filestatus(entry_path, basename_only=True)
                 statuses.append(status)
         return statuses
-
-    def _convert_dir_entry_to_file_status(self, entry: os.DirEntry) -> FileStatus:
-        # TODO (A Yushkovskiy, 26.10.2018) Refact: re-use `_get_filedir_status`
-        # see issue #41
-        path = PurePath(entry.name)
-        if entry.is_dir():
-            return FileStatus.create_dir_status(path)
-        else:
-            return FileStatus.create_file_status(path, size=entry.stat().st_size)
 
     async def liststatus(self, path: PurePath) -> List[FileStatus]:
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
         return await self._loop.run_in_executor(self._executor, self._scandir, path)
 
     @classmethod
-    def _get_filedir_status(cls, path: PurePath, name_only: bool = False) -> FileStatus:
-        with Path(path) as real_path:
-            stat = real_path.stat()
-            mtime = int(stat.st_mtime)  # converting float to int
-            path = PurePath(path.name) if name_only else path
-            if real_path.is_dir():
-                return FileStatus.create_dir_status(path, modification_time=mtime)
-            else:
-                return FileStatus.create_file_status(
-                    path, size=stat.st_size, modification_time=mtime
-                )
+    def _get_file_or_dir_status(cls, path: PurePath) -> FileStatus:
+        return cls._create_filestatus(path, basename_only=False)
 
     async def get_filestatus(self, path: PurePath) -> FileStatus:
         return await self._loop.run_in_executor(
-            self._executor, self._get_filedir_status, path
+            self._executor, self._get_file_or_dir_status, path
         )
 
     def _remove(self, path: PurePath) -> None:
