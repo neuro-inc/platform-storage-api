@@ -123,9 +123,13 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
-            FileStatus(expected_path, size=0,
-                       type=FileStatusType.FILE,
-                       modification_time=expected_mtime)]
+            FileStatus(
+                expected_path,
+                size=0,
+                type=FileStatusType.FILE,
+                modification_time=expected_mtime,
+            )
+        ]
 
     @pytest.mark.asyncio
     async def test_liststatus_single_file(self, fs, tmp_dir_path, tmp_file):
@@ -141,9 +145,12 @@ class TestLocalFileSystem:
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
             FileStatus(
-                expected_path, size=expected_size,
+                expected_path,
+                size=expected_size,
                 type=FileStatusType.FILE,
-                modification_time=expected_mtime)]
+                modification_time=expected_mtime,
+            )
+        ]
 
     @pytest.mark.asyncio
     async def test_liststatus_single_dir(self, fs, tmp_dir_path):
@@ -155,9 +162,13 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
-            FileStatus(expected_path, size=0,
-                       type=FileStatusType.DIRECTORY,
-                       modification_time=expected_mtime)]
+            FileStatus(
+                expected_path,
+                size=0,
+                type=FileStatusType.DIRECTORY,
+                modification_time=expected_mtime,
+            )
+        ]
 
     @pytest.mark.asyncio
     async def test_liststatus_non_existent_dir(self, fs, tmp_dir_path):
@@ -187,9 +198,13 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
-            FileStatus(expected_path, size=0,
-                       type=FileStatusType.DIRECTORY,
-                       modification_time=expected_mtime)]
+            FileStatus(
+                expected_path,
+                size=0,
+                type=FileStatusType.DIRECTORY,
+                modification_time=expected_mtime,
+            )
+        ]
 
         await fs.remove(path)
 
@@ -202,8 +217,8 @@ class TestLocalFileSystem:
         dir_path = tmp_dir_path / expected_path
         file_path = dir_path / "file"
         await fs.mkdir(dir_path)
-        async with fs.open(file_path, mode='wb') as f:
-            await f.write(b'test')
+        async with fs.open(file_path, mode="wb") as f:
+            await f.write(b"test")
             await f.flush()
 
         stat = os.stat(file_path)
@@ -211,9 +226,13 @@ class TestLocalFileSystem:
 
         statuses = await fs.liststatus(dir_path)
         assert statuses == [
-            FileStatus(Path('file'), size=4,
-                       type=FileStatusType.FILE,
-                       modification_time=expected_mtime)]
+            FileStatus(
+                Path("file"),
+                size=4,
+                type=FileStatusType.FILE,
+                modification_time=expected_mtime,
+            )
+        ]
 
         await fs.remove(dir_path)
 
@@ -232,9 +251,14 @@ class TestLocalFileSystem:
         expected_mtime = int(stat.st_mtime)
 
         statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [FileStatus(expected_path, size=4,
-                                       type=FileStatusType.FILE,
-                                       modification_time=expected_mtime)]
+        assert statuses == [
+            FileStatus(
+                expected_path,
+                size=4,
+                type=FileStatusType.FILE,
+                modification_time=expected_mtime,
+            )
+        ]
 
         await fs.remove(path)
 
@@ -243,7 +267,7 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_get_filestatus_file(self, fs, tmp_dir_path):
-        file_relative = Path('nested')
+        file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
 
         payload = b"test"
@@ -254,16 +278,18 @@ class TestLocalFileSystem:
         expected_mtime = int(stat.st_mtime)
 
         status = await fs.get_filestatus(expected_file_path)
-        assert status == FileStatus(path=expected_file_path,
-                                    size=len(payload),
-                                    type=FileStatusType.FILE,
-                                    modification_time=expected_mtime)
+        assert status == FileStatus(
+            path=expected_file_path,
+            size=len(payload),
+            type=FileStatusType.FILE,
+            modification_time=expected_mtime,
+        )
 
         await fs.remove(expected_file_path)
 
     @pytest.mark.asyncio
     async def test_get_filestatus_dir(self, fs, tmp_dir_path):
-        file_relative = Path('nested')
+        file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
 
         payload = b"test"
@@ -274,9 +300,11 @@ class TestLocalFileSystem:
         expected_mtime = int(stat.st_mtime)
 
         status = await fs.get_filestatus(tmp_dir_path)
-        assert status == FileStatus(path=tmp_dir_path,
-                                    size=0,
-                                    type=FileStatusType.DIRECTORY,
-                                    modification_time=expected_mtime)
+        assert status == FileStatus(
+            path=tmp_dir_path,
+            size=0,
+            type=FileStatusType.DIRECTORY,
+            modification_time=expected_mtime,
+        )
 
         await fs.remove(expected_file_path)

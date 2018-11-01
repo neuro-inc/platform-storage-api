@@ -36,32 +36,38 @@ class FileStatus:
     permission: Optional[str] = None
 
     @classmethod
-    def create_file_status(cls,
-                           path: PurePath,
-                           size: Optional[int] = None,
-                           modification_time: Optional[int] = None,
-                           ) -> 'FileStatus':
-        return cls(path=path,
-                   type=FileStatusType.FILE,
-                   size=size,
-                   modification_time=modification_time)
+    def create_file_status(
+        cls,
+        path: PurePath,
+        size: Optional[int] = None,
+        modification_time: Optional[int] = None,
+    ) -> "FileStatus":
+        return cls(
+            path=path,
+            type=FileStatusType.FILE,
+            size=size,
+            modification_time=modification_time,
+        )
 
     @classmethod
-    def create_dir_status(cls,
-                          path: PurePath,
-                          modification_time: Optional[int] = None,
-                          ) -> 'FileStatus':
-        return cls(path=path,
-                   type=FileStatusType.DIRECTORY,
-                   size=0,
-                   modification_time=modification_time)
+    def create_dir_status(
+        cls, path: PurePath, modification_time: Optional[int] = None
+    ) -> "FileStatus":
+        return cls(
+            path=path,
+            type=FileStatusType.DIRECTORY,
+            size=0,
+            modification_time=modification_time,
+        )
 
-    def with_permission(self, permission: str) -> 'FileStatus':
-        return FileStatus(path=self.path,
-                          type=self.type,
-                          size=self.size,
-                          modification_time=self.modification_time,
-                          permission=permission)
+    def with_permission(self, permission: str) -> "FileStatus":
+        return FileStatus(
+            path=self.path,
+            type=self.type,
+            size=self.size,
+            modification_time=self.modification_time,
+            permission=permission,
+        )
 
 
 class FileSystem(metaclass=abc.ABCMeta):
@@ -148,21 +154,20 @@ class LocalFileSystem(FileSystem):
         await self._loop.run_in_executor(self._executor, self._mkdir, path)
 
     @classmethod
-    def _create_filestatus(cls,
-                           path: PurePath,
-                           basename_only: Optional[bool] = False,
-                           ) -> 'FileStatus':
+    def _create_filestatus(
+        cls, path: PurePath, basename_only: Optional[bool] = False
+    ) -> "FileStatus":
         with Path(path) as real_path:
             stat = real_path.stat()
             mod_time = int(stat.st_mtime)  # converting float to int
             path = PurePath(path.name) if basename_only else path
             if real_path.is_dir():
-                return FileStatus.create_dir_status(path,
-                                                    modification_time=mod_time)
+                return FileStatus.create_dir_status(path, modification_time=mod_time)
             else:
                 size = stat.st_size
-                return FileStatus.create_file_status(path, size,
-                                                     modification_time=mod_time)
+                return FileStatus.create_file_status(
+                    path, size, modification_time=mod_time
+                )
 
     @classmethod
     def _scandir(cls, path: PurePath) -> List[FileStatus]:
@@ -176,18 +181,16 @@ class LocalFileSystem(FileSystem):
 
     async def liststatus(self, path: PurePath) -> List[FileStatus]:
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
-        return await self._loop.run_in_executor(self._executor,
-                                                self._scandir,
-                                                path)
+        return await self._loop.run_in_executor(self._executor, self._scandir, path)
 
     @classmethod
     def _get_file_or_dir_status(cls, path: PurePath) -> FileStatus:
         return cls._create_filestatus(path, basename_only=False)
 
     async def get_filestatus(self, path: PurePath) -> FileStatus:
-        return await self._loop.run_in_executor(self._executor,
-                                                self._get_file_or_dir_status,
-                                                path)
+        return await self._loop.run_in_executor(
+            self._executor, self._get_file_or_dir_status, path
+        )
 
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)

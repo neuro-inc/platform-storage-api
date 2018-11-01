@@ -30,8 +30,8 @@ def local_tmp_dir_path():
 
 
 def get_liststatus_dict(response_json: Dict) -> List:
-    return response_json['FileStatuses']['FileStatus']
+    return response_json["FileStatuses"]["FileStatus"]
 
 
 def get_filestatus_dict(response_json: Dict) -> Dict:
-    return response_json['FileStatus']
+    return response_json["FileStatus"]

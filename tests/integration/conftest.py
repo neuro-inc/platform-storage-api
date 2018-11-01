@@ -2,17 +2,22 @@ import os
 import uuid
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, List, NamedTuple, Optional
+from typing import NamedTuple, Optional
 
 import aiohttp
 import pytest
+from jose import jwt
 from neuro_auth_client import AuthClient, User
 from yarl import URL
 
-from platform_storage_api.api import StorageHandler, create_app
-from platform_storage_api.config import (AuthConfig, Config,
-                                         EnvironConfigFactory, ServerConfig,
-                                         StorageConfig)
+from platform_storage_api.api import create_app
+from platform_storage_api.config import (
+    AuthConfig,
+    Config,
+    EnvironConfigFactory,
+    ServerConfig,
+    StorageConfig,
+)
 from platform_storage_api.storage import Storage
 
 
