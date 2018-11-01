@@ -26,14 +26,19 @@ class FileStatusType(str, enum.Enum):
         return self.value
 
 
+class FileStatusPermission(str, enum.Enum):
+    READ = "read"
+    WRITE = "write"
+    MANAGE = "manage"
+
+
 @dataclass(frozen=True)
 class FileStatus:
     path: PurePath
     type: FileStatusType
     size: int
     modification_time: Optional[int] = None
-    # TODO (A Yushkovskiy 29.10.2018): permission should be Action, not a string
-    permission: Optional[str] = None
+    permission: FileStatusPermission = FileStatusPermission.READ
 
     @classmethod
     def create_file_status(
@@ -60,7 +65,7 @@ class FileStatus:
             modification_time=modification_time,
         )
 
-    def with_permission(self, permission: str) -> "FileStatus":
+    def with_permission(self, permission: FileStatusPermission) -> "FileStatus":
         return replace(self, permission=permission)
 
 
