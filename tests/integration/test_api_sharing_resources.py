@@ -75,14 +75,14 @@ class TestStorageListAndResourceSharing:
                     "length": len(payload),
                     "type": str(FileStatusType.FILE),
                     "modificationTime": mock.ANY,
-                    "permission": None,
+                    "permission": "read",
                 },
                 {
                     "path": "second",
                     "length": 0,
                     "type": str(FileStatusType.DIRECTORY),
                     "modificationTime": mock.ANY,
-                    "permission": None,
+                    "permission": "read",
                 },
             ]
             for status in statuses:
@@ -133,7 +133,7 @@ class TestStorageListAndResourceSharing:
                     "length": 0,
                     "type": str(FileStatusType.DIRECTORY),
                     "modificationTime": mock.ANY,
-                    "permission": None,
+                    "permission": "read",
                 }
             ]
             for status in statuses:
@@ -201,14 +201,14 @@ class TestStorageListAndResourceSharing:
                     "length": 0,
                     "type": str(FileStatusType.DIRECTORY),
                     "modificationTime": mock.ANY,
-                    "permission": None,
+                    "permission": "read",
                 },
                 {
                     "path": "third",
                     "length": 0,
                     "type": str(FileStatusType.DIRECTORY),
                     "modificationTime": mock.ANY,
-                    "permission": None,
+                    "permission": "read",
                 },
             ]
             assert statuses[0]["modificationTime"] >= min_mtime_second
