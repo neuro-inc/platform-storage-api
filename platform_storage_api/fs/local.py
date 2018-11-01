@@ -5,7 +5,7 @@ import io
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
 from typing import List, Optional
 
@@ -61,13 +61,7 @@ class FileStatus:
         )
 
     def with_permission(self, permission: str) -> "FileStatus":
-        return FileStatus(
-            path=self.path,
-            type=self.type,
-            size=self.size,
-            modification_time=self.modification_time,
-            permission=permission,
-        )
+        return replace(self, permission=permission)
 
 
 class FileSystem(metaclass=abc.ABCMeta):
