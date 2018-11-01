@@ -250,7 +250,7 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPNoContent.status_code
 
 
-class TestFileStatus:
+class TestGetFileStatus:
 
     payload = b"test"
     len_payload = len(payload)
@@ -292,7 +292,7 @@ class TestFileStatus:
         cls, user, path, server_url, client, file_owner
     ) -> aiohttp.web.Response:
         headers = {"Authorization": "Bearer " + user.token}
-        params = {"op": "FILESTATUS"}
+        params = {"op": "GETFILESTATUS"}
         url = cls.url(server_url, file_owner, path)
         return client.get(url, headers=headers, params=params)
 
