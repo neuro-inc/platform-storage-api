@@ -37,14 +37,14 @@ class StorageOperation(str, Enum):
     The CREATE operation handles opening files for writing.
     The OPEN operation handles opening files for reading.
     The LISTSTATUS operation handles non-recursive listing of directories.
-    The FILESTATUS operation handles getting statistics for files and directories.
+    The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     """
 
     CREATE = "CREATE"
     OPEN = "OPEN"
     LISTSTATUS = "LISTSTATUS"
-    FILESTATUS = "FILESTATUS"
+    GETFILESTATUS = "GETFILESTATUS"
     MKDIRS = "MKDIRS"
     DELETE = "DELETE"
 
@@ -93,10 +93,10 @@ class StorageHandler:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, str(storage_path))
             return await self._handle_liststatus(storage_path, tree)
-        elif operation == StorageOperation.FILESTATUS:
+        elif operation == StorageOperation.GETFILESTATUS:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, str(storage_path))
-            return await self._handle_filestatus(storage_path, tree)
+            return await self._handle_getfilestatus(storage_path, tree)
         raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_delete(self, request: Request):
@@ -183,7 +183,7 @@ class StorageHandler:
         visible_children = access_tree.sub_tree.children
         return [status for status in statuses if str(status.path) in visible_children]
 
-    async def _handle_filestatus(
+    async def _handle_getfilestatus(
         self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
     ):
         permission = access_tree.sub_tree.action
