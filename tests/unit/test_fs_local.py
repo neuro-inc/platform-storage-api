@@ -316,6 +316,33 @@ class TestLocalFileSystem:
 
         await fs.remove(expected_file_path)
 
+    # helper methods for working with sets of statuses
+    @classmethod
+    def statuses_get(cls, statuses, path):
+        return next(st for st in statuses if st.path == path)
+
+    @classmethod
+    def statuses_add(cls, statuses, status):
+        return statuses | {status}
+
+    @classmethod
+    def statuses_drop(cls, statuses, path):
+        return set(filter(lambda st: st.path != path, statuses))
+
+    @classmethod
+    def statuses_rename(cls, statuses, old_path, new_path):
+        def rename(status):
+            if status.path == old_path:
+                return FileStatus(path=new_path,
+                                  type=status.type,
+                                  size=status.size,
+                                  modification_time=status.modification_time,
+                                  permission=status.permission)
+            else:
+                return status
+
+        return set(map(rename, statuses))
+
     @pytest.mark.asyncio
     async def test_rename_file_same_dir(self, fs, tmp_dir_path):
         old_name = PurePath('old')
@@ -328,11 +355,14 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
         await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(new_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        expected_statuses = self.statuses_rename(old_statuses,
+                                                 old_name, new_name)
+        assert statuses == expected_statuses
 
         async with fs.open(new_path, mode='rb') as f:
             real_payload = await f.read()
@@ -356,15 +386,16 @@ class TestLocalFileSystem:
 
         await fs.mkdir(subdir_path)
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        renaming_status = self.statuses_get(old_statuses, old_name)
+
         await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(subdir, size=0, type=FileStatusType.DIRECTORY)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses | {renaming_status} == old_statuses
 
-        statuses = await fs.liststatus(subdir_path)
-        assert statuses == [
-            FileStatus(new_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(subdir_path))
+        assert statuses == self.statuses_rename({renaming_status}, old_name, new_name)
 
         async with fs.open(new_path, mode='rb') as f:
             real_payload = await f.read()
@@ -384,12 +415,13 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
         with pytest.raises(FileNotFoundError):
             await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(old_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
 
         async with fs.open(old_path, mode='rb') as f:
             real_payload = await f.read()
@@ -409,13 +441,14 @@ class TestLocalFileSystem:
 
         await fs.mkdir(subdir_path)
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
         with pytest.raises(IsADirectoryError):
             await fs.rename(old_path, subdir_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert set(statuses) == set([
-            FileStatus(subdir, size=0, type=FileStatusType.DIRECTORY),
-            FileStatus(old_name, size=len(payload), type=FileStatusType.FILE)])
+        statuses = set(await fs.liststatus(tmp_dir_path))
+
+        assert statuses == old_statuses
 
         statuses = await fs.liststatus(subdir_path)
         assert statuses == []
@@ -436,12 +469,13 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
         with pytest.raises(FileNotFoundError):
             await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(new_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
 
         async with fs.open(new_path, mode='rb') as f:
             real_payload = await f.read()
@@ -457,11 +491,12 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
         await fs.rename(path, path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
 
         async with fs.open(path, mode='rb') as f:
             real_payload = await f.read()
@@ -484,12 +519,15 @@ class TestLocalFileSystem:
             await f.write(new_payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
         await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(new_name, size=len(old_payload),
-                       type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        expected_statuses = self.statuses_drop(old_statuses, new_name)
+        expected_statuses = self.statuses_rename(expected_statuses,
+                                                 old_name, new_name)
+        assert statuses == expected_statuses
 
         async with fs.open(new_path, mode='rb') as f:
             real_payload = await f.read()
@@ -512,15 +550,17 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
         await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(new_dir, size=0, type=FileStatusType.DIRECTORY)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == self.statuses_rename(old_statuses,
+                                                old_dir, new_dir)
 
-        statuses = await fs.liststatus(new_path)
-        assert statuses == [
-            FileStatus(file_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(new_path))
+        assert statuses == old_statuses_old_dir
 
         async with fs.open(new_file_path, mode='rb') as f:
             real_payload = await f.read()
@@ -546,19 +586,21 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
         await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(nested_dir, size=0, type=FileStatusType.DIRECTORY)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == self.statuses_drop(old_statuses, old_dir)
 
-        statuses = await fs.liststatus(nested_path)
-        assert statuses == [
-            FileStatus(new_dir, size=0, type=FileStatusType.DIRECTORY)]
+        statuses = set(await fs.liststatus(nested_path))
+        expected_statuses = self.statuses_drop(old_statuses, nested_dir)
+        expected_statuses = self.statuses_rename(expected_statuses,
+                                                 old_dir, new_dir)
+        assert statuses == expected_statuses
 
-        statuses = await fs.liststatus(new_path)
-        assert statuses == [
-            FileStatus(file_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(new_path))
+        assert statuses == old_statuses_old_dir
 
         async with fs.open(new_file_path, mode='rb') as f:
             real_payload = await f.read()
@@ -582,16 +624,17 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
         with pytest.raises(FileNotFoundError):
             await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(old_dir, size=0, type=FileStatusType.DIRECTORY)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
 
-        statuses = await fs.liststatus(old_path)
-        assert statuses == [
-            FileStatus(file_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
 
         async with fs.open(old_file_path, mode='rb') as f:
             real_payload = await f.read()
@@ -611,13 +654,17 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
         with pytest.raises(NotADirectoryError):
             await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert set(statuses) == set([
-            FileStatus(old_dir, size=0, type=FileStatusType.DIRECTORY),
-            FileStatus(new_file, size=len(payload), type=FileStatusType.FILE)])
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
 
         async with fs.open(new_path, mode='rb') as f:
             real_payload = await f.read()
@@ -641,15 +688,19 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
         await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(new_dir, size=0, type=FileStatusType.DIRECTORY)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        expected_statuses = self.statuses_drop(old_statuses, new_dir)
+        expected_statuses = self.statuses_rename(expected_statuses,
+                                                 old_dir, new_dir)
+        assert statuses == expected_statuses
 
-        statuses = await fs.liststatus(new_path)
-        assert statuses == [
-            FileStatus(file_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(new_path))
+        statuses = old_statuses_old_dir
 
         async with fs.open(new_file_path, mode='rb') as f:
             real_payload = await f.read()
@@ -679,27 +730,25 @@ class TestLocalFileSystem:
             await f.write(new_payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+        old_statuses_new_dir = set(await fs.liststatus(new_path))
+
         with pytest.raises(OSError):
             await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert set(statuses) == set([
-            FileStatus(new_dir, size=0, type=FileStatusType.DIRECTORY),
-            FileStatus(old_dir, size=0, type=FileStatusType.DIRECTORY)])
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
 
-        statuses = await fs.liststatus(old_path)
-        assert statuses == [
-            FileStatus(old_file_name, size=len(old_payload),
-                       type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
 
         async with fs.open(old_file_path, mode='rb') as f:
             real_payload = await f.read()
             assert real_payload == old_payload
 
-        statuses = await fs.liststatus(new_path)
-        assert statuses == [
-            FileStatus(new_file_name, size=len(new_payload),
-                       type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(new_path))
+        assert statuses == old_statuses_new_dir
 
         async with fs.open(new_file_path, mode='rb') as f:
             real_payload = await f.read()
@@ -726,18 +775,17 @@ class TestLocalFileSystem:
             await f.write(new_payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
         with pytest.raises(OSError):
             await fs.rename(old_path, tmp_dir_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert set(statuses) == set([
-            FileStatus(old_dir, size=0, type=FileStatusType.DIRECTORY),
-            FileStatus(new_file_name, size=9, type=FileStatusType.FILE)])
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
 
-        statuses = await fs.liststatus(old_path)
-        assert statuses == [
-            FileStatus(old_file_name, size=len(old_payload),
-                       type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
 
         async with fs.open(old_file_path, mode='rb') as f:
             real_payload = await f.read()
@@ -763,16 +811,17 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
         with pytest.raises(OSError):
             await fs.rename(old_path, new_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(old_dir, size=0, type=FileStatusType.DIRECTORY)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
 
-        statuses = await fs.liststatus(old_path)
-        assert statuses == [
-            FileStatus(file_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
 
         async with fs.open(old_file_path, mode='rb') as f:
             real_payload = await f.read()
@@ -792,6 +841,9 @@ class TestLocalFileSystem:
             await f.write(payload)
             await f.flush()
 
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
         with pytest.raises(OSError):
             await fs.rename(old_path, tmp_dir_path / '.')
 
@@ -804,13 +856,11 @@ class TestLocalFileSystem:
         with pytest.raises(OSError):
             await fs.rename(tmp_dir_path / '..', old_path)
 
-        statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
-            FileStatus(old_dir, size=0, type=FileStatusType.DIRECTORY)]
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
 
-        statuses = await fs.liststatus(old_path)
-        assert statuses == [
-            FileStatus(file_name, size=len(payload), type=FileStatusType.FILE)]
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
 
         async with fs.open(old_file_path, mode='rb') as f:
             real_payload = await f.read()

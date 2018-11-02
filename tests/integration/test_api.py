@@ -654,7 +654,7 @@ class TestRename:
     async def get_filestatus(cls, server_url, client, user, owner, path) \
             -> aiohttp.web.Response:
         headers = {'Authorization': 'Bearer ' + user.token}
-        params = {'op': 'FILESTATUS'}
+        params = {'op': 'GETFILESTATUS'}
         url = cls.url(server_url, owner, path)
         return await client.get(url, headers=headers, params=params)
 
@@ -665,8 +665,8 @@ class TestRename:
         assert response.status == expected.status
         values_root = await response.json()
         expected_values_root = await expected.json()
-        expected_values = expected_values_root['FileStatus']
-        values = values_root['FileStatus']
+        expected_values = get_filestatus_dict(expected_values_root)
+        values = get_filestatus_dict(values_root)
         for strict_key in ['type', 'length', 'modificationTime']:
             assert values[strict_key] == expected_values[strict_key]
 
