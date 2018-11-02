@@ -265,13 +265,6 @@ class TestLocalFileSystem:
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
-    @classmethod
-    def assert_filestatus(cls, actual: FileStatus, **expected):
-        for key in ['path', 'size', 'type']:
-            assert actual.__getattribute__(key) == expected[key]
-        mkey = 'modification_time'
-        assert actual.__getattribute__(mkey) >= expected[mkey]
-
     @pytest.mark.asyncio
     async def test_get_filestatus_file(self, fs, tmp_dir_path):
         file_relative = Path("nested")
