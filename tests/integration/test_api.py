@@ -84,7 +84,7 @@ class TestStorage:
                 "type": str(FileStatusType.FILE),
                 "length": len(payload),
                 "modificationTime": mock.ANY,
-                "permission": None,
+                "permission": "manage",
             }
             assert file_status["path"] == file_name
             assert file_status["modificationTime"] >= mtime_min
@@ -114,7 +114,7 @@ class TestStorage:
                 "type": str(FileStatusType.FILE),
                 "length": len(payload),
                 "modificationTime": mock.ANY,
-                "permission": mock.ANY,
+                "permission": "manage",
             }
             assert file_status["path"] == file_name
             assert file_status["modificationTime"] >= mtime_min

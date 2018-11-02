@@ -5,7 +5,7 @@ import io
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
 from typing import List, Optional
 
@@ -26,14 +26,19 @@ class FileStatusType(str, enum.Enum):
         return self.value
 
 
+class FileStatusPermission(str, enum.Enum):
+    READ = "read"
+    WRITE = "write"
+    MANAGE = "manage"
+
+
 @dataclass(frozen=True)
 class FileStatus:
     path: PurePath
     type: FileStatusType
     size: int
     modification_time: Optional[int] = None
-    # TODO (A Yushkovskiy 29.10.2018): permission should be Action, not a string
-    permission: Optional[str] = None
+    permission: FileStatusPermission = FileStatusPermission.READ
 
     @classmethod
     def create_file_status(
@@ -60,14 +65,8 @@ class FileStatus:
             modification_time=modification_time,
         )
 
-    def with_permission(self, permission: str) -> "FileStatus":
-        return FileStatus(
-            path=self.path,
-            type=self.type,
-            size=self.size,
-            modification_time=self.modification_time,
-            permission=permission,
-        )
+    def with_permission(self, permission: FileStatusPermission) -> "FileStatus":
+        return replace(self, permission=permission)
 
 
 class FileSystem(metaclass=abc.ABCMeta):
