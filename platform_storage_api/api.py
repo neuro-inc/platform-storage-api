@@ -40,6 +40,7 @@ class StorageOperation(str, Enum):
     The LISTSTATUS operation handles non-recursive listing of directories.
     The FILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
+    The RENAME operation handles moving of files and directories.
     """
     CREATE = 'CREATE'
     OPEN = 'OPEN'
@@ -47,6 +48,7 @@ class StorageOperation(str, Enum):
     FILESTATUS = 'FILESTATUS'
     MKDIRS = 'MKDIRS'
     DELETE = 'DELETE'
+    RENAME = 'RENAME'
 
     @classmethod
     def values(cls):
@@ -65,6 +67,7 @@ class StorageHandler:
         app.add_routes((
             # TODO (A Danshyn 04/23/18): add some unit test for path matching
             aiohttp.web.put(r'/{path:.*}', self.handle_put),
+            aiohttp.web.post(r'/{path:.*}', self.handle_post),
             aiohttp.web.get(r'/{path:.*}', self.handle_get),
             aiohttp.web.delete(r'/{path:.*}', self.handle_delete),
         ))
@@ -106,6 +109,14 @@ class StorageHandler:
             await self._handle_delete(storage_path)
         raise ValueError(f'Illegal operation: {operation}')
 
+    async def handle_post(self, request: Request):
+        operation = self._parse_post_operation(request)
+        if operation == StorageOperation.RENAME:
+            storage_path: PurePath = self._get_fs_path_from_request(request)
+            await self._check_user_permissions(request, str(storage_path))
+            return await self._handle_rename(storage_path, request)
+        raise ValueError(f'Illegal operation: {operation}')
+
     def _get_fs_path_from_request(self, request):
         return PurePath('/', request.match_info['path'])
 
@@ -140,6 +151,9 @@ class StorageHandler:
 
     def _parse_delete_operation(self, request: Request):
         return self._parse_operation(request) or StorageOperation.DELETE
+
+    def _parse_post_operation(self, request: Request):
+        return self._parse_operation(request) or StorageOperation.RENAME
 
     async def _handle_open(self, request: Request, storage_path: PurePath):
         # TODO (A Danshyn 04/23/18): check if exists (likely in some
@@ -213,6 +227,33 @@ class StorageHandler:
             raise aiohttp.web.HTTPNotFound()
         raise aiohttp.web.HTTPNoContent()
 
+    async def _handle_rename(self, old: PurePath, request: Request):
+        if 'destination' not in request.query:
+            return aiohttp.web.json_response(
+                {'error': 'No destination'},
+                status=aiohttp.web.HTTPBadRequest.status_code)
+        try:
+            new = PurePath(request.query['destination'])
+            if new.root == '':
+                new = old.parent / new
+            await self._check_user_permissions(request, str(new))
+            await self._storage.rename(old, new)
+        except FileNotFoundError:
+            raise aiohttp.web.HTTPNotFound()
+        except IsADirectoryError:
+            return aiohttp.web.json_response(
+                {'error': 'Destination is a directory'},
+                status=aiohttp.web.HTTPBadRequest.status_code)
+        except NotADirectoryError:
+            return aiohttp.web.json_response(
+                {'error': 'Destination is a directory'},
+                status=aiohttp.web.HTTPBadRequest.status_code)
+        except OSError:
+            return aiohttp.web.json_response(
+                {'error': 'Incorrect destination'},
+                status=aiohttp.web.HTTPBadRequest.status_code)
+        return aiohttp.web.HTTPNoContent()
+
     @classmethod
     def _stat_to_dict(cls, stat: FileStatus, action: str) -> Dict[str, Any]:
         # TODO (A Yushkovskiy, 26.10.2018) Refact: re-use the method
@@ -254,10 +295,14 @@ class StorageHandler:
         # TODO (Rafa Zubairov): test if user accessing his own data,
         # then use JWT token claims
         try:
-            await check_permission(request, action, [permission])
+            await check_authorized(request)
         except HTTPUnauthorized:
             # TODO (Rafa Zubairov): Use tree based approach here
             self._raise_unauthorized()
+        try:
+            await check_permission(request, action, [permission])
+        except aiohttp.web.HTTPForbidden:
+            raise aiohttp.web.HTTPNotFound()
 
     def _raise_unauthorized(self) -> None:
         raise HTTPUnauthorized(headers={
