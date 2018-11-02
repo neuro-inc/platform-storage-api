@@ -244,7 +244,6 @@ class TestStorageListAndResourceSharing:
         ) as response:
             assert response.status == 201
 
-        min_mtime_fourth = int(current_time())
         async with client.put(
             dir_url + "/first/fifth", headers=headers1, params=params
         ) as response:
