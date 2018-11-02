@@ -18,6 +18,7 @@ pull:
 
 format:
 	isort -rc platform_storage_api tests
+	black platform_storage_api tests setup.py pip_extra_index_url.py
 
 lint: build_test lint_built
 
@@ -50,6 +51,7 @@ _test_integration:
 	pytest -vv tests/integration
 
 _lint:
+	black --check platform_storage_api tests setup.py pip_extra_index_url.py
 	flake8 platform_storage_api tests
 
 run:
@@ -69,7 +71,7 @@ gke_login:
 	gcloud --quiet config set container/cluster $(GKE_CLUSTER_NAME)
 	gcloud config set compute/zone $(GKE_COMPUTE_ZONE)
 	gcloud auth configure-docker
-	
+
 _helm:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.11.0
 
@@ -83,7 +85,7 @@ gke_k8s_deploy_dev: _helm
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME)
 	sudo chown -R circleci: $(HOME)/.kube
 	helm --set "global.env=dev" --set "IMAGE.dev=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
-	
+
 gke_k8s_deploy_staging: _helm
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_STAGE_CLUSTER_NAME)
 	sudo chown -R circleci: $(HOME)/.kube
