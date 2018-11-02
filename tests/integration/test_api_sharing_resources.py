@@ -213,3 +213,135 @@ class TestStorageListAndResourceSharing:
             ]
             assert statuses[0]["modificationTime"] >= min_mtime_second
             assert statuses[1]["modificationTime"] >= min_mtime_third
+
+    @pytest.mark.asyncio
+    async def test_liststatus_permissions(
+        self, server_url, api, client, regular_user_factory, granter
+    ):
+        user1 = await regular_user_factory()
+        headers1 = {"Authorization": "Bearer " + user1.token}
+
+        user2 = await regular_user_factory()
+        headers2 = {"Authorization": "Bearer " + user2.token}
+
+        # create file /path/to/file by user1
+        dir_url = f"{server_url}/{user1.name}/path/to"
+        url = dir_url + "/file"
+        payload = b"test"
+        async with client.put(url, headers=headers1, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        params = {"op": "MKDIRS"}
+        min_mtime_third = int(current_time())
+        async with client.put(
+            dir_url + "/first/second/third", headers=headers1, params=params
+        ) as response:
+            assert response.status == 201
+
+        min_mtime_fourth = int(current_time())
+        async with client.put(
+            dir_url + "/first/second/fourth", headers=headers1, params=params
+        ) as response:
+            assert response.status == 201
+
+        min_mtime_fourth = int(current_time())
+        async with client.put(
+            dir_url + "/first/fifth", headers=headers1, params=params
+        ) as response:
+            assert response.status == 201
+
+        # list by user2
+        params = {"op": "LISTSTATUS"}
+        async with client.get(dir_url, headers=headers2, params=params) as response:
+            assert response.status == 404
+
+        await granter(
+            user2.name,
+            [{"uri": f"storage://{user1.name}/path/to/file", "action": "read"}],
+            user1,
+        )
+        await granter(
+            user2.name,
+            [
+                {
+                    "uri": f"storage://{user1.name}/path/to/first/second",
+                    "action": "write",
+                }
+            ],
+            user1,
+        )
+        await granter(
+            user2.name,
+            [
+                {
+                    "uri": f"storage://{user1.name}/path/to/first/second/third",
+                    "action": "manage",
+                }
+            ],
+            user1,
+        )
+
+        async with client.get(dir_url, headers=headers2, params=params) as response:
+            assert response.status == 200
+            statuses = get_liststatus_dict(await response.json())
+            statuses = sorted(statuses, key=self.file_status_sort)
+            assert statuses == [
+                {
+                    "path": "file",
+                    "length": 4,
+                    "type": "FILE",
+                    "modificationTime": mock.ANY,
+                    "permission": "read",
+                },
+                {
+                    "path": "first",
+                    "length": 0,
+                    "type": "DIRECTORY",
+                    "modificationTime": mock.ANY,
+                    "permission": "read",
+                },
+            ]
+            assert statuses[0]["modificationTime"] >= min_mtime_third
+            assert statuses[1]["modificationTime"] >= min_mtime_fourth
+
+        async with client.get(
+            dir_url + "/first", headers=headers2, params=params
+        ) as response:
+            assert response.status == 200
+            statuses = get_liststatus_dict(await response.json())
+            statuses = sorted(statuses, key=self.file_status_sort)
+            assert statuses == [
+                {
+                    "path": "second",
+                    "length": 0,
+                    "type": "DIRECTORY",
+                    "modificationTime": mock.ANY,
+                    "permission": "write",
+                }
+            ]
+            assert statuses[0]["modificationTime"] >= min_mtime_third
+
+        async with client.get(
+            dir_url + "/first/second", headers=headers2, params=params
+        ) as response:
+            assert response.status == 200
+            statuses = get_liststatus_dict(await response.json())
+            statuses = sorted(statuses, key=self.file_status_sort)
+            assert statuses == [
+                {
+                    "path": "fourth",
+                    "length": 0,
+                    "type": "DIRECTORY",
+                    "modificationTime": mock.ANY,
+                    "permission": "write",
+                },
+                {
+                    "path": "third",
+                    "length": 0,
+                    "type": "DIRECTORY",
+                    "modificationTime": mock.ANY,
+                    "permission": "manage",
+                },
+            ]
+            assert statuses[0]["modificationTime"] >= min_mtime_third
+            assert statuses[1]["modificationTime"] >= min_mtime_fourth
