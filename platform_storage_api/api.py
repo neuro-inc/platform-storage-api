@@ -2,7 +2,7 @@ import asyncio
 import logging
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, Dict, List, Optional
+from typing import List, Optional, Iterator
 
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
@@ -14,7 +14,7 @@ from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
 
 from .config import Config
-from .fs.local import FileStatus, LocalFileSystem
+from .fs.local import FileStatus, LocalFileSystem, FileStatusPermission
 from .storage import Storage
 
 
@@ -53,6 +53,11 @@ class StorageOperation(str, Enum):
     @classmethod
     def values(cls):
         return [item.value for item in cls]
+
+
+class AuthAction(str, Enum):
+    DENY = "deny"
+    LIST = "list"
 
 
 class StorageHandler:
@@ -169,7 +174,7 @@ class StorageHandler:
     async def _handle_liststatus(
         self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
     ):
-        if access_tree.sub_tree.action == "deny":
+        if access_tree.sub_tree.action == AuthAction.DENY.value:
             raise aiohttp.web.HTTPNotFound
 
         try:
@@ -190,28 +195,35 @@ class StorageHandler:
 
     def _liststatus_filter(
         self, statuses: List[FileStatus], access_tree: ClientSubTreeViewRoot
-    ) -> List[FileStatus]:
-        if access_tree.sub_tree.action != "list":
-            return statuses
+    ) -> Iterator[FileStatus]:
+        tree = access_tree.sub_tree
+        is_list_action = tree.action == AuthAction.LIST.value
+        for status in statuses:
+            sub_tree = tree.children.get(str(status.path))
+            if is_list_action and not sub_tree:
+                continue
 
-        visible_children = access_tree.sub_tree.children
-        return [status for status in statuses if str(status.path) in visible_children]
+            action = sub_tree.action if sub_tree else tree.action
+            yield status.with_permission(self._convert_action_to_permission(action))
+
+    def _convert_action_to_permission(self, action: str) -> FileStatusPermission:
+        if action == AuthAction.LIST.value:
+            return FileStatusPermission.READ
+        return FileStatusPermission(action)
 
     async def _handle_getfilestatus(
         self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
     ):
-        permission = access_tree.sub_tree.action
-        if permission == "deny":
+        action = access_tree.sub_tree.action
+        if action == AuthAction.DENY.value:
             raise aiohttp.web.HTTPNotFound
-        elif permission == "list":
-            permission = "read"
 
         try:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
 
-        fstat = fstat.with_permission(permission)
+        fstat = fstat.with_permission(self._convert_action_to_permission(action))
         stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
         return aiohttp.web.json_response(stat_dict)
 
@@ -264,7 +276,7 @@ class StorageHandler:
             "path": str(status.path),
             "length": status.size,
             "modificationTime": status.modification_time,
-            "permission": status.permission,
+            "permission": status.permission.value,
             "type": str(status.type),
         }
 
