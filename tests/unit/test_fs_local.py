@@ -507,7 +507,7 @@ class TestLocalFileSystem:
         old_name = PurePath('old')
         new_name = PurePath('new')
         old_payload = b'test'
-        new_payload = b'missisipi'
+        new_payload = b'mississippi'
         old_path = tmp_dir_path / old_name
         new_path = tmp_dir_path / new_name
 
@@ -713,7 +713,7 @@ class TestLocalFileSystem:
         old_dir = PurePath('old')
         new_dir = PurePath('new')
         old_payload = b'test'
-        new_payload = b'missisipi'
+        new_payload = b'mississippi'
         old_path = tmp_dir_path / old_dir
         new_path = tmp_dir_path / new_dir
         old_file_path = old_path / old_file_name
@@ -760,7 +760,7 @@ class TestLocalFileSystem:
         new_file_name = PurePath('new_file')
         old_dir = PurePath('old')
         old_payload = b'test'
-        new_payload = b'missisipi'
+        new_payload = b'mississippi'
         old_path = tmp_dir_path / old_dir
         old_file_path = old_path / old_file_name
         new_file_path = tmp_dir_path / new_file_name

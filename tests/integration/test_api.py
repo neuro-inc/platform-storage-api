@@ -615,7 +615,7 @@ class TestGetFileStatus:
 
 class TestRename:
     payload1 = b'test'
-    payload2 = b'missisipi'
+    payload2 = b'mississippi'
     file1 = 'file1'
     file2 = 'file2'
 
