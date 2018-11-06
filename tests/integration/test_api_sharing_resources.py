@@ -1,3 +1,5 @@
+import urllib
+import yarl
 from io import BytesIO
 from time import time as current_time
 from unittest import mock
@@ -30,6 +32,38 @@ class TestStorageListAndResourceSharing:
         params = {"op": "LISTSTATUS"}
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 404
+
+    @pytest.mark.asyncio
+    async def test_ls_other_user_data_no_permission_issue(
+        self, server_url, api, client, regular_user_factory, granter
+    ):
+        # user1 uploads a file
+        user1 = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user1.token}
+        dir_url = f"{server_url}/{user1.name}/path/to"
+        url = dir_url + "/file"
+        payload = b"test"
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        # user2 uploads a file
+        user2 = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user2.token}
+        dir_url = f"{server_url}/{user2.name}/path/to"
+        url = dir_url + "/file"
+        payload = b"test"
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        # user2 lists users
+        headers = {"Authorization": "Bearer " + user2.token}
+        dir_url = f"{server_url}/{user2.name}/../"
+        params = {"op": "LISTSTATUS"}
+        async with client.get(yarl.URL(dir_url, encoded=True), headers=headers, params=params) as response:
+            assert response.status == 200
+            resp_text = await response.text()
+            assert user1.name not in resp_text
+            assert user2.name in resp_text
 
     @pytest.mark.asyncio
     async def test_ls_other_user_data_shared_with_files(
