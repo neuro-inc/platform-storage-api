@@ -15,6 +15,25 @@ class Storage:
         # TODO: (A Danshyn 04/23/18): validate paths
         return PurePath(self._base_path, path.relative_to("/"))
 
+    def sanitize_path(self, path: str) -> str:
+        """
+        Sanitize path - it shall in the end depend on the implementation of the
+        underlying storage subsystem, while now put it here.
+        :param path:
+        :return: string which contains fixed / sanitized path
+        """
+        path_parts = path.split("/")
+        parts_stack = []
+        for part in path_parts:
+            if part == "..":
+                if parts_stack:
+                    parts_stack.pop()
+                else:
+                    raise ValueError("Invalid path.")
+            else:
+                parts_stack.append(part)
+        return "/".join(parts_stack) if parts_stack else ""
+
     async def store(self, outstream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)

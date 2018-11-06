@@ -2,7 +2,7 @@ import asyncio
 import logging
 from enum import Enum
 from pathlib import PurePath
-from typing import List, Optional, Iterator
+from typing import Iterator, List, Optional
 
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
@@ -14,7 +14,7 @@ from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
 
 from .config import Config
-from .fs.local import FileStatus, LocalFileSystem, FileStatusPermission
+from .fs.local import FileStatus, FileStatusPermission, LocalFileSystem
 from .storage import Storage
 
 
@@ -113,7 +113,9 @@ class StorageHandler:
         raise ValueError(f"Illegal operation: {operation}")
 
     def _get_fs_path_from_request(self, request):
-        return PurePath("/", request.match_info["path"])
+        user_provided_path = f"{request.match_info.get('path', '')}"
+        sanitized_path = self._storage.sanitize_path(user_provided_path)
+        return PurePath("/", sanitized_path)
 
     async def _handle_create(self, request, storage_path: PurePath):
         # TODO (A Danshyn 04/23/18): check aiohttp default limits

@@ -1,10 +1,10 @@
 import urllib
-import yarl
 from io import BytesIO
 from time import time as current_time
 from unittest import mock
 
 import pytest
+import yarl
 
 from platform_storage_api.fs.local import FileStatusType
 
@@ -59,7 +59,9 @@ class TestStorageListAndResourceSharing:
         headers = {"Authorization": "Bearer " + user2.token}
         dir_url = f"{server_url}/{user2.name}/../"
         params = {"op": "LISTSTATUS"}
-        async with client.get(yarl.URL(dir_url, encoded=True), headers=headers, params=params) as response:
+        async with client.get(
+            yarl.URL(dir_url, encoded=True), headers=headers, params=params
+        ) as response:
             assert response.status == 200
             resp_text = await response.text()
             assert user1.name not in resp_text
