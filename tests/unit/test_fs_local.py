@@ -1,7 +1,7 @@
 import os
 import tempfile
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import pytest
 
@@ -308,3 +308,553 @@ class TestLocalFileSystem:
         )
 
         await fs.remove(expected_file_path)
+
+    # helper methods for working with sets of statuses
+    @classmethod
+    def statuses_get(cls, statuses, path):
+        return next(st for st in statuses if st.path == path)
+
+    @classmethod
+    def statuses_add(cls, statuses, status):
+        return statuses | {status}
+
+    @classmethod
+    def statuses_drop(cls, statuses, path):
+        return set(filter(lambda st: st.path != path, statuses))
+
+    @classmethod
+    def statuses_rename(cls, statuses, old_path, new_path):
+        def rename(status):
+            if status.path == old_path:
+                return FileStatus(path=new_path,
+                                  type=status.type,
+                                  size=status.size,
+                                  modification_time=status.modification_time,
+                                  permission=status.permission)
+            else:
+                return status
+
+        return set(map(rename, statuses))
+
+    @pytest.mark.asyncio
+    async def test_rename_file_same_dir(self, fs, tmp_dir_path):
+        old_name = PurePath('old')
+        new_name = PurePath('new')
+        payload = b'test'
+        old_path = tmp_dir_path / old_name
+        new_path = tmp_dir_path / new_name
+
+        async with fs.open(old_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
+        await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        expected_statuses = self.statuses_rename(old_statuses,
+                                                 old_name, new_name)
+        assert statuses == expected_statuses
+
+        async with fs.open(new_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+        await fs.remove(new_path)
+
+    @pytest.mark.asyncio
+    async def test_rename_file_different_dir(self, fs, tmp_dir_path):
+        old_name = PurePath('old')
+        subdir = PurePath('nested')
+        new_name = PurePath('new')
+        payload = b'test'
+        old_path = tmp_dir_path / old_name
+        subdir_path = tmp_dir_path / subdir
+        new_path = subdir_path / new_name
+
+        async with fs.open(old_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        await fs.mkdir(subdir_path)
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        renaming_status = self.statuses_get(old_statuses, old_name)
+
+        await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses | {renaming_status} == old_statuses
+
+        statuses = set(await fs.liststatus(subdir_path))
+        assert statuses == self.statuses_rename({renaming_status}, old_name, new_name)
+
+        async with fs.open(new_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_file_nonexistent_dir(self, fs, tmp_dir_path):
+        old_name = PurePath('old')
+        subdir = PurePath('nested')
+        new_name = PurePath('new')
+        payload = b'test'
+        old_path = tmp_dir_path / old_name
+        subdir_path = tmp_dir_path / subdir
+        new_path = subdir_path / new_name
+
+        async with fs.open(old_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
+        with pytest.raises(FileNotFoundError):
+            await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        async with fs.open(old_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_file_to_dir(self, fs, tmp_dir_path):
+        old_name = PurePath('old')
+        subdir = PurePath('nested')
+        payload = b'test'
+        old_path = tmp_dir_path / old_name
+        subdir_path = tmp_dir_path / subdir
+
+        async with fs.open(old_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        await fs.mkdir(subdir_path)
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
+        with pytest.raises(IsADirectoryError):
+            await fs.rename(old_path, subdir_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+
+        assert statuses == old_statuses
+
+        statuses = await fs.liststatus(subdir_path)
+        assert statuses == []
+
+        async with fs.open(old_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_file_no_file(self, fs, tmp_dir_path):
+        old_name = PurePath('old')
+        new_name = PurePath('new')
+        payload = b'test'
+        old_path = tmp_dir_path / old_name
+        new_path = tmp_dir_path / new_name
+
+        async with fs.open(new_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
+        with pytest.raises(FileNotFoundError):
+            await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        async with fs.open(new_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_file_self(self, fs, tmp_dir_path):
+        name = PurePath('file')
+        payload = b'test'
+        path = tmp_dir_path / name
+
+        async with fs.open(path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
+        await fs.rename(path, path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        async with fs.open(path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_file_to_existing_file(self, fs, tmp_dir_path):
+        old_name = PurePath('old')
+        new_name = PurePath('new')
+        old_payload = b'test'
+        new_payload = b'mississippi'
+        old_path = tmp_dir_path / old_name
+        new_path = tmp_dir_path / new_name
+
+        async with fs.open(old_path, mode='wb') as f:
+            await f.write(old_payload)
+            await f.flush()
+
+        async with fs.open(new_path, mode='wb') as f:
+            await f.write(new_payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+
+        await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        expected_statuses = self.statuses_drop(old_statuses, new_name)
+        expected_statuses = self.statuses_rename(expected_statuses,
+                                                 old_name, new_name)
+        assert statuses == expected_statuses
+
+        async with fs.open(new_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == old_payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_same_dir(self, fs, tmp_dir_path):
+        file_name = PurePath('file')
+        old_dir = PurePath('old')
+        new_dir = PurePath('new')
+        payload = b'test'
+        old_path = tmp_dir_path / old_dir
+        new_path = tmp_dir_path / new_dir
+        old_file_path = old_path / file_name
+        new_file_path = new_path / file_name
+
+        await fs.mkdir(old_path)
+
+        async with fs.open(old_file_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
+        await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == self.statuses_rename(old_statuses,
+                                                old_dir, new_dir)
+
+        statuses = set(await fs.liststatus(new_path))
+        assert statuses == old_statuses_old_dir
+
+        async with fs.open(new_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_different_dir(self, fs, tmp_dir_path):
+        file_name = PurePath('file')
+        old_dir = PurePath('old')
+        new_dir = PurePath('new')
+        nested_dir = PurePath('nested')
+        payload = b'test'
+        old_path = tmp_dir_path / old_dir
+        nested_path = tmp_dir_path / nested_dir
+        new_path = nested_path / new_dir
+        old_file_path = old_path / file_name
+        new_file_path = new_path / file_name
+
+        await fs.mkdir(old_path)
+        await fs.mkdir(nested_path)
+
+        async with fs.open(old_file_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+        await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == self.statuses_drop(old_statuses, old_dir)
+
+        statuses = set(await fs.liststatus(nested_path))
+        expected_statuses = self.statuses_drop(old_statuses, nested_dir)
+        expected_statuses = self.statuses_rename(expected_statuses,
+                                                 old_dir, new_dir)
+        assert statuses == expected_statuses
+
+        statuses = set(await fs.liststatus(new_path))
+        assert statuses == old_statuses_old_dir
+
+        async with fs.open(new_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_nonexistent_dir(self, fs, tmp_dir_path):
+        file_name = PurePath('file')
+        old_dir = PurePath('old')
+        new_dir = PurePath('new')
+        nested_dir = PurePath('nested')
+        payload = b'test'
+        old_path = tmp_dir_path / old_dir
+        nested_path = tmp_dir_path / nested_dir
+        new_path = nested_path / new_dir
+        old_file_path = old_path / file_name
+
+        await fs.mkdir(old_path)
+
+        async with fs.open(old_file_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
+        with pytest.raises(FileNotFoundError):
+            await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
+
+        async with fs.open(old_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_to_file(self, fs, tmp_dir_path):
+        old_dir = PurePath('old')
+        new_file = PurePath('new')
+        payload = b'test'
+        old_path = tmp_dir_path / old_dir
+        new_path = tmp_dir_path / new_file
+
+        await fs.mkdir(old_path)
+
+        async with fs.open(new_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
+        with pytest.raises(NotADirectoryError):
+            await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
+
+        async with fs.open(new_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_to_empty_dir(self, fs, tmp_dir_path):
+        file_name = PurePath('file')
+        old_dir = PurePath('old')
+        new_dir = PurePath('new')
+        payload = b'test'
+        old_path = tmp_dir_path / old_dir
+        new_path = tmp_dir_path / new_dir
+        old_file_path = old_path / file_name
+        new_file_path = new_path / file_name
+
+        await fs.mkdir(old_path)
+        await fs.mkdir(new_path)
+
+        async with fs.open(old_file_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
+        await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        expected_statuses = self.statuses_drop(old_statuses, new_dir)
+        expected_statuses = self.statuses_rename(expected_statuses,
+                                                 old_dir, new_dir)
+        assert statuses == expected_statuses
+
+        statuses = set(await fs.liststatus(new_path))
+        statuses = old_statuses_old_dir
+
+        async with fs.open(new_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_to_nonempty_dir(self, fs, tmp_dir_path):
+        old_file_name = PurePath('old_file')
+        new_file_name = PurePath('new_file')
+        old_dir = PurePath('old')
+        new_dir = PurePath('new')
+        old_payload = b'test'
+        new_payload = b'mississippi'
+        old_path = tmp_dir_path / old_dir
+        new_path = tmp_dir_path / new_dir
+        old_file_path = old_path / old_file_name
+        new_file_path = new_path / new_file_name
+
+        await fs.mkdir(old_path)
+        await fs.mkdir(new_path)
+
+        async with fs.open(old_file_path, mode='wb') as f:
+            await f.write(old_payload)
+            await f.flush()
+
+        async with fs.open(new_file_path, mode='wb') as f:
+            await f.write(new_payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+        old_statuses_new_dir = set(await fs.liststatus(new_path))
+
+        with pytest.raises(OSError):
+            await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
+
+        async with fs.open(old_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == old_payload
+
+        statuses = set(await fs.liststatus(new_path))
+        assert statuses == old_statuses_new_dir
+
+        async with fs.open(new_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == new_payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_to_ancestor_dir(self, fs, tmp_dir_path):
+        old_file_name = PurePath('old_file')
+        new_file_name = PurePath('new_file')
+        old_dir = PurePath('old')
+        old_payload = b'test'
+        new_payload = b'mississippi'
+        old_path = tmp_dir_path / old_dir
+        old_file_path = old_path / old_file_name
+        new_file_path = tmp_dir_path / new_file_name
+
+        await fs.mkdir(old_path)
+
+        async with fs.open(old_file_path, mode='wb') as f:
+            await f.write(old_payload)
+            await f.flush()
+
+        async with fs.open(new_file_path, mode='wb') as f:
+            await f.write(new_payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
+        with pytest.raises(OSError):
+            await fs.rename(old_path, tmp_dir_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
+
+        async with fs.open(old_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == old_payload
+
+        async with fs.open(new_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == new_payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_to_descended_dir(self, fs, tmp_dir_path):
+        file_name = PurePath('file')
+        old_dir = PurePath('old')
+        new_dir = PurePath('new')
+        payload = b'test'
+        old_path = tmp_dir_path / old_dir
+        new_path = old_path / new_dir
+        old_file_path = old_path / file_name
+
+        await fs.mkdir(old_path)
+
+        async with fs.open(old_file_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
+        with pytest.raises(OSError):
+            await fs.rename(old_path, new_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
+
+        async with fs.open(old_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_rename_dir_to_dot(self, fs, tmp_dir_path):
+        file_name = PurePath('file')
+        old_dir = PurePath('old')
+        payload = b'test'
+        old_path = tmp_dir_path / old_dir
+        old_file_path = old_path / file_name
+
+        await fs.mkdir(old_path)
+
+        async with fs.open(old_file_path, mode='wb') as f:
+            await f.write(payload)
+            await f.flush()
+
+        old_statuses = set(await fs.liststatus(tmp_dir_path))
+        old_statuses_old_dir = set(await fs.liststatus(old_path))
+
+        with pytest.raises(OSError):
+            await fs.rename(old_path, tmp_dir_path / '.')
+
+        with pytest.raises(OSError):
+            await fs.rename(old_path, tmp_dir_path / '..')
+
+        with pytest.raises(OSError):
+            await fs.rename(tmp_dir_path / '.', old_path)
+
+        with pytest.raises(OSError):
+            await fs.rename(tmp_dir_path / '..', old_path)
+
+        statuses = set(await fs.liststatus(tmp_dir_path))
+        assert statuses == old_statuses
+
+        statuses = set(await fs.liststatus(old_path))
+        assert statuses == old_statuses_old_dir
+
+        async with fs.open(old_file_path, mode='rb') as f:
+            real_payload = await f.read()
+            assert real_payload == payload

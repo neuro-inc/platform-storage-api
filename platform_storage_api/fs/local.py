@@ -115,7 +115,10 @@ class FileSystem(metaclass=abc.ABCMeta):
     async def remove(self, path: PurePath) -> None:
         pass
 
-
+    @abc.abstractmethod
+    async def rename(self, old: PurePath, new: PurePath) -> None:
+        pass
+    
 class LocalFileSystem(FileSystem):
     def __init__(
         self, *, executor_max_workers: Optional[int] = None, loop=None, **kwargs
@@ -201,7 +204,17 @@ class LocalFileSystem(FileSystem):
     async def remove(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path)
 
-
+    def _rename(self, old: PurePath, new: PurePath) -> None:
+        concrete_old_path = Path(old)
+        concrete_new_path = Path(new)
+        concrete_old_path.rename(concrete_new_path)
+        
+    async def rename(self, old: PurePath, new: PurePath) -> None:
+        await self._loop.run_in_executor(self._executor,
+                                         self._rename,
+                                         old,
+                                         new)
+    
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
 
 

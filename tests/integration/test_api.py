@@ -1,6 +1,7 @@
 import uuid
 from io import BytesIO
 from time import time as current_time
+from pathlib import PurePath
 from unittest import mock
 
 import aiohttp
@@ -610,3 +611,226 @@ class TestGetFileStatus:
             }
             assert payload["path"].endswith(self.dir3_dir4)  # relative path
             assert payload["modificationTime"] >= mtime_min
+
+
+class TestRename:
+    payload1 = b'test'
+    payload2 = b'mississippi'
+    file1 = 'file1'
+    file2 = 'file2'
+
+    @classmethod
+    def url(cls, server_url, user, path):
+        return f'{server_url}/{user.name}/{path}'
+
+    @pytest.fixture()
+    async def alice(self, regular_user_factory):
+        return await regular_user_factory()
+
+    @pytest.fixture()
+    async def bob(self, regular_user_factory):
+        return await regular_user_factory()
+
+    @classmethod
+    async def put_file(cls, server_url, client, user, path,
+                       payload) -> None:
+        headers = {'Authorization': 'Bearer ' + user.token}
+        url = cls.url(server_url, user, path)
+        async with client.put(url, headers=headers,
+                              data=BytesIO(payload)) \
+                as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+    @classmethod
+    async def put_dir(cls, server_url, client, user, path) -> None:
+        headers = {'Authorization': 'Bearer ' + user.token}
+        url = cls.url(server_url, user, path)
+        params = {'op': 'MKDIRS'}
+        async with client.put(url, headers=headers, params=params) \
+                as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+    @classmethod
+    async def get_filestatus(cls, server_url, client, user, owner, path) \
+            -> aiohttp.web.Response:
+        headers = {'Authorization': 'Bearer ' + user.token}
+        params = {'op': 'GETFILESTATUS'}
+        url = cls.url(server_url, owner, path)
+        return await client.get(url, headers=headers, params=params)
+
+    @classmethod
+    async def assert_filestatus_equal(cls,
+                                      response: aiohttp.web.Response,
+                                      expected: aiohttp.web.Response) -> None:
+        assert response.status == expected.status
+        values_root = await response.json()
+        expected_values_root = await expected.json()
+        expected_values = get_filestatus_dict(expected_values_root)
+        values = get_filestatus_dict(values_root)
+        for strict_key in ['type', 'length', 'modificationTime']:
+            assert values[strict_key] == expected_values[strict_key]
+
+    @classmethod
+    async def rename(cls, server_url, client, user,
+                     owner1, path1, owner2, path2) -> aiohttp.web.Response:
+        headers = {'Authorization': 'Bearer ' + user.token}
+        params = {'op': 'RENAME',
+                  'destination': str(PurePath('/') / owner2.name / path2)}
+        url = cls.url(server_url, owner1, path1)
+        return await client.post(url, headers=headers, params=params)
+
+    @classmethod
+    async def rename_relative(cls, server_url, client, user,
+                              owner1, path1, path2) -> aiohttp.web.Response:
+        headers = {'Authorization': 'Bearer ' + user.token}
+        params = {'op': 'RENAME',
+                  'destination': path2}
+        url = cls.url(server_url, owner1, path1)
+        return await client.post(url, headers=headers, params=params)
+
+    @classmethod
+    async def assert_no_file(cls, server_url, client, owner, user, path):
+        response_status = await cls.get_filestatus(server_url, client, user,
+                                                   owner, path)
+        assert response_status.status == aiohttp.web.HTTPNotFound.status_code
+
+    @pytest.mark.asyncio
+    async def test_rename_file_same_dir(self, server_url, api, client, alice):
+        await self.put_file(server_url, client, alice,
+                            self.file1, self.payload1)
+        old_status = await self.get_filestatus(server_url, client, alice,
+                                               alice, self.file1)
+        rename_status = await self.rename(server_url, client, alice,
+                                          alice, self.file1, alice, self.file2)
+        assert rename_status.status == aiohttp.web.HTTPNoContent.status_code
+        new_status = await self.get_filestatus(server_url, client, alice,
+                                               alice, self.file2)
+        await self.assert_filestatus_equal(new_status, old_status)
+        await self.assert_no_file(server_url, client, alice, alice, self.file1)
+
+    @pytest.mark.asyncio
+    async def test_rename_file_same_dir_relative(self, server_url, api,
+                                                 client, alice):
+        await self.put_file(server_url, client, alice,
+                            self.file1, self.payload1)
+        old_status = await self.get_filestatus(server_url, client, alice,
+                                               alice, self.file1)
+        rename_status = await self.rename_relative(server_url, client, alice,
+                                                   alice, self.file1,
+                                                   self.file2)
+        assert rename_status.status == aiohttp.web.HTTPNoContent.status_code
+        new_status = await self.get_filestatus(server_url, client, alice,
+                                               alice, self.file2)
+        await self.assert_filestatus_equal(new_status, old_status)
+        await self.assert_no_file(server_url, client, alice, alice, self.file1)
+
+    @pytest.mark.asyncio
+    async def test_rename_file_to_existing_file(self, server_url, api,
+                                                client, alice):
+        await self.put_file(server_url, client, alice,
+                            self.file1, self.payload1)
+        await self.put_file(server_url, client, alice,
+                            self.file2, self.payload2)
+        status = await self.get_filestatus(server_url, client, alice,
+                                           alice, self.file1)
+        await self.rename(server_url, client, alice,
+                          alice, self.file1, alice, self.file2)
+        new_status = await self.get_filestatus(server_url, client, alice,
+                                               alice, self.file2)
+        await self.assert_filestatus_equal(status, new_status)
+        await self.assert_no_file(server_url, client, alice, alice, self.file1)
+
+    @pytest.mark.asyncio
+    async def test_alice_rename_file_to_bobs_folder(self, server_url, api,
+                                                    client, alice, bob):
+        await self.put_file(server_url, client, alice,
+                            self.file1, self.payload1)
+        status = await self.get_filestatus(server_url, client, alice,
+                                           alice, self.file1)
+        response = await self.rename(server_url, client, alice,
+                                     alice, self.file1, bob, self.file2)
+        assert response.status == aiohttp.web.HTTPNotFound.status_code
+        new_status = await self.get_filestatus(server_url, client, alice,
+                                               alice, self.file1)
+        await self.assert_filestatus_equal(status, new_status)
+
+    @pytest.mark.asyncio
+    async def test_alice_rename_file_to_bobs_relative(self, server_url, api,
+                                                      client, alice, bob):
+        await self.put_file(server_url, client, alice,
+                            self.file1, self.payload1)
+        status = await self.get_filestatus(server_url, client, alice,
+                                           alice, self.file1)
+        response = await self.rename_relative(server_url, client, alice,
+                                              alice, self.file1,
+                                              f"../{bob.name}/self.file2")
+        assert response.status == aiohttp.web.HTTPNotFound.status_code
+        new_status = await self.get_filestatus(server_url, client, alice,
+                                               alice, self.file1)
+        await self.assert_filestatus_equal(status, new_status)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('permission', ['read', 'write', 'manage'])
+    async def test_alice_rename_file_to_bobs_folder_shared(self,
+                                                           server_url, api,
+                                                           granter, client,
+                                                           alice, bob,
+                                                           permission):
+        await self.put_file(server_url, client, bob,
+                            self.file1, self.payload2)
+        await granter(alice.name, [
+            {'uri': f'storage://{bob.name}',
+             'action': permission}], bob)
+        await self.put_file(server_url, client, alice,
+                            self.file1, self.payload1)
+        status = await self.get_filestatus(server_url, client, alice,
+                                           alice, self.file1)
+        response = await self.rename(server_url, client, alice,
+                                     alice, self.file1, bob, self.file2)
+        if permission == 'read':
+            assert response.status == aiohttp.web.HTTPNotFound.status_code
+            new_status = await self.get_filestatus(server_url, client, alice,
+                                                   alice, self.file1)
+            await self.assert_filestatus_equal(status, new_status)
+            await self.assert_no_file(server_url, client, alice,
+                                      bob, self.file2)
+        else:
+            assert response.status == aiohttp.web.HTTPNoContent.status_code
+            new_status = await self.get_filestatus(server_url, client, alice,
+                                                   bob, self.file2)
+            await self.assert_filestatus_equal(status, new_status)
+            await self.assert_no_file(server_url, client, alice,
+                                      alice, self.file1)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('permission', ['read', 'write', 'manage'])
+    async def test_alice_rename_bobs_files_shared(self,
+                                                  server_url, api,
+                                                  granter, client,
+                                                  alice, bob,
+                                                  permission):
+        await self.put_file(server_url, client, bob,
+                            self.file2, self.payload2)
+        await granter(alice.name, [
+            {'uri': f'storage://{bob.name}',
+             'action': permission}], bob)
+        await self.put_file(server_url, client, alice,
+                            self.file1, self.payload1)
+        status = await self.get_filestatus(server_url, client, alice,
+                                           bob, self.file2)
+        response = await self.rename(server_url, client, alice,
+                                     bob, self.file2, alice, self.file1)
+        if permission == 'read':
+            assert response.status == aiohttp.web.HTTPNotFound.status_code
+            new_status = await self.get_filestatus(server_url, client, alice,
+                                                   bob, self.file2)
+            await self.assert_filestatus_equal(status, new_status)
+            await self.assert_no_file(server_url, client, alice,
+                                      alice, self.file2)
+        else:
+            assert response.status == aiohttp.web.HTTPNoContent.status_code
+            new_status = await self.get_filestatus(server_url, client, alice,
+                                                   alice, self.file1)
+            await self.assert_filestatus_equal(status, new_status)
+            await self.assert_no_file(server_url, client, alice,
+                                      bob, self.file2)
