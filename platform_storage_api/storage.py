@@ -23,9 +23,9 @@ class Storage:
         :param path:
         :return: string which contains sanitized path
         """
-        normpath = os.path.normpath(path)
-        final_path = PurePath("/", normpath)
-        return final_path
+        normpath = os.path.normpath(str(PurePath("/", path)))
+        # final_path = PurePath("/", normpath)
+        return PurePath(normpath)
 
     async def store(self, outstream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))

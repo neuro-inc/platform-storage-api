@@ -23,6 +23,7 @@ class TestStorage:
 
         assert PurePath("/") == storage.sanitize_path("")
         assert PurePath("/") == storage.sanitize_path("super/..")
+        assert PurePath("/") == storage.sanitize_path("super/../../..")
         assert PurePath("/") == storage.sanitize_path("super/../")
         assert PurePath("/path") == storage.sanitize_path("super/../path")
         assert PurePath("/path") == storage.sanitize_path("super/../path/")
