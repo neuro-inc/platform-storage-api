@@ -113,9 +113,8 @@ class StorageHandler:
         raise ValueError(f"Illegal operation: {operation}")
 
     def _get_fs_path_from_request(self, request):
-        user_provided_path = f"{request.match_info.get('path', '')}"
-        sanitized_path = self._storage.sanitize_path(user_provided_path)
-        return PurePath("/", sanitized_path)
+        user_provided_path = f"/{request.match_info.get('path', '')}"
+        return self._storage.sanitize_path(user_provided_path)
 
     async def _handle_create(self, request, storage_path: PurePath):
         # TODO (A Danshyn 04/23/18): check aiohttp default limits

@@ -1,4 +1,3 @@
-import urllib
 from io import BytesIO
 from time import time as current_time
 from unittest import mock
