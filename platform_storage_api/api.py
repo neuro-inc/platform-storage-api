@@ -113,7 +113,7 @@ class StorageHandler:
         raise ValueError(f"Illegal operation: {operation}")
 
     def _get_fs_path_from_request(self, request):
-        user_provided_path = f"/{request.match_info.get('path', '')}"
+        user_provided_path = request.match_info.get("path", "")
         return self._storage.sanitize_path(user_provided_path)
 
     async def _handle_create(self, request, storage_path: PurePath):
