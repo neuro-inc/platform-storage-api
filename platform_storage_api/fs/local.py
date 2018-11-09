@@ -42,10 +42,7 @@ class FileStatus:
 
     @classmethod
     def create_file_status(
-        cls,
-        path: PurePath,
-        size: Optional[int] = None,
-        modification_time: Optional[int] = None,
+        cls, path: PurePath, size: int, modification_time: Optional[int] = None
     ) -> "FileStatus":
         return cls(
             path=path,
@@ -118,7 +115,8 @@ class FileSystem(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def rename(self, old: PurePath, new: PurePath) -> None:
         pass
-    
+
+
 class LocalFileSystem(FileSystem):
     def __init__(
         self, *, executor_max_workers: Optional[int] = None, loop=None, **kwargs
@@ -208,13 +206,11 @@ class LocalFileSystem(FileSystem):
         concrete_old_path = Path(old)
         concrete_new_path = Path(new)
         concrete_old_path.rename(concrete_new_path)
-        
+
     async def rename(self, old: PurePath, new: PurePath) -> None:
-        await self._loop.run_in_executor(self._executor,
-                                         self._rename,
-                                         old,
-                                         new)
-    
+        await self._loop.run_in_executor(self._executor, self._rename, old, new)
+
+
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
 
 

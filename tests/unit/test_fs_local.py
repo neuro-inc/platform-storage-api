@@ -326,11 +326,13 @@ class TestLocalFileSystem:
     def statuses_rename(cls, statuses, old_path, new_path):
         def rename(status):
             if status.path == old_path:
-                return FileStatus(path=new_path,
-                                  type=status.type,
-                                  size=status.size,
-                                  modification_time=status.modification_time,
-                                  permission=status.permission)
+                return FileStatus(
+                    path=new_path,
+                    type=status.type,
+                    size=status.size,
+                    modification_time=status.modification_time,
+                    permission=status.permission,
+                )
             else:
                 return status
 
@@ -338,13 +340,13 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_rename_file_same_dir(self, fs, tmp_dir_path):
-        old_name = PurePath('old')
-        new_name = PurePath('new')
-        payload = b'test'
+        old_name = PurePath("old")
+        new_name = PurePath("new")
+        payload = b"test"
         old_path = tmp_dir_path / old_name
         new_path = tmp_dir_path / new_name
 
-        async with fs.open(old_path, mode='wb') as f:
+        async with fs.open(old_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -353,11 +355,10 @@ class TestLocalFileSystem:
         await fs.rename(old_path, new_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))
-        expected_statuses = self.statuses_rename(old_statuses,
-                                                 old_name, new_name)
+        expected_statuses = self.statuses_rename(old_statuses, old_name, new_name)
         assert statuses == expected_statuses
 
-        async with fs.open(new_path, mode='rb') as f:
+        async with fs.open(new_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
@@ -365,15 +366,15 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_rename_file_different_dir(self, fs, tmp_dir_path):
-        old_name = PurePath('old')
-        subdir = PurePath('nested')
-        new_name = PurePath('new')
-        payload = b'test'
+        old_name = PurePath("old")
+        subdir = PurePath("nested")
+        new_name = PurePath("new")
+        payload = b"test"
         old_path = tmp_dir_path / old_name
         subdir_path = tmp_dir_path / subdir
         new_path = subdir_path / new_name
 
-        async with fs.open(old_path, mode='wb') as f:
+        async with fs.open(old_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -390,21 +391,21 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(subdir_path))
         assert statuses == self.statuses_rename({renaming_status}, old_name, new_name)
 
-        async with fs.open(new_path, mode='rb') as f:
+        async with fs.open(new_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_file_nonexistent_dir(self, fs, tmp_dir_path):
-        old_name = PurePath('old')
-        subdir = PurePath('nested')
-        new_name = PurePath('new')
-        payload = b'test'
+        old_name = PurePath("old")
+        subdir = PurePath("nested")
+        new_name = PurePath("new")
+        payload = b"test"
         old_path = tmp_dir_path / old_name
         subdir_path = tmp_dir_path / subdir
         new_path = subdir_path / new_name
 
-        async with fs.open(old_path, mode='wb') as f:
+        async with fs.open(old_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -416,19 +417,19 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(tmp_dir_path))
         assert statuses == old_statuses
 
-        async with fs.open(old_path, mode='rb') as f:
+        async with fs.open(old_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_file_to_dir(self, fs, tmp_dir_path):
-        old_name = PurePath('old')
-        subdir = PurePath('nested')
-        payload = b'test'
+        old_name = PurePath("old")
+        subdir = PurePath("nested")
+        payload = b"test"
         old_path = tmp_dir_path / old_name
         subdir_path = tmp_dir_path / subdir
 
-        async with fs.open(old_path, mode='wb') as f:
+        async with fs.open(old_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -446,19 +447,19 @@ class TestLocalFileSystem:
         statuses = await fs.liststatus(subdir_path)
         assert statuses == []
 
-        async with fs.open(old_path, mode='rb') as f:
+        async with fs.open(old_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_file_no_file(self, fs, tmp_dir_path):
-        old_name = PurePath('old')
-        new_name = PurePath('new')
-        payload = b'test'
+        old_name = PurePath("old")
+        new_name = PurePath("new")
+        payload = b"test"
         old_path = tmp_dir_path / old_name
         new_path = tmp_dir_path / new_name
 
-        async with fs.open(new_path, mode='wb') as f:
+        async with fs.open(new_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -470,17 +471,17 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(tmp_dir_path))
         assert statuses == old_statuses
 
-        async with fs.open(new_path, mode='rb') as f:
+        async with fs.open(new_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_file_self(self, fs, tmp_dir_path):
-        name = PurePath('file')
-        payload = b'test'
+        name = PurePath("file")
+        payload = b"test"
         path = tmp_dir_path / name
 
-        async with fs.open(path, mode='wb') as f:
+        async with fs.open(path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -491,24 +492,24 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(tmp_dir_path))
         assert statuses == old_statuses
 
-        async with fs.open(path, mode='rb') as f:
+        async with fs.open(path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_file_to_existing_file(self, fs, tmp_dir_path):
-        old_name = PurePath('old')
-        new_name = PurePath('new')
-        old_payload = b'test'
-        new_payload = b'mississippi'
+        old_name = PurePath("old")
+        new_name = PurePath("new")
+        old_payload = b"test"
+        new_payload = b"mississippi"
         old_path = tmp_dir_path / old_name
         new_path = tmp_dir_path / new_name
 
-        async with fs.open(old_path, mode='wb') as f:
+        async with fs.open(old_path, mode="wb") as f:
             await f.write(old_payload)
             await f.flush()
 
-        async with fs.open(new_path, mode='wb') as f:
+        async with fs.open(new_path, mode="wb") as f:
             await f.write(new_payload)
             await f.flush()
 
@@ -518,20 +519,19 @@ class TestLocalFileSystem:
 
         statuses = set(await fs.liststatus(tmp_dir_path))
         expected_statuses = self.statuses_drop(old_statuses, new_name)
-        expected_statuses = self.statuses_rename(expected_statuses,
-                                                 old_name, new_name)
+        expected_statuses = self.statuses_rename(expected_statuses, old_name, new_name)
         assert statuses == expected_statuses
 
-        async with fs.open(new_path, mode='rb') as f:
+        async with fs.open(new_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == old_payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_same_dir(self, fs, tmp_dir_path):
-        file_name = PurePath('file')
-        old_dir = PurePath('old')
-        new_dir = PurePath('new')
-        payload = b'test'
+        file_name = PurePath("file")
+        old_dir = PurePath("old")
+        new_dir = PurePath("new")
+        payload = b"test"
         old_path = tmp_dir_path / old_dir
         new_path = tmp_dir_path / new_dir
         old_file_path = old_path / file_name
@@ -539,7 +539,7 @@ class TestLocalFileSystem:
 
         await fs.mkdir(old_path)
 
-        async with fs.open(old_file_path, mode='wb') as f:
+        async with fs.open(old_file_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -549,23 +549,22 @@ class TestLocalFileSystem:
         await fs.rename(old_path, new_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))
-        assert statuses == self.statuses_rename(old_statuses,
-                                                old_dir, new_dir)
+        assert statuses == self.statuses_rename(old_statuses, old_dir, new_dir)
 
         statuses = set(await fs.liststatus(new_path))
         assert statuses == old_statuses_old_dir
 
-        async with fs.open(new_file_path, mode='rb') as f:
+        async with fs.open(new_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_different_dir(self, fs, tmp_dir_path):
-        file_name = PurePath('file')
-        old_dir = PurePath('old')
-        new_dir = PurePath('new')
-        nested_dir = PurePath('nested')
-        payload = b'test'
+        file_name = PurePath("file")
+        old_dir = PurePath("old")
+        new_dir = PurePath("new")
+        nested_dir = PurePath("nested")
+        payload = b"test"
         old_path = tmp_dir_path / old_dir
         nested_path = tmp_dir_path / nested_dir
         new_path = nested_path / new_dir
@@ -575,7 +574,7 @@ class TestLocalFileSystem:
         await fs.mkdir(old_path)
         await fs.mkdir(nested_path)
 
-        async with fs.open(old_file_path, mode='wb') as f:
+        async with fs.open(old_file_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -588,24 +587,23 @@ class TestLocalFileSystem:
 
         statuses = set(await fs.liststatus(nested_path))
         expected_statuses = self.statuses_drop(old_statuses, nested_dir)
-        expected_statuses = self.statuses_rename(expected_statuses,
-                                                 old_dir, new_dir)
+        expected_statuses = self.statuses_rename(expected_statuses, old_dir, new_dir)
         assert statuses == expected_statuses
 
         statuses = set(await fs.liststatus(new_path))
         assert statuses == old_statuses_old_dir
 
-        async with fs.open(new_file_path, mode='rb') as f:
+        async with fs.open(new_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_nonexistent_dir(self, fs, tmp_dir_path):
-        file_name = PurePath('file')
-        old_dir = PurePath('old')
-        new_dir = PurePath('new')
-        nested_dir = PurePath('nested')
-        payload = b'test'
+        file_name = PurePath("file")
+        old_dir = PurePath("old")
+        new_dir = PurePath("new")
+        nested_dir = PurePath("nested")
+        payload = b"test"
         old_path = tmp_dir_path / old_dir
         nested_path = tmp_dir_path / nested_dir
         new_path = nested_path / new_dir
@@ -613,7 +611,7 @@ class TestLocalFileSystem:
 
         await fs.mkdir(old_path)
 
-        async with fs.open(old_file_path, mode='wb') as f:
+        async with fs.open(old_file_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -629,21 +627,21 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(old_path))
         assert statuses == old_statuses_old_dir
 
-        async with fs.open(old_file_path, mode='rb') as f:
+        async with fs.open(old_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_to_file(self, fs, tmp_dir_path):
-        old_dir = PurePath('old')
-        new_file = PurePath('new')
-        payload = b'test'
+        old_dir = PurePath("old")
+        new_file = PurePath("new")
+        payload = b"test"
         old_path = tmp_dir_path / old_dir
         new_path = tmp_dir_path / new_file
 
         await fs.mkdir(old_path)
 
-        async with fs.open(new_path, mode='wb') as f:
+        async with fs.open(new_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -659,16 +657,16 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(old_path))
         assert statuses == old_statuses_old_dir
 
-        async with fs.open(new_path, mode='rb') as f:
+        async with fs.open(new_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_to_empty_dir(self, fs, tmp_dir_path):
-        file_name = PurePath('file')
-        old_dir = PurePath('old')
-        new_dir = PurePath('new')
-        payload = b'test'
+        file_name = PurePath("file")
+        old_dir = PurePath("old")
+        new_dir = PurePath("new")
+        payload = b"test"
         old_path = tmp_dir_path / old_dir
         new_path = tmp_dir_path / new_dir
         old_file_path = old_path / file_name
@@ -677,7 +675,7 @@ class TestLocalFileSystem:
         await fs.mkdir(old_path)
         await fs.mkdir(new_path)
 
-        async with fs.open(old_file_path, mode='wb') as f:
+        async with fs.open(old_file_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -688,25 +686,24 @@ class TestLocalFileSystem:
 
         statuses = set(await fs.liststatus(tmp_dir_path))
         expected_statuses = self.statuses_drop(old_statuses, new_dir)
-        expected_statuses = self.statuses_rename(expected_statuses,
-                                                 old_dir, new_dir)
+        expected_statuses = self.statuses_rename(expected_statuses, old_dir, new_dir)
         assert statuses == expected_statuses
 
         statuses = set(await fs.liststatus(new_path))
         statuses = old_statuses_old_dir
 
-        async with fs.open(new_file_path, mode='rb') as f:
+        async with fs.open(new_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_to_nonempty_dir(self, fs, tmp_dir_path):
-        old_file_name = PurePath('old_file')
-        new_file_name = PurePath('new_file')
-        old_dir = PurePath('old')
-        new_dir = PurePath('new')
-        old_payload = b'test'
-        new_payload = b'mississippi'
+        old_file_name = PurePath("old_file")
+        new_file_name = PurePath("new_file")
+        old_dir = PurePath("old")
+        new_dir = PurePath("new")
+        old_payload = b"test"
+        new_payload = b"mississippi"
         old_path = tmp_dir_path / old_dir
         new_path = tmp_dir_path / new_dir
         old_file_path = old_path / old_file_name
@@ -715,11 +712,11 @@ class TestLocalFileSystem:
         await fs.mkdir(old_path)
         await fs.mkdir(new_path)
 
-        async with fs.open(old_file_path, mode='wb') as f:
+        async with fs.open(old_file_path, mode="wb") as f:
             await f.write(old_payload)
             await f.flush()
 
-        async with fs.open(new_file_path, mode='wb') as f:
+        async with fs.open(new_file_path, mode="wb") as f:
             await f.write(new_payload)
             await f.flush()
 
@@ -736,35 +733,35 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(old_path))
         assert statuses == old_statuses_old_dir
 
-        async with fs.open(old_file_path, mode='rb') as f:
+        async with fs.open(old_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == old_payload
 
         statuses = set(await fs.liststatus(new_path))
         assert statuses == old_statuses_new_dir
 
-        async with fs.open(new_file_path, mode='rb') as f:
+        async with fs.open(new_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == new_payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_to_ancestor_dir(self, fs, tmp_dir_path):
-        old_file_name = PurePath('old_file')
-        new_file_name = PurePath('new_file')
-        old_dir = PurePath('old')
-        old_payload = b'test'
-        new_payload = b'mississippi'
+        old_file_name = PurePath("old_file")
+        new_file_name = PurePath("new_file")
+        old_dir = PurePath("old")
+        old_payload = b"test"
+        new_payload = b"mississippi"
         old_path = tmp_dir_path / old_dir
         old_file_path = old_path / old_file_name
         new_file_path = tmp_dir_path / new_file_name
 
         await fs.mkdir(old_path)
 
-        async with fs.open(old_file_path, mode='wb') as f:
+        async with fs.open(old_file_path, mode="wb") as f:
             await f.write(old_payload)
             await f.flush()
 
-        async with fs.open(new_file_path, mode='wb') as f:
+        async with fs.open(new_file_path, mode="wb") as f:
             await f.write(new_payload)
             await f.flush()
 
@@ -780,27 +777,27 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(old_path))
         assert statuses == old_statuses_old_dir
 
-        async with fs.open(old_file_path, mode='rb') as f:
+        async with fs.open(old_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == old_payload
 
-        async with fs.open(new_file_path, mode='rb') as f:
+        async with fs.open(new_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == new_payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_to_descended_dir(self, fs, tmp_dir_path):
-        file_name = PurePath('file')
-        old_dir = PurePath('old')
-        new_dir = PurePath('new')
-        payload = b'test'
+        file_name = PurePath("file")
+        old_dir = PurePath("old")
+        new_dir = PurePath("new")
+        payload = b"test"
         old_path = tmp_dir_path / old_dir
         new_path = old_path / new_dir
         old_file_path = old_path / file_name
 
         await fs.mkdir(old_path)
 
-        async with fs.open(old_file_path, mode='wb') as f:
+        async with fs.open(old_file_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -816,21 +813,21 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(old_path))
         assert statuses == old_statuses_old_dir
 
-        async with fs.open(old_file_path, mode='rb') as f:
+        async with fs.open(old_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
     async def test_rename_dir_to_dot(self, fs, tmp_dir_path):
-        file_name = PurePath('file')
-        old_dir = PurePath('old')
-        payload = b'test'
+        file_name = PurePath("file")
+        old_dir = PurePath("old")
+        payload = b"test"
         old_path = tmp_dir_path / old_dir
         old_file_path = old_path / file_name
 
         await fs.mkdir(old_path)
 
-        async with fs.open(old_file_path, mode='wb') as f:
+        async with fs.open(old_file_path, mode="wb") as f:
             await f.write(payload)
             await f.flush()
 
@@ -838,16 +835,16 @@ class TestLocalFileSystem:
         old_statuses_old_dir = set(await fs.liststatus(old_path))
 
         with pytest.raises(OSError):
-            await fs.rename(old_path, tmp_dir_path / '.')
+            await fs.rename(old_path, tmp_dir_path / ".")
 
         with pytest.raises(OSError):
-            await fs.rename(old_path, tmp_dir_path / '..')
+            await fs.rename(old_path, tmp_dir_path / "..")
 
         with pytest.raises(OSError):
-            await fs.rename(tmp_dir_path / '.', old_path)
+            await fs.rename(tmp_dir_path / ".", old_path)
 
         with pytest.raises(OSError):
-            await fs.rename(tmp_dir_path / '..', old_path)
+            await fs.rename(tmp_dir_path / "..", old_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))
         assert statuses == old_statuses
@@ -855,6 +852,6 @@ class TestLocalFileSystem:
         statuses = set(await fs.liststatus(old_path))
         assert statuses == old_statuses_old_dir
 
-        async with fs.open(old_file_path, mode='rb') as f:
+        async with fs.open(old_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload

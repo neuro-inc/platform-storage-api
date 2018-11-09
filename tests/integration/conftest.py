@@ -2,7 +2,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import NamedTuple, Optional
+from typing import Dict, List, NamedTuple, Optional
 
 import aiohttp
 import pytest
@@ -138,3 +138,11 @@ async def granter(auth_client, admin_token):
             assert p.status == 201
 
     return f
+
+
+def get_liststatus_dict(response_json: Dict) -> List:
+    return response_json["FileStatuses"]["FileStatus"]
+
+
+def get_filestatus_dict(response_json: Dict) -> Dict:
+    return response_json["FileStatus"]
