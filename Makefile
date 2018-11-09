@@ -51,7 +51,7 @@ _test_integration:
 	pytest -vv tests/integration
 
 _lint:
-	black --check platform_storage_api tests setup.py pip_extra_index_url.py
+	black --check platform_storage_api tests setup.py
 	flake8 platform_storage_api tests
 
 run:
