@@ -304,12 +304,10 @@ class StorageHandler:
         # TODO (Rafa Zubairov): test if user accessing his own data,
         # then use JWT token claims
         try:
-            await check_authorized(request)
+            await check_permission(request, action, [permission])
         except HTTPUnauthorized:
             # TODO (Rafa Zubairov): Use tree based approach here
             self._raise_unauthorized()
-        try:
-            await check_permission(request, action, [permission])
         except aiohttp.web.HTTPForbidden:
             raise aiohttp.web.HTTPNotFound()
 
