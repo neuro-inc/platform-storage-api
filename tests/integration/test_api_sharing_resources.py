@@ -5,8 +5,7 @@ from unittest import mock
 import pytest
 
 from platform_storage_api.fs.local import FileStatusType
-
-from ..conftest import get_liststatus_dict
+from tests.integration.conftest import get_liststatus_dict
 
 
 class TestStorageListAndResourceSharing:

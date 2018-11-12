@@ -2,7 +2,7 @@ import asyncio
 import logging
 from enum import Enum
 from pathlib import PurePath
-from typing import List, Optional, Iterator
+from typing import Iterator, List, Optional
 
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
@@ -14,7 +14,7 @@ from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
 
 from .config import Config
-from .fs.local import FileStatus, LocalFileSystem, FileStatusPermission
+from .fs.local import FileStatus, FileStatusPermission, LocalFileSystem
 from .storage import Storage
 
 
@@ -73,7 +73,7 @@ class StorageHandler:
             (
                 # TODO (A Danshyn 04/23/18): add some unit test for path matching
                 aiohttp.web.put(r"/{path:.*}", self.handle_put),
-                aiohttp.web.post(r'/{path:.*}', self.handle_post),
+                aiohttp.web.post(r"/{path:.*}", self.handle_post),
                 aiohttp.web.get(r"/{path:.*}", self.handle_get),
                 aiohttp.web.delete(r"/{path:.*}", self.handle_delete),
             )
@@ -121,7 +121,7 @@ class StorageHandler:
             storage_path: PurePath = self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, str(storage_path))
             return await self._handle_rename(storage_path, request)
-        raise ValueError(f'Illegal operation: {operation}')
+        raise ValueError(f"Illegal operation: {operation}")
 
     def _get_fs_path_from_request(self, request):
         return PurePath("/", request.match_info["path"])
@@ -244,13 +244,14 @@ class StorageHandler:
         raise aiohttp.web.HTTPNoContent()
 
     async def _handle_rename(self, old: PurePath, request: Request):
-        if 'destination' not in request.query:
+        if "destination" not in request.query:
             return aiohttp.web.json_response(
-                {'error': 'No destination'},
-                status=aiohttp.web.HTTPBadRequest.status_code)
+                {"error": "No destination"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
         try:
-            new = PurePath(request.query['destination'])
-            if new.root == '':
+            new = PurePath(request.query["destination"])
+            if new.root == "":
                 new = old.parent / new
             await self._check_user_permissions(request, str(new))
             await self._storage.rename(old, new)
@@ -258,16 +259,19 @@ class StorageHandler:
             raise aiohttp.web.HTTPNotFound()
         except IsADirectoryError:
             return aiohttp.web.json_response(
-                {'error': 'Destination is a directory'},
-                status=aiohttp.web.HTTPBadRequest.status_code)
+                {"error": "Destination is a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
         except NotADirectoryError:
             return aiohttp.web.json_response(
-                {'error': 'Destination is a directory'},
-                status=aiohttp.web.HTTPBadRequest.status_code)
+                {"error": "Destination is a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
         except OSError:
             return aiohttp.web.json_response(
-                {'error': 'Incorrect destination'},
-                status=aiohttp.web.HTTPBadRequest.status_code)
+                {"error": "Incorrect destination"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
         return aiohttp.web.HTTPNoContent()
 
     @classmethod

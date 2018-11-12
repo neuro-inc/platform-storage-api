@@ -43,9 +43,8 @@ class Storage:
         await self._fs.remove(real_path)
 
     async def rename(
-            self,
-            old: Union[PurePath, str],
-            new: Union[PurePath, str]) -> None:
+        self, old: Union[PurePath, str], new: Union[PurePath, str]
+    ) -> None:
         real_old = self._resolve_real_path(PurePath(old))
         real_new = self._resolve_real_path(PurePath(new))
         await self._fs.rename(real_old, real_new)
