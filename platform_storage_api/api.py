@@ -418,7 +418,7 @@ def main():
 
     loop = asyncio.get_event_loop()
 
-    fs = LocalFileSystem()
+    fs = LocalFileSystem(executor_max_workers=config.storage.fs_local_thread_pool_size)
     storage = Storage(fs, config.storage.fs_local_base_path)
 
     async def _init_storage(app):
