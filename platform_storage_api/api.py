@@ -272,7 +272,7 @@ class StorageHandler:
                 {"error": "Incorrect destination"},
                 status=aiohttp.web.HTTPBadRequest.status_code,
             )
-        return aiohttp.web.HTTPNoContent()
+        raise aiohttp.web.HTTPNoContent()
 
     @classmethod
     def _convert_filestatus_to_primitive(cls, status: FileStatus):
