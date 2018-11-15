@@ -26,6 +26,7 @@ class AuthConfig:
 @dataclass(frozen=True)
 class StorageConfig:
     fs_local_base_path: PurePath
+    fs_local_thread_pool_size: int = 100
 
     @classmethod
     def from_environ(cls, environ=None) -> "StorageConfig":
@@ -49,7 +50,16 @@ class EnvironConfigFactory:
 
     def create_storage(self) -> StorageConfig:
         fs_local_base_path = self._environ["NP_STORAGE_LOCAL_BASE_PATH"]
-        return StorageConfig(fs_local_base_path=PurePath(fs_local_base_path))
+        fs_local_thread_pool_size = int(
+            self._environ.get(
+                "NP_STORAGE_LOCAL_THREAD_POOL_SIZE",
+                StorageConfig.fs_local_thread_pool_size,
+            )
+        )
+        return StorageConfig(
+            fs_local_base_path=PurePath(fs_local_base_path),
+            fs_local_thread_pool_size=fs_local_thread_pool_size,
+        )
 
     def create_server(self) -> ServerConfig:
         port = int(self._environ.get("NP_STORAGE_API_PORT", ServerConfig.port))

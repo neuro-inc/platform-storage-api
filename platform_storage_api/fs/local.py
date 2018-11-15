@@ -4,12 +4,16 @@ import enum
 import io
 import os
 import shutil
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
 from typing import List, Optional
 
 import aiofiles
+
+
+logger = logging.getLogger()
 
 
 # TODO (A Danshyn 04/23/18): likely should be revisited
@@ -130,6 +134,10 @@ class LocalFileSystem(FileSystem):
         self._executor = ThreadPoolExecutor(
             max_workers=self._executor_max_workers,
             thread_name_prefix="LocalFileSystemThread",
+        )
+        logger.info(
+            "Initialized LocalFileSystem with a thread pool of size %s",
+            self._executor_max_workers,
         )
 
     async def close(self) -> None:
