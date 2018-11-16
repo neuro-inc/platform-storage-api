@@ -17,6 +17,19 @@ class AsyncBytesIO(BytesIO):
 
 
 class TestStorage:
+    def test_path_sanitize(self, local_fs, local_tmp_dir_path) -> None:
+        base_path = local_tmp_dir_path
+        storage = Storage(fs=local_fs, base_path=base_path)
+
+        assert PurePath("/") == storage.sanitize_path("")
+        assert PurePath("/") == storage.sanitize_path("super/..")
+        assert PurePath("/") == storage.sanitize_path("super/../../..")
+        assert PurePath("/") == storage.sanitize_path("super/../")
+        assert PurePath("/path") == storage.sanitize_path("super/../path")
+        assert PurePath("/path") == storage.sanitize_path("super/../path/")
+        assert PurePath("/path") == storage.sanitize_path("/super/../path/")
+        assert PurePath("/") == storage.sanitize_path("/super/../path/../..")
+
     @pytest.mark.asyncio
     async def test_store(self, local_fs, local_tmp_dir_path):
         base_path = local_tmp_dir_path

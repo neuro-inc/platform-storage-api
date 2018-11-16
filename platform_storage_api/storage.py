@@ -1,3 +1,4 @@
+import os
 from pathlib import PurePath
 from typing import List, Union
 
@@ -14,6 +15,16 @@ class Storage:
     def _resolve_real_path(self, path: PurePath) -> PurePath:
         # TODO: (A Danshyn 04/23/18): validate paths
         return PurePath(self._base_path, path.relative_to("/"))
+
+    def sanitize_path(self, path: str) -> PurePath:
+        """
+        Sanitize path - it shall in the end depend on the implementation of the
+        underlying storage subsystem, while now put it here.
+        :param path:
+        :return: string which contains sanitized path
+        """
+        normpath = os.path.normpath(str(PurePath("/", path)))
+        return PurePath(normpath)
 
     async def store(self, outstream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
