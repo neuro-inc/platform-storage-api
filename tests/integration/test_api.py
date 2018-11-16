@@ -241,7 +241,7 @@ class TestStorage:
         async with client.put(dir_url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
-            assert payload["error"] == f"{path_str} is not a directory"
+            assert payload["error"] == "Predescessor is not a directory"
 
 
     @pytest.mark.asyncio

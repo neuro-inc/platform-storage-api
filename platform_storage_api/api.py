@@ -243,6 +243,11 @@ class StorageHandler:
             return aiohttp.web.json_response(
                 {"error": "File exists"}, status=aiohttp.web.HTTPBadRequest.status_code
             )
+        except NotADirectoryError:
+            return aiohttp.web.json_response(
+                {"error": "Predescessor is not a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
         raise aiohttp.web.HTTPCreated()
 
     async def _handle_delete(self, storage_path: PurePath):
