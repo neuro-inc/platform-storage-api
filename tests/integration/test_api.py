@@ -173,9 +173,7 @@ class TestStorage:
             assert response.status == 404
 
     @pytest.mark.asyncio
-    async def test_liststatus_file(
-        self, server_url, api, client, regular_user_factory
-    ):
+    async def test_liststatus_file(self, server_url, api, client, regular_user_factory):
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -262,7 +260,9 @@ class TestStorage:
             assert payload["error"] == "Predescessor is not a directory"
 
     @pytest.mark.asyncio
-    async def test_put_target_is_directory(self, server_url, client, regular_user_factory, api):
+    async def test_put_target_is_directory(
+        self, server_url, client, regular_user_factory, api
+    ):
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -275,7 +275,6 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "Destination is a directory"
-
 
     @pytest.mark.asyncio
     async def test_delete_non_existent(
