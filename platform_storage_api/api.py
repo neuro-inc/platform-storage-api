@@ -278,7 +278,7 @@ class StorageHandler:
             )
         except NotADirectoryError:
             return aiohttp.web.json_response(
-                {"error": "Destination is a directory"},
+                {"error": "Destination is not a directory"},
                 status=aiohttp.web.HTTPBadRequest.status_code,
             )
         except OSError:
