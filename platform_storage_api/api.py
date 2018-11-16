@@ -190,7 +190,11 @@ class StorageHandler:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
-
+        except NotADirectoryError:
+            return aiohttp.web.json_response(
+                {"error": "Not a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
         filtered_statuses = self._liststatus_filter(statuses, access_tree)
         primitive_statuses = {
             "FileStatuses": {

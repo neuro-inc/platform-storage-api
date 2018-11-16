@@ -188,7 +188,7 @@ class TestStorage:
         async with client.get(url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
-            assert payload["error"] == "Is not a directory"
+            assert payload["error"] == "Not a directory"
 
     @pytest.mark.asyncio
     async def test_mkdirs(self, server_url, api, client, regular_user_factory):
