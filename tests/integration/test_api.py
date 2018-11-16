@@ -225,6 +225,19 @@ class TestStorage:
             assert payload["error"] == "File exists"
 
     @pytest.mark.asyncio
+    async def test_put_target_is_directory(self, server_url, client, regular_user_factory, api):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test"
+        params = {"op": "MKDIRS"}
+        async with client.put(url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+
+    @pytest.mark.asyncio
     async def test_delete_non_existent(
         self, server_url, api, client, regular_user_factory
     ):
