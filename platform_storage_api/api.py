@@ -130,7 +130,14 @@ class StorageHandler:
 
     async def _handle_create(self, request, storage_path: PurePath):
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
-        await self._storage.store(request.content, storage_path)
+        try:
+            await self._storage.store(request.content, storage_path)
+        except IsADirectoryError:
+            return aiohttp.web.json_response(
+                {"error": "Destination is a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
+
         return aiohttp.web.Response(status=201)
 
     def _parse_operation(self, request) -> Optional[StorageOperation]:
