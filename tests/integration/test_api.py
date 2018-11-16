@@ -173,6 +173,24 @@ class TestStorage:
             assert response.status == 404
 
     @pytest.mark.asyncio
+    async def test_liststatus_file(
+        self, server_url, api, client, regular_user_factory
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test"
+
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        params = {"op": "LISTSTATUS"}
+        async with client.get(url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert payload["error"] == "Is not a directory"
+
+    @pytest.mark.asyncio
     async def test_mkdirs(self, server_url, api, client, regular_user_factory):
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -242,7 +260,6 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "Predescessor is not a directory"
-
 
     @pytest.mark.asyncio
     async def test_put_target_is_directory(self, server_url, client, regular_user_factory, api):
