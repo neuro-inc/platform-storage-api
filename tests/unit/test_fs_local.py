@@ -382,11 +382,18 @@ class TestLocalFileSystem:
 
         old_statuses = set(await fs.liststatus(tmp_dir_path))
         renaming_status = self.statuses_get(old_statuses, old_name)
+        old_subdir_status = self.statuses_get(old_statuses, subdir)
 
         await fs.rename(old_path, new_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))
-        assert statuses | {renaming_status} == old_statuses
+        new_subdir_status = self.statuses_get(statuses, subdir)
+        assert (
+            new_subdir_status.modification_time >= old_subdir_status.modification_time
+        )
+        assert statuses | {renaming_status} | {old_subdir_status} == old_statuses | {
+            new_subdir_status
+        }
 
         statuses = set(await fs.liststatus(subdir_path))
         assert statuses == self.statuses_rename({renaming_status}, old_name, new_name)
@@ -580,10 +587,18 @@ class TestLocalFileSystem:
 
         old_statuses = set(await fs.liststatus(tmp_dir_path))
         old_statuses_old_dir = set(await fs.liststatus(old_path))
+        renaming_status = self.statuses_get(old_statuses, old_dir)
+        old_subdir_status = self.statuses_get(old_statuses, nested_dir)
         await fs.rename(old_path, new_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))
-        assert statuses == self.statuses_drop(old_statuses, old_dir)
+        new_subdir_status = self.statuses_get(statuses, nested_dir)
+        assert (
+            new_subdir_status.modification_time >= old_subdir_status.modification_time
+        )
+        assert statuses | {renaming_status} | {old_subdir_status} == old_statuses | {
+            new_subdir_status
+        }
 
         statuses = set(await fs.liststatus(nested_path))
         expected_statuses = self.statuses_drop(old_statuses, nested_dir)
