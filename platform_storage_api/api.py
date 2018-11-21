@@ -7,12 +7,11 @@ from typing import Iterator, List, Optional
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
+from aiohttp_security import check_authorized, check_permission
+from async_exit_stack import AsyncExitStack
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
-
-from aiohttp_security import check_authorized, check_permission
-from async_exit_stack import AsyncExitStack
 
 from .config import Config
 from .fs.local import FileStatus, FileStatusPermission, LocalFileSystem
@@ -130,7 +129,14 @@ class StorageHandler:
 
     async def _handle_create(self, request, storage_path: PurePath):
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
-        await self._storage.store(request.content, storage_path)
+        try:
+            await self._storage.store(request.content, storage_path)
+        except IsADirectoryError:
+            return aiohttp.web.json_response(
+                {"error": "Destination is a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
+
         return aiohttp.web.Response(status=201)
 
     def _parse_operation(self, request) -> Optional[StorageOperation]:
@@ -183,7 +189,11 @@ class StorageHandler:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
-
+        except NotADirectoryError:
+            return aiohttp.web.json_response(
+                {"error": "Not a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
         filtered_statuses = self._liststatus_filter(statuses, access_tree)
         primitive_statuses = {
             "FileStatuses": {
@@ -236,6 +246,11 @@ class StorageHandler:
             return aiohttp.web.json_response(
                 {"error": "File exists"}, status=aiohttp.web.HTTPBadRequest.status_code
             )
+        except NotADirectoryError:
+            return aiohttp.web.json_response(
+                {"error": "Predescessor is not a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
         raise aiohttp.web.HTTPCreated()
 
     async def _handle_delete(self, storage_path: PurePath):
@@ -266,7 +281,7 @@ class StorageHandler:
             )
         except NotADirectoryError:
             return aiohttp.web.json_response(
-                {"error": "Destination is a directory"},
+                {"error": "Destination is not a directory"},
                 status=aiohttp.web.HTTPBadRequest.status_code,
             )
         except OSError:

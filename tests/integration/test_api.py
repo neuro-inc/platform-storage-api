@@ -173,6 +173,22 @@ class TestStorage:
             assert response.status == 404
 
     @pytest.mark.asyncio
+    async def test_liststatus_file(self, server_url, api, client, regular_user_factory):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test"
+
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        params = {"op": "LISTSTATUS"}
+        async with client.get(url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert payload["error"] == "Not a directory"
+
+    @pytest.mark.asyncio
     async def test_mkdirs(self, server_url, api, client, regular_user_factory):
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -223,6 +239,42 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "File exists"
+
+    @pytest.mark.asyncio
+    async def test_mkdirs_existent_parent_file(
+        self, server_url, api, client, regular_user_factory
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
+        url = f"{server_url}{path_str}"
+        dir_url = f"{server_url}{path_str}/dir"
+        payload = b"test"
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        params = {"op": "MKDIRS"}
+        async with client.put(dir_url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert payload["error"] == "Predescessor is not a directory"
+
+    @pytest.mark.asyncio
+    async def test_put_target_is_directory(
+        self, server_url, client, regular_user_factory, api
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test"
+        params = {"op": "MKDIRS"}
+        async with client.put(url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert payload["error"] == "Destination is a directory"
 
     @pytest.mark.asyncio
     async def test_delete_non_existent(
