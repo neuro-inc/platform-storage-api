@@ -120,6 +120,10 @@ class FileSystem(metaclass=abc.ABCMeta):
     async def rename(self, old: PurePath, new: PurePath) -> None:
         pass
 
+    @abc.abstractmethod
+    async def close_and_sync_file(self, file: io.FileIO) -> None:
+        pass
+
 
 class LocalFileSystem(FileSystem):
     def __init__(
@@ -217,6 +221,16 @@ class LocalFileSystem(FileSystem):
 
     async def rename(self, old: PurePath, new: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
+
+    def _close_and_sync_file(self, file: io.FileIO) -> None:
+        file.flush()
+        os.fsync(file.fileno())
+        file.close()
+
+    async def close_and_sync_file(self, file: io.FileIO) -> List[PurePath]:
+        return await self._loop.run_in_executor(
+            self._executor, self._close_and_sync_file, file
+        )
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
