@@ -223,11 +223,14 @@ class LocalFileSystem(FileSystem):
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
 
     def _close_and_sync_file(self, file: io.FileIO) -> None:
+        logger.info('Flushing file')
         file.flush()
+        logger.info('Fsync file')
         os.fsync(file.fileno())
+        logger.info('Close file')
         file.close()
 
-    async def close_and_sync_file(self, file: io.FileIO) -> List[PurePath]:
+    async def close_and_sync_file(self, file: io.FileIO) -> None:
         return await self._loop.run_in_executor(
             self._executor, self._close_and_sync_file, file
         )
