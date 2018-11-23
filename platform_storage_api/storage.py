@@ -31,7 +31,6 @@ class Storage:
         await self._fs.mkdir(real_path.parent)
         async with self._fs.open(real_path, "wb") as f:
             await copy_streams(outstream, f)
-            await self._fs.close_and_sync_file(f)
 
     async def retrieve(self, instream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
