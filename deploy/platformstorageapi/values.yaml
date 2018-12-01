@@ -1,6 +1,6 @@
 NP_STORAGE_NFS_SERVER:
   _default: '172.27.83.58'
-  dev: '172.27.83.48'
+  dev: '172.27.83.58'
   staging: '10.69.59.50'
 NP_STORAGE_NFS_PATH:
   _default: '/staging_premium'
