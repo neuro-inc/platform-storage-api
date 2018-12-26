@@ -270,6 +270,7 @@ class StorageHandler:
             new = PurePath(request.query["destination"])
             if new.root == "":
                 new = old.parent / new
+            new = self._storage.sanitize_path(new)
             await self._check_user_permissions(request, str(new))
             await self._storage.rename(old, new)
         except FileNotFoundError:
