@@ -82,7 +82,7 @@ gke_docker_push: build
 	sudo /opt/google-cloud-sdk/bin/gcloud docker -- push $(IMAGE_K8S)
 
 gke_k8s_deploy_dev: _helm
-	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME)
+	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME) --region $(GKE_CLUSTER_REGION)
 	sudo chown -R circleci: $(HOME)/.kube
 	helm --set "global.env=dev" --set "IMAGE.dev=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
 
