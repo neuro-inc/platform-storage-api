@@ -90,3 +90,15 @@ gke_k8s_deploy_staging: _helm
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_STAGE_CLUSTER_NAME)
 	sudo chown -R circleci: $(HOME)/.kube
 	helm --set "global.env=staging" --set "IMAGE.staging=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
+
+
+gke_k8s_deploy_local:
+	@echo "deploy PLATFORM-STORAGE-API in cluster: $(GKE_CLUSTER_NAME)"
+	docker build --build-arg PIP_INDEX_URL="$(PIP_INDEX_URL_LOCAL)" -t $(IMAGE_NAME):local_$(GKE_CLUSTER_NAME)_$(IMAGE_TAG) .
+	docker tag $(IMAGE_NAME):local_$(GKE_CLUSTER_NAME)_$(IMAGE_TAG) $(IMAGE_K8S):local_$(GKE_CLUSTER_NAME)_$(IMAGE_TAG)
+	docker push $(IMAGE_K8S):local_$(GKE_CLUSTER_NAME)_$(IMAGE_TAG)
+	helm --set "global.env=dev" \
+		--set "IMAGE.dev=$(IMAGE_K8S):local_$(GKE_CLUSTER_NAME)_$(IMAGE_TAG)" \
+		--set "NP_STORAGE_NFS_SERVER.dev=$(NFS_IP)" \
+		--set "NP_STORAGE_NFS_PATH.dev=$(NFS_PATH)" \
+		upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
