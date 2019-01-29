@@ -202,7 +202,9 @@ class LocalFileSystem(FileSystem):
 
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)
-        if concrete_path.is_dir():
+        if not concrete_path.exists():
+            raise FileNotFoundError(f"File {path} not found")
+        elif concrete_path.is_dir():
             shutil.rmtree(concrete_path)
         else:
             concrete_path.unlink()
