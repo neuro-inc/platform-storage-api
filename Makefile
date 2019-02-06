@@ -109,8 +109,8 @@ test_env:
 	#echo "MESOS_USER=$(MESOS_USER)"
 	#echo "HELM_ENV=$(HELM_ENV)"
 	#echo "CLUSTER_TYPE=$(CLUSTER_TYPE)"
-	ifeq ($(CLUSTER_TYPE), regional)
-		@echo "regional cluster"
-	else
-		@echo "zonal cluster"
-	endif
+	@if [ "$(CLUSTER_TYPE)" = "regional" ]; then\
+		echo "regional cluster";\
+	else \
+		echo "zonal cluster";\
+	fi

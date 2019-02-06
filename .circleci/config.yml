@@ -77,6 +77,10 @@ workflows:
     jobs:
       - test:
           context: org-global
+          filters:
+            branches:
+              only:
+                - master
       - gke_deploy:
           context: org-global
           requires:
@@ -90,6 +94,10 @@ workflows:
     jobs:
       - test:
           context: org-global
+          filters:
+            branches:
+              only:
+                - /release.*/
       - gke_deploy:
           context: org-global
           requires:
