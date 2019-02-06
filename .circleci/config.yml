@@ -58,16 +58,7 @@ jobs:
             make gke_k8s_deploy
 
 
-  gke_test:
-    <<: *defaults
 
-    steps:
-      - checkout
-
-      - run:
-          name: GKE show env
-          command: |
-            make test_env
 
 
 workflows:
@@ -109,8 +100,14 @@ workflows:
 
   prod:
     jobs:
-      - gke_test:
-          context: org-global
+      - test:
+          context: org-prod
+          filters:
+            branches:
+              only:
+                - /prod-cluster/
+      - gke_deploy:
+          context: org-prod
           filters:
             branches:
               only:

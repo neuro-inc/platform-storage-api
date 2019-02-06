@@ -65,11 +65,15 @@ gke_login:
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet components update --version 204.0.0
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet components update --version 204.0.0 kubectl
 	sudo chown circleci:circleci -R $$HOME
-	@echo $(GKE_ACCT_AUTH) | base64 --decode > $(HOME)//gcloud-service-key.json
+	@echo $(GKE_ACCT_AUTH) | base64 --decode > $(HOME)/gcloud-service-key.json
 	gcloud auth activate-service-account --key-file $(HOME)/gcloud-service-key.json
 	gcloud config set project $(GKE_PROJECT_ID)
 	gcloud --quiet config set container/cluster $(GKE_CLUSTER_NAME)
-	gcloud config set compute/zone $(GKE_COMPUTE_ZONE)
+	@if [ "$(CLUSTER_TYPE)" = "regional" ]; then\
+		gcloud config set compute/region $(GKE_CLUSTER_REGION)
+	else \
+		gcloud config set compute/zone $(GKE_COMPUTE_ZONE)
+	fi
 	gcloud auth configure-docker
 
 _helm:
@@ -82,35 +86,10 @@ gke_docker_push: build
 	sudo /opt/google-cloud-sdk/bin/gcloud docker -- push $(IMAGE_K8S)
 
 gke_k8s_deploy: _helm
-	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME) --region $(GKE_CLUSTER_REGION)
-	sudo chown -R circleci: $(HOME)/.kube
-	helm --set "global.env=dev" --set "IMAGE.dev=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
-
-test_env:
-	#echo "CI_KYRYL_TOKEN=$(CI_KYRYL_TOKEN)"
-	#echo "CLIENT_TEST_E2E_USER_NAME=$(CLIENT_TEST_E2E_USER_NAME)"
-	#echo "DEVPI_HOST=$(DEVPI_HOST)"
-	#echo "DEVPI_INDEX=$(DEVPI_INDEX)"
-	#echo "DEVPI_PASS=$(DEVPI_PASS)"
-	#echo "DEVPI_USER=$(DEVPI_USER)"
-	#echo "DOCKER_EMAIL=$(DOCKER_EMAIL)"
-	#echo "DOCKER_PASS=$(DOCKER_PASS)"
-	#echo "DOCKER_USER=$(DOCKER_USER)"
-	#echo "GKE_ACCT_AUTH=$(GKE_ACCT_AUTH)"
-	#echo "GKE_ACCT_AUTH_PROD=$(GKE_ACCT_AUTH_PROD)"
-	#echo "GKE_CLUSTER_NAME=$(GKE_CLUSTER_NAME)"
-	#echo "GKE_CLUSTER_REGION=$(GKE_CLUSTER_REGION)"
-	#echo "GKE_COMPUTE_ZONE=$(GKE_COMPUTE_ZONE)"
-	#echo "GKE_DOCKER_REGISTRY=$(GKE_DOCKER_REGISTRY)"
-	#echo "GKE_PROJECT_ID=$(GKE_PROJECT_ID)"
-	#echo "GKE_PROJECT_NAME=$(GKE_PROJECT_NAME)"
-	#echo "GKE_STAGE_CLUSTER_NAME=$(GKE_STAGE_CLUSTER_NAME)"
-	#echo "MESOS_PASSWORD=$(MESOS_PASSWORD)"
-	#echo "MESOS_USER=$(MESOS_USER)"
-	#echo "HELM_ENV=$(HELM_ENV)"
-	#echo "CLUSTER_TYPE=$(CLUSTER_TYPE)"
 	@if [ "$(CLUSTER_TYPE)" = "regional" ]; then\
-		echo "regional cluster";\
+		sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME) --region $(GKE_CLUSTER_REGION)
 	else \
-		echo "zonal cluster";\
+		sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME) --zone $(GKE_COMPUTE_ZONE)
 	fi
+	sudo chown -R circleci: $(HOME)/.kube
+	helm --set "global.env=$(HELM_ENV)" --set "IMAGE.$(HELM_ENV)=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
