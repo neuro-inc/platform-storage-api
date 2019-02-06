@@ -12,6 +12,20 @@
 
 
 
+# Deploy in Production cluster
+
+###  _cd_ to _deploy_ folder
+``` cd deploy ```
+
+### Connect to cluster
+```gcloud container clusters get-credentials prod-cluster-01 --zone us-west1-b --project production-228907```
+
+### Deploy platform-registry-api
+```helm --set "global.env=prod" upgrade --install platformstorageapi platformstorageapi```
+
+
+
+
 
 #Deploy in stagging and dev clusters
 
