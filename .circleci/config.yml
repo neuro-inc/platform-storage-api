@@ -110,10 +110,10 @@ workflows:
           filters:
             branches:
               only:
-                - /release.*/
+                - prod-cluster
       - gke_deploy:
           context: org-prod
           filters:
             branches:
               only:
-                - /release.*/
+                - prod-cluster
