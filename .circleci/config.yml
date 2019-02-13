@@ -112,10 +112,10 @@ workflows:
               only:
                 - prod-cluster
       - gke_deploy:
-          context: org-staging
+          context: org-prod
           requires:
             - test
           filters:
             branches:
               only:
-                - prod-cluster
+                - /release.*/
