@@ -70,6 +70,7 @@ gke_login:
 	gcloud config set project $(GKE_PROJECT_ID)
 	gcloud --quiet config set container/cluster $(GKE_CLUSTER_NAME)
 	gcloud config set $(SET_CLUSTER_ZONE_REGION)
+	gcloud auth configure-docker
 
 _helm:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.11.0
