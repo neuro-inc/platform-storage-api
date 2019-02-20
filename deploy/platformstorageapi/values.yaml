@@ -2,54 +2,45 @@ NP_STORAGE_NFS_SERVER:
   _default: '10.76.126.154'
   dev: '10.76.126.154'
   staging: '10.69.59.50'
-  hse: '10.247.106.10'
   prod: '10.47.20.74'
 NP_STORAGE_NFS_PATH:
   _default: '/dev2premium'
   dev: '/dev2premium'
   staging: '/devpremium'
-  hse: '/hse_premium'
   prod: '/prodpremium'
 IMAGE:
   _default: gcr.io/light-reality-205619/platformstorageapi:latest
   dev: gcr.io/light-reality-205619/platformstorageapi:latest
   staging: gcr.io/light-reality-205619/platformstorageapi:latest
-  hse: gcr.io/hse-project-230316/platformstorageapi:latest
   prod: gcr.io/production-228907/platformstorageapi:latest
 NP_STORAGE_AUTH_URL:
   _default: http://platformauthapi:8080
   dev: http://platformauthapi:8080
   staging: http://platformauthapi:8080
-  hse: http://platformauthapi:8080
   prod: http://platformauthapi:8080
 NP_STORAGE_REQUESTS_CPU:
   _default: "0.3"
   dev: "0.1"
   staging: "0.1"
-  hse: "0.1"
   prod: "0.1"
 NP_STORAGE_LIMITS_CPU:
   _default: "0.5"
   dev: "0.2"
   staging: "0.3"
-  hse: "0.2"
   prod: "0.3"
 NP_STORAGE_REQUESTS_MEMORY:
   _default: "500Mi"
   dev: "300Mi"
   staging: "400Mi"
-  hse: "300Mi"
   prod: "400Mi"
 NP_STORAGE_LIMITS_MEMORY:
   _default: "1Gi"
   dev: "600Mi"
   staging: "800Mi"
-  hse: "600Mi"
   prod: "800Mi"
 NP_STORAGE_REPLICAS:
   _default: "2"
   dev: "2"
   staging: "2"
-  hse: "2"
   prod: "2"
 

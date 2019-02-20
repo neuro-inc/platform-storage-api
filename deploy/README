@@ -1,18 +1,4 @@
-# Deploy in HSE cluster
 
-###  _cd_ to _deploy_ folder
-``` cd deploy ```
-
-### Connect to cluster
-```gcloud container clusters get-credentials hse-cluster-01 --zone us-central1-a --project light-reality-205619```
-
-### Deploy platform-storage
-```helm --set "global.env=hse" upgrade --install platformstorageapi platformstorageapi```
-
-
-
-
-# Deploy in Production cluster
 
 ###  _cd_ to _deploy_ folder
 ``` cd deploy ```
@@ -20,18 +6,20 @@
 ### Connect to cluster
 ```gcloud container clusters get-credentials prod-cluster-01 --zone us-west1-b --project production-228907```
 
+
+
+# Deploy in Production cluster
+
 ### Deploy platform-registry-api
 ```helm --set "global.env=prod" upgrade --install platformstorageapi platformstorageapi```
 
 
 
-
-
-#Deploy in stagging and dev clusters
+#Deploy in staging and dev clusters
 
 Dev : 
-	- helm --set "global.env=dev" install platformstorageapi --name=platformstorageapi
+	- helm --set "global.env=dev" upgrade --install platformstorageapi --name=platformstorageapi
 
-Stage : 
-	- helm --set "global.env=stage" install platformstorageapi --name=platformstorageapi
+Staging :
+	- helm --set "global.env=stage" upgrade --install platformstorageapi --name=platformstorageapi
 
