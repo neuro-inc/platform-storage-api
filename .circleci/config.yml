@@ -109,6 +109,8 @@ workflows:
           context: org-prod
           filters:
             branches:
+              ignore: /.*/
+            tags:
               only:
                 - /release.*/
       - gke_deploy:
@@ -117,5 +119,7 @@ workflows:
             - test
           filters:
             branches:
+              ignore: /.*/
+            tags:
               only:
                 - /release.*/
