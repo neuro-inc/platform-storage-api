@@ -41,6 +41,6 @@ NP_STORAGE_LIMITS_MEMORY:
 NP_STORAGE_REPLICAS:
   _default: "2"
   dev: "2"
-  staging: "2"
+  staging: "1"
   prod: "2"
 
