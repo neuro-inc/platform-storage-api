@@ -41,7 +41,10 @@ spec:
         volumeMounts:
         - name: storage
           mountPath: /var/storage
-
+      {{- if eq .Values.global.env "client" }}
+      imagePullSecrets:
+        - name: {{ printf "%s" (pluck .Values.global.env .Values.DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME | first | default .Values.DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME._default) }}
+      {{- end }}
       volumes:
         - name: storage
           nfs:
