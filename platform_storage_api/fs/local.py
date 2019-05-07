@@ -9,7 +9,7 @@ import stat
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
-from typing import Any, Callable, List, Optional
+from typing import Any, List, Optional
 
 import aiofiles
 
