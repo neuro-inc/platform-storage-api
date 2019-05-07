@@ -208,7 +208,9 @@ class LocalFileSystem(FileSystem):
         else:
             concrete_path.unlink()
 
-    def _handle_rmtree_error(self, func: Any, path: str, exc_info: Any) -> Any:
+    def _handle_rmtree_error(
+        self, func: Any, path: os.PathLike[str], exc_info: Any
+    ) -> Any:
         logger.warning("Handling Error for file %s", path)
         logger.warning(exc_info)
         # Check if file access issue
