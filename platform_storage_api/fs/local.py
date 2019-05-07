@@ -9,7 +9,7 @@ import stat
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 
 import aiofiles
 
@@ -208,7 +208,7 @@ class LocalFileSystem(FileSystem):
         else:
             concrete_path.unlink()
 
-    def _handle_rmtree_error(func, path, exc_info):
+    def _handle_rmtree_error(func: Callable, path: str, exc_info: Any) -> Any:
         logger.warning("Handling Error for file %s", path)
         logger.warning(exc_info)
         # Check if file access issue
