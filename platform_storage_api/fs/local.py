@@ -5,6 +5,7 @@ import io
 import logging
 import os
 import shutil
+import stat
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
@@ -203,9 +204,20 @@ class LocalFileSystem(FileSystem):
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)
         if concrete_path.is_dir():
-            shutil.rmtree(concrete_path)
+            shutil.rmtree(concrete_path, onerror=self._handle_rmtree_error)
         else:
             concrete_path.unlink()
+
+    def _handle_rmtree_error(func, path, exc_info):
+        logger.warning('Handling Error for file %s', path)
+        logger.warning(exc_info)
+        # Check if file access issue
+        if not os.access(path, os.W_OK):
+            logger.warning('Access error')
+            # Try to change the permission of file
+            os.chmod(path, stat.S_IWUSR)
+            # call the calling function again
+            func(path)
 
     async def remove(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path)
