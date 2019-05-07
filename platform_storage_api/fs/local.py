@@ -209,11 +209,11 @@ class LocalFileSystem(FileSystem):
             concrete_path.unlink()
 
     def _handle_rmtree_error(func, path, exc_info):
-        logger.warning('Handling Error for file %s', path)
+        logger.warning("Handling Error for file %s", path)
         logger.warning(exc_info)
         # Check if file access issue
         if not os.access(path, os.W_OK):
-            logger.warning('Access error')
+            logger.warning("Access error")
             # Try to change the permission of file
             os.chmod(path, stat.S_IWUSR)
             # call the calling function again
