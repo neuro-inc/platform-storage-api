@@ -9,7 +9,7 @@ import stat
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 import aiofiles
 
@@ -208,33 +208,18 @@ class LocalFileSystem(FileSystem):
         else:
             concrete_path.unlink()
 
-    if TYPE_CHECKING:
-
-        def _handle_rmtree_error(
-            self, func: Any, path: os.PathLike[str], exc_info: Any
-        ) -> Any:
-            logger.warning("Handling Error for file %s", path)
-            logger.warning(exc_info)
-            # Check if file access issue
-            if not os.access(path, os.W_OK):
-                logger.warning("Access error")
-                # Try to change the permission of file
-                os.chmod(path, stat.S_IWUSR)
-                # call the calling function again
-                func(path)
-
-    else:
-
-        def _handle_rmtree_error(self, func, path, exc_info) -> Any:
-            logger.warning("Handling Error for file %s", path)
-            logger.warning(exc_info)
-            # Check if file access issue
-            if not os.access(path, os.W_OK):
-                logger.warning("Access error")
-                # Try to change the permission of file
-                os.chmod(path, stat.S_IWUSR)
-                # call the calling function again
-                func(path)
+    def _handle_rmtree_error(
+        self, func: Any, path: Union[str, os.PathLike], exc_info: Any
+    ) -> Any:
+        logger.warning("Handling Error for file %s", path)
+        logger.warning(exc_info)
+        # Check if file access issue
+        if not os.access(path, os.W_OK):
+            logger.warning("Access error")
+            # Try to change the permission of file
+            os.chmod(path, stat.S_IWUSR)
+            # call the calling function again
+        func(path)
 
     async def remove(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path)
