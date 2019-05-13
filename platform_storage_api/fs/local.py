@@ -1,6 +1,7 @@
 import abc
 import asyncio
 import enum
+import errno
 import io
 import logging
 import os
@@ -208,14 +209,30 @@ class LocalFileSystem(FileSystem):
             except OSError as e:
                 # Debug logging
                 path = e.filename
-                parent_path = os.path.dirname(path)
                 path_access_ok = os.access(path, os.W_OK)
+                try:
+                    path_mode = f"{os.stat(path).st_mode:03o}"
+                except OSError:
+                    path_mode = "?"
+
+                parent_path = os.path.dirname(path)
                 parent_path_access_ok = os.access(parent_path, os.W_OK)
+                try:
+                    parent_path_mode = f"{os.stat(parent_path).st_mode:03o}"
+                except OSError:
+                    parent_path_mode = "?"
+
                 logger.warning(
-                    f"OSError for path %s, access = %s parent_access = %s",
+                    "OSError for path = %s, path_mode = %s, access = %s, "
+                    "parent_path_mode = %s, parent_access = %s, "
+                    "error_message = %s, errno = %s",
                     path,
+                    path_mode,
                     path_access_ok,
+                    parent_path_mode,
                     parent_path_access_ok,
+                    str(e),
+                    errno.errorcode.get(e.errno, e.errno),
                 )
                 raise e
         else:
