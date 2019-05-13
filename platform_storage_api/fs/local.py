@@ -204,22 +204,19 @@ class LocalFileSystem(FileSystem):
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)
         if concrete_path.is_dir():
-            shutil.rmtree(concrete_path, onerror=self._handle_rmtree_error)
+            try:
+                shutil.rmtree(concrete_path)
+            except OSError as e:
+                # Debug logging
+                path = e.filename
+                parent_path = os.path.abspath(os.path.join(path, os.pardir))
+                path_access_ok = os.access(path, os.W_OK)
+                parent_path_access_ok = os.access(parent_path, os.W_OK)
+                logger.warning(f'OSError for path %s, access = %s parent_access = %s', path, path_access_ok,
+                               parent_path_access_ok)
+                raise e
         else:
             concrete_path.unlink()
-
-    def _handle_rmtree_error(
-        self, func: Any, path: Union[str, os.PathLike], exc_info: Any
-    ) -> Any:
-        logger.warning("Handling Error for file %s", path)
-        logger.warning(exc_info)
-        # Check if file access issue
-        if not os.access(path, os.W_OK):
-            logger.warning("Access error")
-            # Try to change the permission of file
-            os.chmod(path, stat.S_IWUSR)
-            # call the calling function again
-        func(path)
 
     async def remove(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path)
