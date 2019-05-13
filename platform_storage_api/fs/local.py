@@ -5,11 +5,10 @@ import io
 import logging
 import os
 import shutil
-import stat
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
-from typing import Any, List, Optional, Union
+from typing import List, Optional
 
 import aiofiles
 
@@ -209,11 +208,15 @@ class LocalFileSystem(FileSystem):
             except OSError as e:
                 # Debug logging
                 path = e.filename
-                parent_path = os.path.abspath(os.path.join(path, os.pardir))
+                parent_path = os.path.dirname(path)
                 path_access_ok = os.access(path, os.W_OK)
                 parent_path_access_ok = os.access(parent_path, os.W_OK)
-                logger.warning(f'OSError for path %s, access = %s parent_access = %s', path, path_access_ok,
-                               parent_path_access_ok)
+                logger.warning(
+                    f"OSError for path %s, access = %s parent_access = %s",
+                    path,
+                    path_access_ok,
+                    parent_path_access_ok,
+                )
                 raise e
         else:
             concrete_path.unlink()
