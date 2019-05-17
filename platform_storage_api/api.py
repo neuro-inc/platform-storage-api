@@ -176,7 +176,7 @@ class StorageHandler:
         await response.prepare(request)
         await self._storage.retrieve(response, storage_path)
         assert "Content-Length" in response.headers
-        assert "Last-Modified" in instream.headers
+        assert "Last-Modified" in response.headers
         await response.write_eof()
 
         return response
