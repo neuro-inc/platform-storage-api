@@ -34,6 +34,9 @@ class Storage:
 
     async def retrieve(self, instream, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
+        filestatus = await self._fs.get_filestatus(real_path)
+        instream.content_length = filestatus.size
+        instream.last_modified = filestatus.modification_time
         async with self._fs.open(real_path, "rb") as f:
             await copy_streams(f, instream)
 

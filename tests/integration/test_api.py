@@ -32,6 +32,7 @@ class TestStorage:
 
         async with client.get(url, headers=headers) as response:
             assert response.status == 200
+            assert response.content_length == len(payload)
             result_payload = await response.read()
             assert result_payload == payload
 

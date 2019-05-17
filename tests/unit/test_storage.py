@@ -60,8 +60,13 @@ class TestStorage:
         async with local_fs.open(real_file_path, "wb") as f:
             await f.write(expected_payload)
 
+        real_stat = os.stat(str(real_file_path))
+
         instream = AsyncBytesIO()
         await storage.retrieve(instream, "/file")
+        assert instream.content_length == real_stat.st_size
+        assert instream.last_modified == int(real_stat.st_mtime)
+
         instream.seek(0)
         payload = await instream.read()
         assert payload == expected_payload

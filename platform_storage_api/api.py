@@ -175,6 +175,8 @@ class StorageHandler:
         response = aiohttp.web.StreamResponse(status=200)
         await response.prepare(request)
         await self._storage.retrieve(response, storage_path)
+        assert "Content-Length" in response.headers
+        assert "Last-Modified" in instream.headers
         await response.write_eof()
 
         return response
