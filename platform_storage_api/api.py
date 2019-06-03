@@ -14,7 +14,7 @@ from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
 
 from .config import Config
-from .fs.local import FileStatus, FileStatusPermission, LocalFileSystem
+from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .storage import Storage
 
 
@@ -92,6 +92,16 @@ class StorageHandler:
             return await self._handle_mkdirs(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
 
+    def _create_response(self, fstat: FileStatus) -> aiohttp.web.StreamResponse:
+        response = aiohttp.web.StreamResponse()
+        response.content_length = fstat.size
+        response.last_modified = fstat.modification_time
+        response.headers["X-File-Type"] = str(fstat.type)
+        response.headers["X-File-Permission"] = fstat.permission.value
+        if fstat.type == FileStatusType.FILE:
+            response.headers["X-File-Length"] = str(fstat.size)
+        return response
+
     async def handle_head(self, request: Request):
         storage_path = self._get_fs_path_from_request(request)
         await self._check_user_permissions(request, str(storage_path))
@@ -100,10 +110,7 @@ class StorageHandler:
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
 
-        response = aiohttp.web.StreamResponse()
-        response.content_length = fstat.size
-        response.last_modified = fstat.modification_time
-        return response
+        return self._create_response(fstat)
 
     async def handle_get(self, request: Request):
         operation = self._parse_get_operation(request)
@@ -189,9 +196,7 @@ class StorageHandler:
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
 
-        response = aiohttp.web.StreamResponse(status=200)
-        response.content_length = fstat.size
-        response.last_modified = fstat.modification_time
+        response = self._create_response(fstat)
         await response.prepare(request)
         await self._storage.retrieve(response, storage_path)
         await response.write_eof()

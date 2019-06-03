@@ -44,11 +44,17 @@ class TestStorage:
             )
             assert mtime >= mtime_min
             assert mtime <= int(current_time())
+            assert response.headers["X-File-Type"] == "FILE"
+            assert response.headers["X-File-Permission"] == "read"
+            assert response.headers["X-File-Length"] == str(len(payload))
 
         async with client.get(url, headers=headers) as response:
             assert response.status == 200
             assert response.content_length == len(payload)
             assert response.headers["Last-Modified"] == last_modified
+            assert response.headers["X-File-Type"] == "FILE"
+            assert response.headers["X-File-Permission"] == "read"
+            assert response.headers["X-File-Length"] == str(len(payload))
             result_payload = await response.read()
             assert result_payload == payload
 
@@ -329,6 +335,8 @@ class TestStorage:
         async with client.head(url, headers=headers) as response:
             assert response.status == 200
             assert response.content_length == 0
+            assert response.headers["X-File-Type"] == "DIRECTORY"
+            assert response.headers["X-File-Permission"] == "read"
 
     @pytest.mark.asyncio
     async def test_get_target_is_directory(
@@ -344,6 +352,8 @@ class TestStorage:
         async with client.get(url, headers=headers) as response:
             assert response.status == 200
             assert response.content_length == 0
+            assert response.headers["X-File-Type"] == "DIRECTORY"
+            assert response.headers["X-File-Permission"] == "read"
             payload = await response.read()
             assert payload == b""
 
