@@ -89,12 +89,12 @@ gke_k8s_deploy: _helm
 
 
 artifactory_docker_push: build
-	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE):$(ARTIFACTORY_TAG)
+	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
 	docker login $(ARTIFACTORY_DOCKER_REPO) --username=$(ARTIFACTORY_USERNAME) --password=$(ARTIFACTORY_PASSWORD)
 	docker push $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE):$(ARTIFACTORY_TAG)
 
 artifactory_helm_push: _helm
 	helm package --app-version=$(ARTIFACTORY_TAG) --version=$(ARTIFACTORY_TAG) deploy/platformstorageapi/
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
-	helm push-artifactory $(IMAGE)-$(ARTIFACTORY_TAG).tgz $(ARTIFACTORY_HELM_REPO) --username $(ARTIFACTORY_USERNAME) --password $(ARTIFACTORY_PASSWORD)
+	helm push-artifactory $(IMAGE_NAME)-$(ARTIFACTORY_TAG).tgz $(ARTIFACTORY_HELM_REPO) --username $(ARTIFACTORY_USERNAME) --password $(ARTIFACTORY_PASSWORD)
 
