@@ -94,7 +94,7 @@ artifactory_docker_push: build
 	docker push $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
 
 artifactory_helm_push: _helm
-	helm init
+	helm init --client-only
 	helm package --app-version=$(ARTIFACTORY_TAG) --version=$(ARTIFACTORY_TAG) deploy/platformstorageapi/
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
 	helm push-artifactory $(IMAGE_NAME)-$(ARTIFACTORY_TAG).tgz $(ARTIFACTORY_HELM_REPO) --username $(ARTIFACTORY_USERNAME) --password $(ARTIFACTORY_PASSWORD)
