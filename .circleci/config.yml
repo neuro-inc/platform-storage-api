@@ -141,8 +141,16 @@ workflows:
 
   artifactory:
     jobs:
+      - test:
+          context: org-global
+          filters:
+            branches:
+              only:
+                - artifactory
       - artifactory_deploy:
           context: org-global
+          requires:
+            - test
           filters:
             branches:
               only:

@@ -85,7 +85,7 @@ gke_docker_push: build
 gke_k8s_deploy: _helm
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME) $(CLUSTER_ZONE_REGION)
 	sudo chown -R circleci: $(HOME)/.kube
-	helm --set "global.env=$(HELM_ENV)" --set "IMAGE.$(HELM_ENV)=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
+	helm -f deploy/platformstorageapi/values-$(HELM_ENV).yaml --set "IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
 
 
 artifactory_docker_push: build
