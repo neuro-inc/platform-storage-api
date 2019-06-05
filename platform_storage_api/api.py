@@ -170,9 +170,14 @@ class StorageHandler:
         return self._parse_operation(request) or StorageOperation.RENAME
 
     async def _handle_open(self, request: Request, storage_path: PurePath):
-        # TODO (A Danshyn 04/23/18): check if exists (likely in some
-        # middleware)
+        try:
+            fstat = await self._storage.get_filestatus(storage_path)
+        except FileNotFoundError:
+            raise aiohttp.web.HTTPNotFound
+
         response = aiohttp.web.StreamResponse(status=200)
+        response.content_length = fstat.size
+        response.last_modified = fstat.modification_time
         await response.prepare(request)
         await self._storage.retrieve(response, storage_path)
         await response.write_eof()

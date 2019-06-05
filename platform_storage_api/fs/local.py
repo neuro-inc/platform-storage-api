@@ -1,6 +1,7 @@
 import abc
 import asyncio
 import enum
+import errno
 import io
 import logging
 import os
@@ -203,7 +204,37 @@ class LocalFileSystem(FileSystem):
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)
         if concrete_path.is_dir():
-            shutil.rmtree(concrete_path)
+            try:
+                shutil.rmtree(concrete_path)
+            except OSError as e:
+                # Debug logging
+                path = e.filename
+                path_access_ok = os.access(path, os.W_OK)
+                try:
+                    path_mode = f"{os.stat(path).st_mode:03o}"
+                except OSError:
+                    path_mode = "?"
+
+                parent_path = os.path.dirname(path)
+                parent_path_access_ok = os.access(parent_path, os.W_OK)
+                try:
+                    parent_path_mode = f"{os.stat(parent_path).st_mode:03o}"
+                except OSError:
+                    parent_path_mode = "?"
+
+                logger.warning(
+                    "OSError for path = %s, path_mode = %s, access = %s, "
+                    "parent_path_mode = %s, parent_access = %s, "
+                    "error_message = %s, errno = %s",
+                    path,
+                    path_mode,
+                    path_access_ok,
+                    parent_path_mode,
+                    parent_path_access_ok,
+                    str(e),
+                    errno.errorcode.get(e.errno, e.errno),
+                )
+                raise e
         else:
             concrete_path.unlink()
 
