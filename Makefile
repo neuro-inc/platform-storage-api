@@ -94,7 +94,7 @@ artifactory_docker_push: build
 	docker push $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
 
 artifactory_helm_push: _helm
-	cp deploy/platformstorageapi/values-$(HELM_ENV).yaml deploy/platformstorageapi/values.yaml
+	cp deploy/platformstorageapi/values-client.yaml deploy/platformstorageapi/values.yaml
 	find deploy/platformstorageapi -type f -name 'values-*' -delete
 	helm init --client-only
 	helm package --app-version=$(ARTIFACTORY_TAG) --version=$(ARTIFACTORY_TAG) deploy/platformstorageapi/
