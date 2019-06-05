@@ -95,6 +95,7 @@ artifactory_docker_push: build
 
 artifactory_helm_push: _helm
 	cp deploy/platformstorageapi/values-client.yaml deploy/platformstorageapi/values.yaml
+	sed -i "s/IMAGE_TAG/$(ARTIFACTORY_TAG)/g" deploy/platformstorageapi/values.yaml
 	find deploy/platformstorageapi -type f -name 'values-*' -delete
 	helm init --client-only
 	helm package --app-version=$(ARTIFACTORY_TAG) --version=$(ARTIFACTORY_TAG) deploy/platformstorageapi/
