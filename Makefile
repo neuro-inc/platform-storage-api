@@ -1,6 +1,6 @@
 IMAGE_NAME ?= platformstorageapi
 IMAGE_TAG ?= latest
-ARTIFACTORY_TAG ?=0.0.16
+ARTIFACTORY_TAG ?=$(CIRCLE_BRANCH)
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_K8S ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
 
@@ -94,11 +94,13 @@ artifactory_docker_push: build
 	docker push $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
 
 artifactory_helm_push: _helm
-	cp deploy/platformstorageapi/values-client.yaml deploy/platformstorageapi/values.yaml
-	sed -i "s/IMAGE_TAG/$(ARTIFACTORY_TAG)/g" deploy/platformstorageapi/values.yaml
-	find deploy/platformstorageapi -type f -name 'values-*' -delete
+    mkdir -p temp_deploy
+    cp -Rf deploy/platformstorageapi/. temp_deploy/
+	cp temp_deploy/values-client.yaml temp_deploy/values.yaml
+	sed -i "s/IMAGE_TAG/$(ARTIFACTORY_TAG)/g" temp_deploy/values.yaml
+	find temp_deploy -type f -name 'values-*' -delete
 	helm init --client-only
-	helm package --app-version=$(ARTIFACTORY_TAG) --version=$(ARTIFACTORY_TAG) deploy/platformstorageapi/
+	helm package --app-version=$(ARTIFACTORY_TAG) --version=$(ARTIFACTORY_TAG) temp_deploy/
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
 	helm push-artifactory $(IMAGE_NAME)-$(ARTIFACTORY_TAG).tgz $(ARTIFACTORY_HELM_REPO) --username $(ARTIFACTORY_USERNAME) --password $(ARTIFACTORY_PASSWORD)
 

@@ -145,13 +145,17 @@ workflows:
           context: org-global
           filters:
             branches:
+              ignore: /.*/
+            tags:
               only:
-                - artifactory
+                - /artifactory.*/
       - artifactory_deploy:
           context: org-global
           requires:
             - test
           filters:
             branches:
+              ignore: /.*/
+            tags:
               only:
-                - artifactory
+                - /artifactory.*/
