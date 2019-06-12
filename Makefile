@@ -94,8 +94,8 @@ artifactory_docker_push: build
 	docker push $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
 
 artifactory_helm_push: _helm
-    mkdir -p temp_deploy
-    cp -Rf deploy/platformstorageapi/. temp_deploy/
+	mkdir -p temp_deploy
+	cp -Rf deploy/platformstorageapi/. temp_deploy/
 	cp temp_deploy/values-client.yaml temp_deploy/values.yaml
 	sed -i "s/IMAGE_TAG/$(ARTIFACTORY_TAG)/g" temp_deploy/values.yaml
 	find temp_deploy -type f -name 'values-*' -delete
