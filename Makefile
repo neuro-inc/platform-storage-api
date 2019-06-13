@@ -96,7 +96,7 @@ artifactory_docker_push: build
 artifactory_helm_push: _helm
 	mkdir -p temp_deploy/platformstorageapi
 	cp -Rf deploy/platformstorageapi/. temp_deploy/platformstorageapi
-	cp temp_deploy/platformstorageapi/values-client.yaml temp_deploy/platformstorageapi/values.yaml
+	cp temp_deploy/platformstorageapi/values-template.yaml temp_deploy/platformstorageapi/values.yaml
 	sed -i "s/IMAGE_TAG/$(ARTIFACTORY_TAG)/g" temp_deploy/platformstorageapi/values.yaml
 	find temp_deploy/platformstorageapi -type f -name 'values-*' -delete
 	helm init --client-only
