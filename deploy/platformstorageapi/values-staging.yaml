@@ -1,6 +1,6 @@
 NP_STORAGE_NFS_SERVER: '10.69.59.50'
 NP_STORAGE_NFS_PATH: '/devpremium'
-IMAGE: gcr.io/light-reality-205619/platformstorageapi:latest
+IMAGE: ''
 NP_STORAGE_AUTH_URL: http://platformauthapi:8080
 NP_STORAGE_REQUESTS_CPU: "0.1"
 NP_STORAGE_LIMITS_CPU: "0.3"
