@@ -1,3 +1,4 @@
+import time
 import uuid
 from io import BytesIO
 from pathlib import PurePath
@@ -15,26 +16,69 @@ from tests.integration.conftest import get_filestatus_dict, get_liststatus_dict
 class TestApi:
     @pytest.mark.asyncio
     async def test_ping(self, api, client):
+        async with client.head(api.ping_url) as response:
+            assert response.status == 200
+
         async with client.get(api.ping_url) as response:
             assert response.status == 200
 
 
 class TestStorage:
     @pytest.mark.asyncio
-    async def test_put_get(self, server_url, client, regular_user_factory, api):
+    async def test_put_head_get(self, server_url, client, regular_user_factory, api):
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
         payload = b"test"
+        mtime_min = int(current_time())
 
         async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
             assert response.status == 201
 
+        async with client.head(url, headers=headers) as response:
+            assert response.status == 200
+            assert response.content_length == len(payload)
+            last_modified = response.headers["Last-Modified"]
+            mtime = time.mktime(
+                time.strptime(last_modified, "%a, %d %b %Y %H:%M:%S %Z")
+            )
+            assert mtime >= mtime_min
+            assert mtime <= int(current_time())
+            assert response.headers["X-File-Type"] == "FILE"
+            assert response.headers["X-File-Permission"] == "read"
+            assert response.headers["X-File-Length"] == str(len(payload))
+
         async with client.get(url, headers=headers) as response:
             assert response.status == 200
             assert response.content_length == len(payload)
+            assert response.headers["Last-Modified"] == last_modified
+            assert response.headers["X-File-Type"] == "FILE"
+            assert response.headers["X-File-Permission"] == "read"
+            assert response.headers["X-File-Length"] == str(len(payload))
             result_payload = await response.read()
             assert result_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_head_non_existent(
+        self, server_url, client, regular_user_factory, api
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/non-existent"
+
+        async with client.head(url, headers=headers) as response:
+            assert response.status == 404
+
+    @pytest.mark.asyncio
+    async def test_get_non_existent(
+        self, server_url, client, regular_user_factory, api
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/non-existent"
+
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 404
 
     @pytest.mark.asyncio
     async def test_put_illegal_op(self, server_url, api, client, regular_user_factory):
@@ -276,6 +320,42 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "Destination is a directory"
+
+    @pytest.mark.asyncio
+    async def test_head_target_is_directory(
+        self, server_url, client, regular_user_factory, api
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        params = {"op": "MKDIRS"}
+        async with client.put(url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        async with client.head(url, headers=headers) as response:
+            assert response.status == 200
+            assert response.content_length == 0
+            assert response.headers["X-File-Type"] == "DIRECTORY"
+            assert response.headers["X-File-Permission"] == "read"
+
+    @pytest.mark.asyncio
+    async def test_get_target_is_directory(
+        self, server_url, client, regular_user_factory, api
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        params = {"op": "MKDIRS"}
+        async with client.put(url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 200
+            assert response.content_length == 0
+            assert response.headers["X-File-Type"] == "DIRECTORY"
+            assert response.headers["X-File-Permission"] == "read"
+            payload = await response.read()
+            assert payload == b""
 
     @pytest.mark.asyncio
     async def test_delete_non_existent(
