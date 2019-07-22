@@ -276,15 +276,15 @@ class TestLocalFileSystem:
         expected_mtime = int(stat.st_mtime)
 
         statuses = await fs.liststatus(tmp_dir_path)
-        assert statuses == [
+        assert sorted(statuses, key=lambda s: s.path) == [
             FileStatus(
-                Path("link"),
+                Path("dir"),
                 size=0,
                 type=FileStatusType.DIRECTORY,
                 modification_time=expected_mtime,
             ),
             FileStatus(
-                Path("dir"),
+                Path("link"),
                 size=0,
                 type=FileStatusType.DIRECTORY,
                 modification_time=expected_mtime,
