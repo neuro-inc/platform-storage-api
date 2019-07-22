@@ -266,6 +266,44 @@ class TestLocalFileSystem:
         assert statuses == []
 
     @pytest.mark.asyncio
+    async def test_rm_symlink_to_dir(self, fs, tmp_dir_path):
+        dir_path = tmp_dir_path / "dir"
+        await fs.mkdir(dir_path)
+        link_path = tmp_dir_path / "link"
+        link_path.symlink_to("dir", target_is_directory=True)
+
+        stat = os.stat(dir_path)
+        expected_mtime = int(stat.st_mtime)
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == [
+            FileStatus(
+                Path("link"),
+                size=0,
+                type=FileStatusType.DIRECTORY,
+                modification_time=expected_mtime,
+            ),
+            FileStatus(
+                Path("dir"),
+                size=0,
+                type=FileStatusType.DIRECTORY,
+                modification_time=expected_mtime,
+            ),
+        ]
+
+        await fs.remove(link_path)
+
+        statuses = await fs.liststatus(tmp_dir_path)
+        assert statuses == [
+            FileStatus(
+                Path("dir"),
+                size=0,
+                type=FileStatusType.DIRECTORY,
+                modification_time=expected_mtime,
+            )
+        ]
+
+    @pytest.mark.asyncio
     async def test_get_filestatus_file(self, fs, tmp_dir_path):
         file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
