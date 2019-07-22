@@ -203,12 +203,13 @@ class LocalFileSystem(FileSystem):
 
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)
-        if concrete_path.is_dir():
+        if not concrete_path.is_symlink() and concrete_path.is_dir():
             try:
                 shutil.rmtree(concrete_path)
             except OSError as e:
                 # Debug logging
-                path = e.filename
+                if e.filename:
+                    path = e.filename
                 path_access_ok = os.access(path, os.W_OK)
                 try:
                     path_mode = f"{os.stat(path).st_mode:03o}"
