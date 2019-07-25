@@ -334,7 +334,7 @@ class TestStorageListAndResourceSharing:
                     "permission": "read",
                 },
             ]
-            assert statuses[0]["modificationTime"] >= min_mtime_third
+            assert statuses[0]["modificationTime"] <= min_mtime_third
             assert statuses[1]["modificationTime"] >= min_mtime_fourth
 
         async with client.get(
@@ -352,7 +352,7 @@ class TestStorageListAndResourceSharing:
                     "permission": "write",
                 }
             ]
-            assert statuses[0]["modificationTime"] >= min_mtime_third
+            assert statuses[0]["modificationTime"] >= min_mtime_fourth
 
         async with client.get(
             dir_url + "/first/second", headers=headers2, params=params
@@ -376,5 +376,6 @@ class TestStorageListAndResourceSharing:
                     "permission": "manage",
                 },
             ]
-            assert statuses[0]["modificationTime"] >= min_mtime_third
-            assert statuses[1]["modificationTime"] >= min_mtime_fourth
+            assert statuses[0]["modificationTime"] >= min_mtime_fourth
+            assert statuses[1]["modificationTime"] >= min_mtime_third
+            assert statuses[1]["modificationTime"] <= min_mtime_fourth
