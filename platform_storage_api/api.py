@@ -257,7 +257,7 @@ class StorageHandler:
                     stat_dict = {
                         "FileStatus": self._convert_filestatus_to_primitive(fstat)
                     }
-                    response.write(json.dumps(stat_dict).encode() + b"\r\n")
+                    await response.write(json.dumps(stat_dict).encode() + b"\r\n")
                 await response.write_eof()
 
                 return response
