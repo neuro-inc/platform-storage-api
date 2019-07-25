@@ -1,8 +1,9 @@
 import asyncio
+import json
 import logging
 from enum import Enum
 from pathlib import PurePath
-from typing import Iterator, List, Optional
+from typing import AsyncIterable, AsyncIterator, Optional
 
 import aiohttp.web
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
@@ -37,6 +38,7 @@ class StorageOperation(str, Enum):
     The CREATE operation handles opening files for writing.
     The OPEN operation handles opening files for reading.
     The LISTSTATUS operation handles non-recursive listing of directories.
+    The ITERSTATUS operation handles streamed non-recursive listing of directories.
     The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     The RENAME operation handles moving of files and directories.
@@ -45,6 +47,7 @@ class StorageOperation(str, Enum):
     CREATE = "CREATE"
     OPEN = "OPEN"
     LISTSTATUS = "LISTSTATUS"
+    ITERSTATUS = "ITERSTATUS"
     GETFILESTATUS = "GETFILESTATUS"
     MKDIRS = "MKDIRS"
     DELETE = "DELETE"
@@ -122,6 +125,10 @@ class StorageHandler:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, str(storage_path))
             return await self._handle_liststatus(storage_path, tree)
+        elif operation == StorageOperation.ITERSTATUS:
+            storage_path = self._get_fs_path_from_request(request)
+            tree = await self._get_user_permissions_tree(request, str(storage_path))
+            return await self._handle_iterstatus(request, storage_path, tree)
         elif operation == StorageOperation.GETFILESTATUS:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, str(storage_path))
@@ -210,7 +217,11 @@ class StorageHandler:
             raise aiohttp.web.HTTPNotFound
 
         try:
-            statuses = await self._storage.liststatus(storage_path)
+            async with await self._storage.iterstatus(storage_path) as statuses:
+                filtered_statuses = [
+                    fstat
+                    async for fstat in self._liststatus_filter(statuses, access_tree)
+                ]
         except FileNotFoundError:
             raise aiohttp.web.HTTPNotFound
         except NotADirectoryError:
@@ -218,7 +229,7 @@ class StorageHandler:
                 {"error": "Not a directory"},
                 status=aiohttp.web.HTTPBadRequest.status_code,
             )
-        filtered_statuses = self._liststatus_filter(statuses, access_tree)
+
         primitive_statuses = {
             "FileStatuses": {
                 "FileStatus": [
@@ -229,12 +240,41 @@ class StorageHandler:
 
         return aiohttp.web.json_response(primitive_statuses)
 
-    def _liststatus_filter(
-        self, statuses: List[FileStatus], access_tree: ClientSubTreeViewRoot
-    ) -> Iterator[FileStatus]:
+    async def _handle_iterstatus(
+        self,
+        request: Request,
+        storage_path: PurePath,
+        access_tree: ClientSubTreeViewRoot,
+    ):
+        if access_tree.sub_tree.action == AuthAction.DENY.value:
+            raise aiohttp.web.HTTPNotFound
+
+        try:
+            async with await self._storage.iterstatus(storage_path) as statuses:
+                response = aiohttp.web.StreamResponse()
+                await response.prepare(request)
+                async for fstat in self._liststatus_filter(statuses, access_tree):
+                    stat_dict = {
+                        "FileStatus": self._convert_filestatus_to_primitive(fstat)
+                    }
+                    response.write(json.dumps(stat_dict).encode() + b"\r\n")
+                await response.write_eof()
+
+                return response
+        except FileNotFoundError:
+            raise aiohttp.web.HTTPNotFound
+        except NotADirectoryError:
+            return aiohttp.web.json_response(
+                {"error": "Not a directory"},
+                status=aiohttp.web.HTTPBadRequest.status_code,
+            )
+
+    async def _liststatus_filter(
+        self, statuses: AsyncIterable[FileStatus], access_tree: ClientSubTreeViewRoot
+    ) -> AsyncIterator[FileStatus]:
         tree = access_tree.sub_tree
         is_list_action = tree.action == AuthAction.LIST.value
-        for status in statuses:
+        async for status in statuses:
             sub_tree = tree.children.get(str(status.path))
             if is_list_action and not sub_tree:
                 continue

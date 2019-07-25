@@ -183,6 +183,15 @@ class TestLocalFileSystem:
         assert statuses == []
 
     @pytest.mark.asyncio
+    async def test_iterstatus_non_existent_dir(self, fs, tmp_dir_path):
+        path = tmp_dir_path / "nested"
+
+        it = fs.iterstatus(path)
+        with pytest.raises(FileNotFoundError):
+            async with it:
+                pass
+
+    @pytest.mark.asyncio
     async def test_rm_non_existent(self, fs, tmp_dir_path):
         path = tmp_dir_path / "nested"
         with pytest.raises(FileNotFoundError):

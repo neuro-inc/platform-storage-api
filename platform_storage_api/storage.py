@@ -1,6 +1,6 @@
 import os
 from pathlib import PurePath
-from typing import List, Union
+from typing import AsyncContextManager, AsyncIterator, List, Union
 
 from .fs.local import FileStatus, FileSystem, copy_streams
 
@@ -36,6 +36,12 @@ class Storage:
         real_path = self._resolve_real_path(PurePath(path))
         async with self._fs.open(real_path, "rb") as f:
             await copy_streams(f, instream)
+
+    async def iterstatus(
+        self, path: Union[PurePath, str]
+    ) -> AsyncContextManager[AsyncIterator[FileStatus]]:
+        real_path = self._resolve_real_path(PurePath(path))
+        return self._fs.iterstatus(real_path)
 
     async def liststatus(self, path: Union[PurePath, str]) -> List[FileStatus]:
         real_path = self._resolve_real_path(PurePath(path))

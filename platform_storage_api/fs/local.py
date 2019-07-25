@@ -9,9 +9,10 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
-from typing import List, Optional
+from typing import Any, AsyncContextManager, AsyncIterator, Iterator, List, Optional
 
 import aiofiles
+from async_generator import asynccontextmanager
 
 
 logger = logging.getLogger()
@@ -106,8 +107,15 @@ class FileSystem(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+    def iterstatus(
+        self, path: PurePath
+    ) -> AsyncContextManager[AsyncIterator[FileStatus]]:
         pass
+
+    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+        # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
+        async with self.iterstatus(path) as dir_iter:
+            return [status async for status in dir_iter]
 
     @abc.abstractmethod
     async def get_filestatus(self, path: PurePath) -> FileStatus:
@@ -179,18 +187,16 @@ class LocalFileSystem(FileSystem):
                 )
 
     @classmethod
-    def _scandir(cls, path: PurePath) -> List[FileStatus]:
-        statuses = []
-        with os.scandir(path) as dir_iter:
-            for entry in dir_iter:
-                entry_path = PurePath(entry)
-                status = cls._create_filestatus(entry_path, basename_only=True)
-                statuses.append(status)
-        return statuses
+    async def _scandir_iter(cls, dir_iter: Iterator[Any]) -> AsyncIterator[FileStatus]:
+        for entry in dir_iter:
+            yield cls._create_filestatus(PurePath(entry), basename_only=True)
 
-    async def liststatus(self, path: PurePath) -> List[FileStatus]:
-        # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
-        return await self._loop.run_in_executor(self._executor, self._scandir, path)
+    @asynccontextmanager
+    async def iterstatus(
+        self, path: PurePath
+    ) -> AsyncIterator[AsyncIterator[FileStatus]]:
+        with os.scandir(path) as dir_iter:
+            yield self._scandir_iter(dir_iter)
 
     @classmethod
     def _get_file_or_dir_status(cls, path: PurePath) -> FileStatus:

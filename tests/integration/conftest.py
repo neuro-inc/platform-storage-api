@@ -1,8 +1,9 @@
+import json
 import os
 import uuid
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, List, NamedTuple, Optional
+from typing import AsyncIterable, Dict, List, NamedTuple, Optional
 
 import aiohttp
 import pytest
@@ -138,6 +139,10 @@ async def granter(auth_client, admin_token):
             assert p.status == 201
 
     return f
+
+
+async def get_iterstatus_list(response_lines: AsyncIterable[bytes]) -> List:
+    return [json.loads(line)["FileStatus"] async for line in response_lines]
 
 
 def get_liststatus_dict(response_json: Dict) -> List:

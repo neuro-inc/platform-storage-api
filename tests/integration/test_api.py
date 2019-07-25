@@ -10,7 +10,11 @@ import aiohttp.web
 import pytest
 
 from platform_storage_api.fs.local import FileStatusType
-from tests.integration.conftest import get_filestatus_dict, get_liststatus_dict
+from tests.integration.conftest import (
+    get_filestatus_dict,
+    get_iterstatus_list,
+    get_liststatus_dict,
+)
 
 
 class TestApi:
@@ -103,6 +107,94 @@ class TestStorage:
             payload = await response.json()
             expected_error = "Illegal operation: CREATE"
             assert payload["error"] == expected_error
+
+    @pytest.mark.asyncio
+    async def test_iterstatus(self, server_url, api, client, regular_user_factory):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"{user.name}/path/to"
+        dir_url = f"{server_url}/{dir_path}"
+        file_name = "file.txt"
+        url = f"{dir_url}/{file_name}"
+
+        payload = b"test"
+        mtime_min = int(current_time())
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        params = {"op": "ITERSTATUS"}
+        async with client.get(dir_url, headers=headers, params=params) as response:
+            assert response.status == 200
+            statuses = await get_iterstatus_list(response.content)
+            file_status = statuses[0]
+
+            assert file_status == {
+                "path": mock.ANY,
+                "type": str(FileStatusType.FILE),
+                "length": len(payload),
+                "modificationTime": mock.ANY,
+                "permission": "manage",
+            }
+            assert file_status["path"] == file_name
+            assert file_status["modificationTime"] >= mtime_min
+
+    @pytest.mark.asyncio
+    async def test_iterstatus_no_op_param_no_equals(
+        self, server_url, api, client, regular_user_factory
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"{user.name}/path/to"
+        dir_url = f"{server_url}/{dir_path}"
+        file_name = "file.txt"
+        url = f"{dir_url}/{file_name}"
+        payload = b"test"
+
+        mtime_min = int(current_time())
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        async with client.get(dir_url + "?iterstatus", headers=headers) as response:
+            statuses = await get_iterstatus_list(response.content)
+            file_status = statuses[0]
+
+            assert file_status == {
+                "path": mock.ANY,
+                "type": str(FileStatusType.FILE),
+                "length": len(payload),
+                "modificationTime": mock.ANY,
+                "permission": "manage",
+            }
+            assert file_status["path"] == file_name
+            assert file_status["modificationTime"] >= mtime_min
+
+    @pytest.mark.asyncio
+    async def test_iterstatus_non_existent_dir(
+        self, server_url, api, client, regular_user_factory
+    ):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_url = f"{server_url}/{user.name}/non-existent"
+
+        params = {"op": "ITERSTATUS"}
+        async with client.get(dir_url, headers=headers, params=params) as response:
+            assert response.status == 404
+
+    @pytest.mark.asyncio
+    async def test_iterstatus_file(self, server_url, api, client, regular_user_factory):
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test"
+
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == 201
+
+        params = {"op": "ITERSTATUS"}
+        async with client.get(url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert payload["error"] == "Not a directory"
 
     @pytest.mark.asyncio
     async def test_liststatus(self, server_url, api, client, regular_user_factory):
