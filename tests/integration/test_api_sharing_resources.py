@@ -6,7 +6,7 @@ import pytest
 import yarl
 
 from platform_storage_api.fs.local import FileStatusType
-from tests.integration.conftest import get_liststatus_dict
+from tests.integration.conftest import get_iterstatus_list
 
 
 class TestStorageListAndResourceSharing:
@@ -27,7 +27,7 @@ class TestStorageListAndResourceSharing:
 
         user2 = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user2.token}
-        params = {"op": "LISTSTATUS"}
+        params = {"op": "ITERSTATUS"}
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 404
 
@@ -56,7 +56,7 @@ class TestStorageListAndResourceSharing:
         # user2 lists users
         headers = {"Authorization": "Bearer " + user2.token}
         dir_url = f"{server_url}/{user2.name}/../"
-        params = {"op": "LISTSTATUS"}
+        params = {"op": "ITERSTATUS"}
         async with client.get(
             yarl.URL(dir_url, encoded=True), headers=headers, params=params
         ) as response:
@@ -90,7 +90,7 @@ class TestStorageListAndResourceSharing:
             assert response.status == 201
 
         # list by user2
-        params = {"op": "LISTSTATUS"}
+        params = {"op": "ITERSTATUS"}
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 404
 
@@ -101,7 +101,7 @@ class TestStorageListAndResourceSharing:
         )
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -147,7 +147,7 @@ class TestStorageListAndResourceSharing:
             assert response.status == 201
 
         # list by user2
-        params = {"op": "LISTSTATUS"}
+        params = {"op": "ITERSTATUS"}
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 404
 
@@ -159,7 +159,7 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
 
-            statuses = get_liststatus_dict(await response.json())
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -209,7 +209,7 @@ class TestStorageListAndResourceSharing:
             assert response.status == 201
 
         # list by user2
-        params = {"op": "LISTSTATUS"}
+        params = {"op": "ITERSTATUS"}
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 404
 
@@ -227,7 +227,7 @@ class TestStorageListAndResourceSharing:
             dir_url + "/first", headers=headers2, params=params
         ) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -284,7 +284,7 @@ class TestStorageListAndResourceSharing:
             assert response.status == 201
 
         # list by user2
-        params = {"op": "LISTSTATUS"}
+        params = {"op": "ITERSTATUS"}
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 404
 
@@ -316,7 +316,7 @@ class TestStorageListAndResourceSharing:
 
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -341,7 +341,7 @@ class TestStorageListAndResourceSharing:
             dir_url + "/first", headers=headers2, params=params
         ) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -358,7 +358,7 @@ class TestStorageListAndResourceSharing:
             dir_url + "/first/second", headers=headers2, params=params
         ) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
