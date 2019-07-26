@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 from time import time as current_time
 from unittest import mock
@@ -266,18 +267,23 @@ class TestStorageListAndResourceSharing:
             assert response.status == 201
 
         params = {"op": "MKDIRS"}
+        await asyncio.sleep(1)
         min_mtime_third = int(current_time())
+        await asyncio.sleep(1)
         async with client.put(
             dir_url + "/first/second/third", headers=headers1, params=params
         ) as response:
             assert response.status == 201
 
+        await asyncio.sleep(1)
         min_mtime_fourth = int(current_time())
+        await asyncio.sleep(1)
         async with client.put(
             dir_url + "/first/second/fourth", headers=headers1, params=params
         ) as response:
             assert response.status == 201
 
+        await asyncio.sleep(1)
         async with client.put(
             dir_url + "/first/fifth", headers=headers1, params=params
         ) as response:
