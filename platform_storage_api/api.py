@@ -1,10 +1,13 @@
 import asyncio
+import json
 import logging
+import struct
 from enum import Enum
 from pathlib import PurePath
 from typing import Iterator, List, Optional
 
 import aiohttp.web
+from aiohttp import ClientWebSocketResponse, WSCloseCode
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
 from aiohttp_security import check_authorized, check_permission
@@ -21,6 +24,9 @@ from .storage import Storage
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
 
 logger = logging.getLogger(__name__)
+
+MAX_WS_READ_SIZE = 16 * 2 ** 20  # 16 MiB
+MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2 ** 16 + 100
 
 
 class ApiHandler:
@@ -40,6 +46,10 @@ class StorageOperation(str, Enum):
     The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     The RENAME operation handles moving of files and directories.
+    The WEBSOCKET_READ operation handles immutable operations via the WebSocket
+    protocol.
+    The WEBSOCKET_WRITE operation handles mutable operations via the WebSocket
+    protocol.
     """
 
     CREATE = "CREATE"
@@ -49,10 +59,25 @@ class StorageOperation(str, Enum):
     MKDIRS = "MKDIRS"
     DELETE = "DELETE"
     RENAME = "RENAME"
+    WEBSOCKET_READ = "WEBSOCKET_READ"
+    WEBSOCKET_WRITE = "WEBSOCKET_WRITE"
 
     @classmethod
     def values(cls):
         return [item.value for item in cls]
+
+
+class WSStorageOperation(int, Enum):
+    # XXX Maybe use 2- or 4-bytes identifiers?
+    # E.g. READ = b"RE" or b"READ".
+    ACK = 0x01
+    ERROR = 0x02
+    READ = 0x11
+    STAT = 0x12
+    LIST = 0x13
+    CREATE = 0x21
+    WRITE = 0x22
+    MKDIR = 0x23
 
 
 class AuthAction(str, Enum):
@@ -126,6 +151,18 @@ class StorageHandler:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, str(storage_path))
             return await self._handle_getfilestatus(storage_path, tree)
+        elif operation == StorageOperation.WEBSOCKET_READ:
+            storage_path = self._get_fs_path_from_request(request)
+            await self._check_user_permissions(
+                request, str(storage_path), action="read"
+            )
+            return await self._handle_websocket(request, storage_path, write=False)
+        elif operation == StorageOperation.WEBSOCKET_WRITE:
+            storage_path = self._get_fs_path_from_request(request)
+            await self._check_user_permissions(
+                request, str(storage_path), action="write"
+            )
+            return await self._handle_websocket(request, storage_path, write=True)
         raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_delete(self, request: Request):
@@ -189,6 +226,138 @@ class StorageHandler:
 
     def _parse_post_operation(self, request: Request):
         return self._parse_operation(request) or StorageOperation.RENAME
+
+    def _validate_path(self, path: str) -> None:
+        if not path:
+            return
+        parts = path.split("/")
+        if ".." in parts:
+            raise ValueError(f"path should not contain '..' components: {path!r}")
+        if "." in parts:
+            raise ValueError(f"path should not contain '.' components: {path!r}")
+        if parts and not parts[0]:
+            raise ValueError(f"path should be relative: {path!r}")
+
+    async def _handle_websocket(
+        self, request: Request, storage_path: PurePath, write: bool
+    ):
+        ws = aiohttp.web.WebSocketResponse()
+        await ws.prepare(request)
+
+        async for msg in ws:
+            if msg.type == aiohttp.WSMsgType.BINARY:
+                hsize = 8
+                if len(msg.data) < hsize:
+                    await ws.close(code=WSCloseCode.UNSUPPORTED_DATA)
+                    break
+                if len(msg.data) > MAX_WS_MESSAGE_SIZE:
+                    await ws.close(code=WSCloseCode.MESSAGE_TOO_BIG)
+                    break
+                op, path_size, reqid = struct.unpack("!BxHI", msg.data[:hsize])
+                try:
+                    rel_path = msg.data[
+                        hsize : hsize + path_size  # noqa: E203
+                    ].decode()
+                    self._validate_path(rel_path)
+                    path = storage_path / rel_path if rel_path else storage_path
+                    pos = hsize + path_size
+
+                    if op == WSStorageOperation.READ:
+                        offset, size = struct.unpack(
+                            "!QI", msg.data[pos : pos + 12]  # noqa: E203
+                        )
+                        if size > MAX_WS_READ_SIZE:
+                            await self._ws_send_error(
+                                ws, op, reqid, "Too large read size"
+                            )
+                        else:
+                            data = await self._storage.read(path, offset, size)
+                            await self._ws_send_ack(ws, op, reqid, data)
+
+                    elif op == WSStorageOperation.STAT:
+                        try:
+                            fstat = await self._storage.get_filestatus(path)
+                        except FileNotFoundError:
+                            await self._ws_send_error(ws, op, reqid, "File not found")
+                        else:
+                            stat_dict = {
+                                "FileStatus": self._convert_filestatus_to_primitive(
+                                    fstat
+                                )
+                            }
+                            data = json.dumps(stat_dict).encode()
+                            await self._ws_send_ack(ws, op, reqid, data)
+
+                    elif op == WSStorageOperation.LIST:
+                        # XXX Maybe sent separate messages for every entity?
+                        try:
+                            statuses = await self._storage.liststatus(path)
+                        except FileNotFoundError:
+                            await self._ws_send_error(ws, op, reqid, "File not found")
+                        except NotADirectoryError:
+                            await self._ws_send_error(ws, op, reqid, "Not a directory")
+                        else:
+                            primitive_statuses = {
+                                "FileStatuses": {
+                                    "FileStatus": [
+                                        self._convert_filestatus_to_primitive(s)
+                                        for s in statuses
+                                    ]
+                                }
+                            }
+                            data = json.dumps(primitive_statuses).encode()
+                            await self._ws_send_ack(ws, op, reqid, data)
+
+                    elif not write:
+                        await self._ws_send_error(
+                            ws, op, reqid, "Requires writing permission"
+                        )
+
+                    elif op == WSStorageOperation.WRITE:
+                        offset, = struct.unpack(
+                            "!Q", msg.data[pos : pos + 8]  # noqa: E203
+                        )
+                        data = msg.data[pos + 8 :]  # noqa: E203
+                        await self._storage.write(path, offset, data)
+                        await self._ws_send_ack(ws, op, reqid)
+
+                    elif op == WSStorageOperation.CREATE:
+                        size, = struct.unpack(
+                            "!Q", msg.data[pos : pos + 8]  # noqa: E203
+                        )
+                        data = msg.data[pos + 8 :]  # noqa: E203
+                        await self._storage.create(path, size)
+                        await self._ws_send_ack(ws, op, reqid)
+
+                    elif op == WSStorageOperation.MKDIR:
+                        await self._storage.mkdir(path)
+                        await self._ws_send_ack(ws, op, reqid)
+
+                    else:
+                        await self._ws_send_error(ws, op, reqid, "Unknown operation")
+                except Exception as e:
+                    await self._ws_send_error(ws, op, reqid, str(e))
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                exc = ws.exception()
+                logger.error(
+                    f"WS connection closed with exception {exc!s}", exc_info=exc
+                )
+        return ws
+
+    async def _ws_send_ack(
+        self, ws: ClientWebSocketResponse, op: int, reqid: int, data: bytes = b""
+    ):
+        await ws.send_bytes(
+            struct.pack("!BBI", WSStorageOperation.ACK, op, reqid) + data
+        )
+
+    async def _ws_send_error(
+        self, ws: ClientWebSocketResponse, op: int, reqid: int, errmsg: str
+    ):
+        await ws.send_bytes(
+            struct.pack("!BBI", WSStorageOperation.ERROR, op, reqid)
+            + json.dumps({"error": errmsg}).encode()
+        )
 
     async def _handle_open(self, request: Request, storage_path: PurePath):
         try:
@@ -335,12 +504,15 @@ class StorageHandler:
         tree = await auth_client.get_permissions_tree(username.name, target_path_uri)
         return tree
 
-    async def _check_user_permissions(self, request, target_path: str) -> None:
+    async def _check_user_permissions(
+        self, request, target_path: str, action: str = ""
+    ) -> None:
         uri = f"storage:/{target_path}"
-        if request.method in ("HEAD", "GET"):
-            action = "read"
-        else:  # POST, PUT, PATCH, DELETE
-            action = "write"
+        if not action:
+            if request.method in ("HEAD", "GET"):
+                action = "read"
+            else:  # POST, PUT, PATCH, DELETE
+                action = "write"
         permission = Permission(uri=uri, action=action)
         logger.info(f"Checking {permission}")
         # TODO (Rafa Zubairov): test if user accessing his own data,
