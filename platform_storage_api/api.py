@@ -3,6 +3,7 @@ import json
 import logging
 import struct
 from enum import Enum
+from errno import errorcode
 from pathlib import PurePath
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -277,8 +278,10 @@ class StorageHandler:
                     elif op == WSStorageOperation.STAT:
                         try:
                             fstat = await self._storage.get_filestatus(path)
-                        except FileNotFoundError:
-                            await self._ws_send_error(ws, op, reqid, "File not found")
+                        except FileNotFoundError as e:
+                            await self._ws_send_error(
+                                ws, op, reqid, "File not found", e.errno
+                            )
                         else:
                             stat_dict = {
                                 "FileStatus": self._convert_filestatus_to_primitive(
@@ -290,10 +293,14 @@ class StorageHandler:
                     elif op == WSStorageOperation.LIST:
                         try:
                             statuses = await self._storage.liststatus(path)
-                        except FileNotFoundError:
-                            await self._ws_send_error(ws, op, reqid, "File not found")
-                        except NotADirectoryError:
-                            await self._ws_send_error(ws, op, reqid, "Not a directory")
+                        except FileNotFoundError as e:
+                            await self._ws_send_error(
+                                ws, op, reqid, "File not found", e.errno
+                            )
+                        except NotADirectoryError as e:
+                            await self._ws_send_error(
+                                ws, op, reqid, "Not a directory", e.errno
+                            )
                         else:
                             primitive_statuses = {
                                 "FileStatuses": {
@@ -329,6 +336,8 @@ class StorageHandler:
 
                     else:
                         await self._ws_send_error(ws, op, reqid, "Unknown operation")
+                except OSError as e:
+                    await self._ws_send_error(ws, op, reqid, str(e), e.errno)
                 except Exception as e:
                     await self._ws_send_error(ws, op, reqid, str(e))
             elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -358,16 +367,21 @@ class StorageHandler:
         result: Dict[str, Any] = {},
         data: bytes = b"",
     ) -> None:
-        await self._ws_send(
-            ws, WSStorageOperation.ACK, {"rop": op, "rid": reqid, **result}, data
-        )
+        payload = {"rop": op, "rid": reqid, **result}
+        await self._ws_send(ws, WSStorageOperation.ACK, payload, data)
 
     async def _ws_send_error(
-        self, ws: ClientWebSocketResponse, op: str, reqid: int, errmsg: str
+        self,
+        ws: ClientWebSocketResponse,
+        op: str,
+        reqid: int,
+        errmsg: str,
+        errno: Optional[int] = None,
     ) -> None:
-        await self._ws_send(
-            ws, WSStorageOperation.ERROR, {"rop": op, "rid": reqid, "error": errmsg}
-        )
+        payload = {"rop": op, "rid": reqid, "error": errmsg}
+        if errno is not None:
+            payload["errno"] = errorcode.get(errno, errno)
+        await self._ws_send(ws, WSStorageOperation.ERROR, payload)
 
     async def _handle_open(self, request: Request, storage_path: PurePath):
         try:

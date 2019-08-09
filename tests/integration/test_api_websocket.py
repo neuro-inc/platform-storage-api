@@ -66,7 +66,9 @@ class TestStorageWebSocket:
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
-            assert_ws_error(resp, WSStorageOperation.STAT, 1, "File not found")
+            assert_ws_error(
+                resp, WSStorageOperation.STAT, 1, "File not found", errno="ENOENT"
+            )
 
             size = 54321
             offset = 12345
@@ -127,7 +129,9 @@ class TestStorageWebSocket:
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
-            assert_ws_error(resp, WSStorageOperation.STAT, 1, "File not found")
+            assert_ws_error(
+                resp, WSStorageOperation.STAT, 1, "File not found", errno="ENOENT"
+            )
 
             size = 543_210
             offset = 12345
@@ -206,10 +210,14 @@ class TestStorageWebSocket:
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
-            assert_ws_error(resp, WSStorageOperation.STAT, 1, "File not found")
+            assert_ws_error(
+                resp, WSStorageOperation.STAT, 1, "File not found", errno="ENOENT"
+            )
 
             mtime_min = int(current_time())
-            await ws.send_bytes(ws_request(WSStorageOperation.MKDIRS, 100_000, rel_path))
+            await ws.send_bytes(
+                ws_request(WSStorageOperation.MKDIRS, 100_000, rel_path)
+            )
             resp = await ws.receive_bytes()
             assert_ws_ack(resp, WSStorageOperation.MKDIRS, 100_000)
 
@@ -396,7 +404,13 @@ class TestStorageWebSocket:
                 ws_request(WSStorageOperation.LIST, 300_002, file1_name)
             )
             resp = await ws.receive_bytes()
-            assert_ws_error(resp, WSStorageOperation.LIST, 300_002, "Not a directory")
+            assert_ws_error(
+                resp,
+                WSStorageOperation.LIST,
+                300_002,
+                "Not a directory",
+                errno="ENOTDIR",
+            )
 
     @pytest.mark.asyncio
     async def test_readonly(self, server_url, api, client, regular_user_factory):
@@ -424,7 +438,9 @@ class TestStorageWebSocket:
                 resp, WSStorageOperation.WRITE, 400_002, "Requires writing permission"
             )
 
-            await ws.send_bytes(ws_request(WSStorageOperation.MKDIRS, 400_003, dir_name))
+            await ws.send_bytes(
+                ws_request(WSStorageOperation.MKDIRS, 400_003, dir_name)
+            )
             resp = await ws.receive_bytes()
             assert_ws_error(
                 resp, WSStorageOperation.MKDIRS, 400_003, "Requires writing permission"
