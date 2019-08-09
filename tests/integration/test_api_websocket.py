@@ -2,6 +2,7 @@ import json
 import struct
 import uuid
 from time import time as current_time
+from typing import Any, Dict, Optional
 from unittest import mock
 
 import pytest
@@ -11,25 +12,45 @@ from platform_storage_api.fs.local import FileStatusType
 from tests.integration.conftest import get_filestatus_dict, get_liststatus_dict
 
 
-def ws_request(op: WSStorageOperation, reqid: int, path: str = "") -> bytes:
-    path_bytes = path.encode()
-    return struct.pack("!BxHI", op, len(path_bytes), reqid) + path_bytes
+def ws_request(
+    op: WSStorageOperation, id: int, path: Optional[str] = None, **kwargs: Any
+) -> bytes:
+    payload = {"op": op, "id": id, **kwargs}
+    if path is not None:
+        payload["path"] = path
+    header = json.dumps(payload).encode()
+    return struct.pack("!I", len(header) + 4) + header
 
 
-def ws_ack(op: WSStorageOperation, reqid: int) -> bytes:
-    return struct.pack("!BBI", WSStorageOperation.ACK, op, reqid)
+def parse_ws_response(resp: bytes) -> Dict[str, Any]:
+    hsize, = struct.unpack("!I", resp[:4])
+    return json.loads(resp[4:hsize])
 
 
-def ws_error(op: WSStorageOperation, reqid: int) -> bytes:
-    return struct.pack("!BBI", WSStorageOperation.ERROR, op, reqid)
+def get_ws_response_data(resp: bytes) -> bytes:
+    hsize, = struct.unpack("!I", resp[:4])
+    return resp[hsize:]
+
+
+def assert_ws_response(
+    resp: bytes, op: WSStorageOperation, rop: WSStorageOperation, rid: int, **kwargs
+) -> None:
+    payload = parse_ws_response(resp)
+    assert payload["op"] == op
+    assert payload["rop"] == rop
+    assert payload["rid"] == rid
+    for key, value in kwargs.items():
+        assert payload[key] == value
+
+
+def assert_ws_ack(resp: bytes, rop: WSStorageOperation, rid: int, **kwargs) -> None:
+    assert_ws_response(resp, WSStorageOperation.ACK, rop, rid, **kwargs)
 
 
 def assert_ws_error(
-    resp: bytes, op: WSStorageOperation, reqid: int, errmsg: str
+    resp: bytes, rop: WSStorageOperation, rid: int, error: str, **kwargs
 ) -> None:
-    assert resp.startswith(ws_error(op, reqid))
-    payload = json.loads(resp[6:])
-    assert payload["error"] == errmsg
+    assert_ws_response(resp, WSStorageOperation.ERROR, rop, rid, **kwargs)
 
 
 class TestStorageWebSocket:
@@ -41,7 +62,7 @@ class TestStorageWebSocket:
         rel_path = f"path/to/file-{uuid.uuid4()}"
 
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET_WRITE", headers=headers
+            f"{server_url}{base_path}?op=WEBSOCKET_WRITE", headers=headers, timeout=10
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
@@ -53,25 +74,23 @@ class TestStorageWebSocket:
 
             mtime_min = int(current_time())
             await ws.send_bytes(
-                ws_request(WSStorageOperation.CREATE, 100_000, rel_path)
-                + struct.pack("!Q", size)
+                ws_request(WSStorageOperation.CREATE, 100_000, rel_path, size=size)
             )
             resp = await ws.receive_bytes()
-            assert resp == ws_ack(WSStorageOperation.CREATE, 100_000)
+            assert_ws_ack(resp, WSStorageOperation.CREATE, 100_000)
 
             await ws.send_bytes(
-                ws_request(WSStorageOperation.WRITE, 200_000, rel_path)
-                + struct.pack("!Q", offset)
+                ws_request(WSStorageOperation.WRITE, 200_000, rel_path, offset=offset)
                 + data
             )
             resp = await ws.receive_bytes()
             mtime_min2 = int(current_time())
-            assert resp == ws_ack(WSStorageOperation.WRITE, 200_000)
+            assert_ws_ack(resp, WSStorageOperation.WRITE, 200_000)
 
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 200_001, rel_path))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.STAT, 200_001))
-            payload = get_filestatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.STAT, 200_001)
+            payload = get_filestatus_dict(parse_ws_response(resp))
             assert payload == {
                 "path": mock.ANY,
                 "type": str(FileStatusType.FILE),
@@ -84,12 +103,17 @@ class TestStorageWebSocket:
             assert payload["modificationTime"] <= mtime_min2
 
             await ws.send_bytes(
-                ws_request(WSStorageOperation.READ, 200_002, rel_path)
-                + struct.pack("!QI", offset, len(data))
+                ws_request(
+                    WSStorageOperation.READ,
+                    200_002,
+                    rel_path,
+                    offset=offset,
+                    size=len(data),
+                )
             )
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.READ, 200_002))
-            assert resp[6:] == data
+            assert_ws_ack(resp, WSStorageOperation.READ, 200_002)
+            assert get_ws_response_data(resp) == data
 
     @pytest.mark.asyncio
     async def test_write_create(self, server_url, api, client, regular_user_factory):
@@ -112,18 +136,17 @@ class TestStorageWebSocket:
 
             mtime_min = int(current_time())
             await ws.send_bytes(
-                ws_request(WSStorageOperation.WRITE, 100_000, rel_path)
-                + struct.pack("!Q", offset)
+                ws_request(WSStorageOperation.WRITE, 100_000, rel_path, offset=offset)
                 + data
             )
             resp = await ws.receive_bytes()
             mtime_min2 = int(current_time())
-            assert resp == ws_ack(WSStorageOperation.WRITE, 100_000)
+            assert_ws_ack(resp, WSStorageOperation.WRITE, 100_000)
 
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 100_001, rel_path))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.STAT, 100_001))
-            payload = get_filestatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.STAT, 100_001)
+            payload = get_filestatus_dict(parse_ws_response(resp))
             assert payload == {
                 "path": mock.ANY,
                 "type": str(FileStatusType.FILE),
@@ -136,17 +159,16 @@ class TestStorageWebSocket:
             assert payload["modificationTime"] <= mtime_min2
 
             await ws.send_bytes(
-                ws_request(WSStorageOperation.CREATE, 200_000, rel_path)
-                + struct.pack("!Q", size)
+                ws_request(WSStorageOperation.CREATE, 200_000, rel_path, size=size)
             )
             resp = await ws.receive_bytes()
             mtime_min3 = int(current_time())
-            assert resp == ws_ack(WSStorageOperation.CREATE, 200_000)
+            assert_ws_ack(resp, WSStorageOperation.CREATE, 200_000)
 
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 200_001, rel_path))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.STAT, 200_001))
-            payload = get_filestatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.STAT, 200_001)
+            payload = get_filestatus_dict(parse_ws_response(resp))
             assert payload == {
                 "path": mock.ANY,
                 "type": str(FileStatusType.FILE),
@@ -159,12 +181,17 @@ class TestStorageWebSocket:
             assert payload["modificationTime"] <= mtime_min3
 
             await ws.send_bytes(
-                ws_request(WSStorageOperation.READ, 200_002, rel_path)
-                + struct.pack("!QI", offset, len(data))
+                ws_request(
+                    WSStorageOperation.READ,
+                    200_002,
+                    rel_path,
+                    offset=offset,
+                    size=len(data),
+                )
             )
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.READ, 200_002))
-            assert resp[6:] == data
+            assert_ws_ack(resp, WSStorageOperation.READ, 200_002)
+            assert get_ws_response_data(resp) == data
 
     @pytest.mark.asyncio
     async def test_mkdirs(self, server_url, api, client, regular_user_factory):
@@ -184,12 +211,12 @@ class TestStorageWebSocket:
             mtime_min = int(current_time())
             await ws.send_bytes(ws_request(WSStorageOperation.MKDIR, 100_000, rel_path))
             resp = await ws.receive_bytes()
-            assert resp == ws_ack(WSStorageOperation.MKDIR, 100_000)
+            assert_ws_ack(resp, WSStorageOperation.MKDIR, 100_000)
 
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 100_001, rel_path))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.STAT, 100_001))
-            payload = get_filestatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.STAT, 100_001)
+            payload = get_filestatus_dict(parse_ws_response(resp))
             assert payload == {
                 "path": mock.ANY,
                 "type": str(FileStatusType.DIRECTORY),
@@ -202,8 +229,8 @@ class TestStorageWebSocket:
 
             await ws.send_bytes(ws_request(WSStorageOperation.LIST, 100_002))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.LIST, 100_002))
-            statuses = get_liststatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.LIST, 100_002)
+            statuses = get_liststatus_dict(parse_ws_response(resp))
             assert statuses == [
                 {
                     "path": "nested",
@@ -217,8 +244,8 @@ class TestStorageWebSocket:
 
             await ws.send_bytes(ws_request(WSStorageOperation.LIST, 100_002, "nested"))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.LIST, 100_002))
-            statuses = get_liststatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.LIST, 100_002)
+            statuses = get_liststatus_dict(parse_ws_response(resp))
             assert statuses == [
                 {
                     "path": dir_name,
@@ -247,30 +274,28 @@ class TestStorageWebSocket:
         ) as ws:
             mtime_min = int(current_time())
             await ws.send_bytes(
-                ws_request(WSStorageOperation.CREATE, 100_000, file1_name)
-                + struct.pack("!Q", 123)
+                ws_request(WSStorageOperation.CREATE, 100_000, file1_name, size=123)
             )
             resp = await ws.receive_bytes()
-            assert resp == ws_ack(WSStorageOperation.CREATE, 100_000)
+            assert_ws_ack(resp, WSStorageOperation.CREATE, 100_000)
 
             await ws.send_bytes(
                 ws_request(WSStorageOperation.MKDIR, 100_001, dir1_name)
             )
             resp = await ws.receive_bytes()
-            assert resp == ws_ack(WSStorageOperation.MKDIR, 100_001)
+            assert_ws_ack(resp, WSStorageOperation.MKDIR, 100_001)
 
             await ws.send_bytes(
-                ws_request(WSStorageOperation.CREATE, 100_002, file2_path)
-                + struct.pack("!Q", 321)
+                ws_request(WSStorageOperation.CREATE, 100_002, file2_path, size=321)
             )
             resp = await ws.receive_bytes()
-            assert resp == ws_ack(WSStorageOperation.CREATE, 100_002)
+            assert_ws_ack(resp, WSStorageOperation.CREATE, 100_002)
 
             await ws.send_bytes(
                 ws_request(WSStorageOperation.MKDIR, 100_003, dir2_path)
             )
             resp = await ws.receive_bytes()
-            assert resp == ws_ack(WSStorageOperation.MKDIR, 100_003)
+            assert_ws_ack(resp, WSStorageOperation.MKDIR, 100_003)
             mtime_min2 = int(current_time())
 
         async with client.ws_connect(
@@ -278,8 +303,8 @@ class TestStorageWebSocket:
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 200_001))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.STAT, 200_001))
-            payload = get_filestatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.STAT, 200_001)
+            payload = get_filestatus_dict(parse_ws_response(resp))
             assert payload == {
                 "path": mock.ANY,
                 "type": str(FileStatusType.DIRECTORY),
@@ -295,8 +320,8 @@ class TestStorageWebSocket:
                 ws_request(WSStorageOperation.STAT, 200_002, file1_name)
             )
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.STAT, 200_002))
-            payload = get_filestatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.STAT, 200_002)
+            payload = get_filestatus_dict(parse_ws_response(resp))
             assert payload == {
                 "path": mock.ANY,
                 "type": str(FileStatusType.FILE),
@@ -310,8 +335,8 @@ class TestStorageWebSocket:
 
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 200_003, dir1_name))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.STAT, 200_003))
-            payload = get_filestatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.STAT, 200_003)
+            payload = get_filestatus_dict(parse_ws_response(resp))
             assert payload == {
                 "path": mock.ANY,
                 "type": str(FileStatusType.DIRECTORY),
@@ -325,8 +350,8 @@ class TestStorageWebSocket:
 
             await ws.send_bytes(ws_request(WSStorageOperation.LIST, 300_000))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.LIST, 300_000))
-            statuses = get_liststatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.LIST, 300_000)
+            statuses = get_liststatus_dict(parse_ws_response(resp))
             statuses = sorted(statuses, key=lambda s: s["path"])
             assert statuses == [
                 {
@@ -347,8 +372,8 @@ class TestStorageWebSocket:
 
             await ws.send_bytes(ws_request(WSStorageOperation.LIST, 300_001, dir1_name))
             resp = await ws.receive_bytes()
-            assert resp.startswith(ws_ack(WSStorageOperation.LIST, 300_001))
-            statuses = get_liststatus_dict(json.loads(resp[6:]))
+            assert_ws_ack(resp, WSStorageOperation.LIST, 300_001)
+            statuses = get_liststatus_dict(parse_ws_response(resp))
             statuses = sorted(statuses, key=lambda s: s["path"])
             assert statuses == [
                 {
@@ -384,8 +409,7 @@ class TestStorageWebSocket:
             f"{server_url}/{user.name}?op=WEBSOCKET_READ", headers=headers
         ) as ws:
             await ws.send_bytes(
-                ws_request(WSStorageOperation.CREATE, 400_001, file_name)
-                + struct.pack("!Q", 123)
+                ws_request(WSStorageOperation.CREATE, 400_001, file_name, size=123)
             )
             resp = await ws.receive_bytes()
             assert_ws_error(
@@ -393,9 +417,7 @@ class TestStorageWebSocket:
             )
 
             await ws.send_bytes(
-                ws_request(WSStorageOperation.WRITE, 400_002, file_name)
-                + struct.pack("!Q", 0)
-                + b""
+                ws_request(WSStorageOperation.WRITE, 400_002, file_name, offset=0) + b""
             )
             resp = await ws.receive_bytes()
             assert_ws_error(

@@ -4,7 +4,7 @@ import logging
 import struct
 from enum import Enum
 from pathlib import PurePath
-from typing import Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 import aiohttp.web
 from aiohttp import ClientWebSocketResponse, WSCloseCode
@@ -67,17 +67,15 @@ class StorageOperation(str, Enum):
         return [item.value for item in cls]
 
 
-class WSStorageOperation(int, Enum):
-    # XXX Maybe use 2- or 4-bytes identifiers?
-    # E.g. READ = b"RE" or b"READ".
-    ACK = 0x01
-    ERROR = 0x02
-    READ = 0x11
-    STAT = 0x12
-    LIST = 0x13
-    CREATE = 0x21
-    WRITE = 0x22
-    MKDIR = 0x23
+class WSStorageOperation(str, Enum):
+    ACK = "ACK"
+    ERROR = "ERROR"
+    READ = "READ"
+    STAT = "STAT"
+    LIST = "LIST"
+    CREATE = "CREATE"
+    WRITE = "WRITE"
+    MKDIR = "MKDIR"
 
 
 class AuthAction(str, Enum):
@@ -240,39 +238,41 @@ class StorageHandler:
 
     async def _handle_websocket(
         self, request: Request, storage_path: PurePath, write: bool
-    ):
+    ) -> aiohttp.web.WebSocketResponse:
         ws = aiohttp.web.WebSocketResponse()
         await ws.prepare(request)
 
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.BINARY:
-                hsize = 8
-                if len(msg.data) < hsize:
+                if len(msg.data) < 4:
                     await ws.close(code=WSCloseCode.UNSUPPORTED_DATA)
                     break
                 if len(msg.data) > MAX_WS_MESSAGE_SIZE:
                     await ws.close(code=WSCloseCode.MESSAGE_TOO_BIG)
                     break
-                op, path_size, reqid = struct.unpack("!BxHI", msg.data[:hsize])
                 try:
-                    rel_path = msg.data[
-                        hsize : hsize + path_size  # noqa: E203
-                    ].decode()
+                    hsize, = struct.unpack("!I", msg.data[:4])
+                    payload = json.loads(msg.data[4:hsize])
+                    op = payload["op"]
+                    reqid = payload["id"]
+                except Exception as e:
+                    await self._ws_send(ws, WSStorageOperation.ERROR, {"error": str(e)})
+                    continue
+                try:
+                    rel_path = payload.get("path", "")
                     self._validate_path(rel_path)
                     path = storage_path / rel_path if rel_path else storage_path
-                    pos = hsize + path_size
 
                     if op == WSStorageOperation.READ:
-                        offset, size = struct.unpack(
-                            "!QI", msg.data[pos : pos + 12]  # noqa: E203
-                        )
+                        offset = payload["offset"]
+                        size = payload["size"]
                         if size > MAX_WS_READ_SIZE:
                             await self._ws_send_error(
                                 ws, op, reqid, "Too large read size"
                             )
                         else:
                             data = await self._storage.read(path, offset, size)
-                            await self._ws_send_ack(ws, op, reqid, data)
+                            await self._ws_send_ack(ws, op, reqid, data=data)
 
                     elif op == WSStorageOperation.STAT:
                         try:
@@ -285,11 +285,9 @@ class StorageHandler:
                                     fstat
                                 )
                             }
-                            data = json.dumps(stat_dict).encode()
-                            await self._ws_send_ack(ws, op, reqid, data)
+                            await self._ws_send_ack(ws, op, reqid, result=stat_dict)
 
                     elif op == WSStorageOperation.LIST:
-                        # XXX Maybe sent separate messages for every entity?
                         try:
                             statuses = await self._storage.liststatus(path)
                         except FileNotFoundError:
@@ -305,8 +303,9 @@ class StorageHandler:
                                     ]
                                 }
                             }
-                            data = json.dumps(primitive_statuses).encode()
-                            await self._ws_send_ack(ws, op, reqid, data)
+                            await self._ws_send_ack(
+                                ws, op, reqid, result=primitive_statuses
+                            )
 
                     elif not write:
                         await self._ws_send_error(
@@ -314,18 +313,13 @@ class StorageHandler:
                         )
 
                     elif op == WSStorageOperation.WRITE:
-                        offset, = struct.unpack(
-                            "!Q", msg.data[pos : pos + 8]  # noqa: E203
-                        )
-                        data = msg.data[pos + 8 :]  # noqa: E203
+                        data = msg.data[hsize:]
+                        offset = payload["offset"]
                         await self._storage.write(path, offset, data)
                         await self._ws_send_ack(ws, op, reqid)
 
                     elif op == WSStorageOperation.CREATE:
-                        size, = struct.unpack(
-                            "!Q", msg.data[pos : pos + 8]  # noqa: E203
-                        )
-                        data = msg.data[pos + 8 :]  # noqa: E203
+                        size = payload["size"]
                         await self._storage.create(path, size)
                         await self._ws_send_ack(ws, op, reqid)
 
@@ -344,19 +338,35 @@ class StorageHandler:
                 )
         return ws
 
+    async def _ws_send(
+        self,
+        ws: ClientWebSocketResponse,
+        op: WSStorageOperation,
+        payload: Dict[str, Any],
+        data: bytes = b"",
+    ) -> None:
+        payload = {"op": op.value, **payload}
+        header = json.dumps(payload).encode()
+        await ws.send_bytes(struct.pack("!I", len(header) + 4) + header + data)
+
     async def _ws_send_ack(
-        self, ws: ClientWebSocketResponse, op: int, reqid: int, data: bytes = b""
-    ):
-        await ws.send_bytes(
-            struct.pack("!BBI", WSStorageOperation.ACK, op, reqid) + data
+        self,
+        ws: ClientWebSocketResponse,
+        op: str,
+        reqid: int,
+        *,
+        result: Dict[str, Any] = {},
+        data: bytes = b"",
+    ) -> None:
+        await self._ws_send(
+            ws, WSStorageOperation.ACK, {"rop": op, "rid": reqid, **result}, data
         )
 
     async def _ws_send_error(
-        self, ws: ClientWebSocketResponse, op: int, reqid: int, errmsg: str
-    ):
-        await ws.send_bytes(
-            struct.pack("!BBI", WSStorageOperation.ERROR, op, reqid)
-            + json.dumps({"error": errmsg}).encode()
+        self, ws: ClientWebSocketResponse, op: str, reqid: int, errmsg: str
+    ) -> None:
+        await self._ws_send(
+            ws, WSStorageOperation.ERROR, {"rop": op, "rid": reqid, "error": errmsg}
         )
 
     async def _handle_open(self, request: Request, storage_path: PurePath):
