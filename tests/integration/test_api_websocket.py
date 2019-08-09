@@ -50,7 +50,7 @@ def assert_ws_ack(resp: bytes, rop: WSStorageOperation, rid: int, **kwargs) -> N
 def assert_ws_error(
     resp: bytes, rop: WSStorageOperation, rid: int, error: str, **kwargs
 ) -> None:
-    assert_ws_response(resp, WSStorageOperation.ERROR, rop, rid, **kwargs)
+    assert_ws_response(resp, WSStorageOperation.ERROR, rop, rid, error=error, **kwargs)
 
 
 class TestStorageWebSocket:
@@ -209,9 +209,9 @@ class TestStorageWebSocket:
             assert_ws_error(resp, WSStorageOperation.STAT, 1, "File not found")
 
             mtime_min = int(current_time())
-            await ws.send_bytes(ws_request(WSStorageOperation.MKDIR, 100_000, rel_path))
+            await ws.send_bytes(ws_request(WSStorageOperation.MKDIRS, 100_000, rel_path))
             resp = await ws.receive_bytes()
-            assert_ws_ack(resp, WSStorageOperation.MKDIR, 100_000)
+            assert_ws_ack(resp, WSStorageOperation.MKDIRS, 100_000)
 
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 100_001, rel_path))
             resp = await ws.receive_bytes()
@@ -280,10 +280,10 @@ class TestStorageWebSocket:
             assert_ws_ack(resp, WSStorageOperation.CREATE, 100_000)
 
             await ws.send_bytes(
-                ws_request(WSStorageOperation.MKDIR, 100_001, dir1_name)
+                ws_request(WSStorageOperation.MKDIRS, 100_001, dir1_name)
             )
             resp = await ws.receive_bytes()
-            assert_ws_ack(resp, WSStorageOperation.MKDIR, 100_001)
+            assert_ws_ack(resp, WSStorageOperation.MKDIRS, 100_001)
 
             await ws.send_bytes(
                 ws_request(WSStorageOperation.CREATE, 100_002, file2_path, size=321)
@@ -292,10 +292,10 @@ class TestStorageWebSocket:
             assert_ws_ack(resp, WSStorageOperation.CREATE, 100_002)
 
             await ws.send_bytes(
-                ws_request(WSStorageOperation.MKDIR, 100_003, dir2_path)
+                ws_request(WSStorageOperation.MKDIRS, 100_003, dir2_path)
             )
             resp = await ws.receive_bytes()
-            assert_ws_ack(resp, WSStorageOperation.MKDIR, 100_003)
+            assert_ws_ack(resp, WSStorageOperation.MKDIRS, 100_003)
             mtime_min2 = int(current_time())
 
         async with client.ws_connect(
@@ -424,8 +424,8 @@ class TestStorageWebSocket:
                 resp, WSStorageOperation.WRITE, 400_002, "Requires writing permission"
             )
 
-            await ws.send_bytes(ws_request(WSStorageOperation.MKDIR, 400_003, dir_name))
+            await ws.send_bytes(ws_request(WSStorageOperation.MKDIRS, 400_003, dir_name))
             resp = await ws.receive_bytes()
             assert_ws_error(
-                resp, WSStorageOperation.MKDIR, 400_003, "Requires writing permission"
+                resp, WSStorageOperation.MKDIRS, 400_003, "Requires writing permission"
             )

@@ -75,7 +75,7 @@ class WSStorageOperation(str, Enum):
     LIST = "LIST"
     CREATE = "CREATE"
     WRITE = "WRITE"
-    MKDIR = "MKDIR"
+    MKDIRS = "MKDIRS"
 
 
 class AuthAction(str, Enum):
@@ -323,7 +323,7 @@ class StorageHandler:
                         await self._storage.create(path, size)
                         await self._ws_send_ack(ws, op, reqid)
 
-                    elif op == WSStorageOperation.MKDIR:
+                    elif op == WSStorageOperation.MKDIRS:
                         await self._storage.mkdir(path)
                         await self._ws_send_ack(ws, op, reqid)
 
