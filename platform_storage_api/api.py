@@ -263,79 +263,16 @@ class StorageHandler:
                     rel_path = payload.get("path", "")
                     self._validate_path(rel_path)
                     path = storage_path / rel_path if rel_path else storage_path
-
-                    if op == WSStorageOperation.READ:
-                        offset = payload["offset"]
-                        size = payload["size"]
-                        if size > MAX_WS_READ_SIZE:
-                            await self._ws_send_error(
-                                ws, op, reqid, "Too large read size"
-                            )
-                        else:
-                            data = await self._storage.read(path, offset, size)
-                            await self._ws_send_ack(ws, op, reqid, data=data)
-
-                    elif op == WSStorageOperation.STAT:
-                        try:
-                            fstat = await self._storage.get_filestatus(path)
-                        except FileNotFoundError as e:
-                            await self._ws_send_error(
-                                ws, op, reqid, "File not found", e.errno
-                            )
-                        else:
-                            stat_dict = {
-                                "FileStatus": self._convert_filestatus_to_primitive(
-                                    fstat
-                                )
-                            }
-                            await self._ws_send_ack(ws, op, reqid, result=stat_dict)
-
-                    elif op == WSStorageOperation.LIST:
-                        try:
-                            statuses = await self._storage.liststatus(path)
-                        except FileNotFoundError as e:
-                            await self._ws_send_error(
-                                ws, op, reqid, "File not found", e.errno
-                            )
-                        except NotADirectoryError as e:
-                            await self._ws_send_error(
-                                ws, op, reqid, "Not a directory", e.errno
-                            )
-                        else:
-                            primitive_statuses = {
-                                "FileStatuses": {
-                                    "FileStatus": [
-                                        self._convert_filestatus_to_primitive(s)
-                                        for s in statuses
-                                    ]
-                                }
-                            }
-                            await self._ws_send_ack(
-                                ws, op, reqid, result=primitive_statuses
-                            )
-
-                    elif not write:
-                        await self._ws_send_error(
-                            ws, op, reqid, "Requires writing permission"
-                        )
-
-                    elif op == WSStorageOperation.WRITE:
-                        data = msg.data[hsize:]
-                        offset = payload["offset"]
-                        await self._storage.write(path, offset, data)
-                        await self._ws_send_ack(ws, op, reqid)
-
-                    elif op == WSStorageOperation.CREATE:
-                        size = payload["size"]
-                        await self._storage.create(path, size)
-                        await self._ws_send_ack(ws, op, reqid)
-
-                    elif op == WSStorageOperation.MKDIRS:
-                        await self._storage.mkdir(path)
-                        await self._ws_send_ack(ws, op, reqid)
-
-                    else:
-                        await self._ws_send_error(ws, op, reqid, "Unknown operation")
+                    await self._handle_websocket_message(
+                        ws,
+                        storage_path,
+                        write,
+                        op,
+                        reqid,
+                        path,
+                        payload,
+                        msg.data[hsize:],
+                    )
                 except OSError as e:
                     await self._ws_send_error(ws, op, reqid, str(e), e.errno)
                 except Exception as e:
@@ -346,6 +283,72 @@ class StorageHandler:
                     f"WS connection closed with exception {exc!s}", exc_info=exc
                 )
         return ws
+
+    async def _handle_websocket_message(
+        self,
+        ws: aiohttp.web.WebSocketResponse,
+        storage_path: PurePath,
+        write: bool,
+        op: str,
+        reqid: int,
+        path: str,
+        payload: Dict[str, Any],
+        data: bytes,
+    ) -> None:
+        if op == WSStorageOperation.READ:
+            offset = payload["offset"]
+            size = payload["size"]
+            if size > MAX_WS_READ_SIZE:
+                await self._ws_send_error(ws, op, reqid, "Too large read size")
+            else:
+                data = await self._storage.read(path, offset, size)
+                await self._ws_send_ack(ws, op, reqid, data=data)
+
+        elif op == WSStorageOperation.STAT:
+            try:
+                fstat = await self._storage.get_filestatus(path)
+            except FileNotFoundError as e:
+                await self._ws_send_error(ws, op, reqid, "File not found", e.errno)
+            else:
+                stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
+                await self._ws_send_ack(ws, op, reqid, result=stat_dict)
+
+        elif op == WSStorageOperation.LIST:
+            try:
+                statuses = await self._storage.liststatus(path)
+            except FileNotFoundError as e:
+                await self._ws_send_error(ws, op, reqid, "File not found", e.errno)
+            except NotADirectoryError as e:
+                await self._ws_send_error(ws, op, reqid, "Not a directory", e.errno)
+            else:
+                primitive_statuses = {
+                    "FileStatuses": {
+                        "FileStatus": [
+                            self._convert_filestatus_to_primitive(s) for s in statuses
+                        ]
+                    }
+                }
+                await self._ws_send_ack(ws, op, reqid, result=primitive_statuses)
+
+        elif not write:
+            await self._ws_send_error(ws, op, reqid, "Requires writing permission")
+
+        elif op == WSStorageOperation.WRITE:
+            offset = payload["offset"]
+            await self._storage.write(path, offset, data)
+            await self._ws_send_ack(ws, op, reqid)
+
+        elif op == WSStorageOperation.CREATE:
+            size = payload["size"]
+            await self._storage.create(path, size)
+            await self._ws_send_ack(ws, op, reqid)
+
+        elif op == WSStorageOperation.MKDIRS:
+            await self._storage.mkdir(path)
+            await self._ws_send_ack(ws, op, reqid)
+
+        else:
+            await self._ws_send_error(ws, op, reqid, "Unknown operation")
 
     async def _ws_send(
         self,
