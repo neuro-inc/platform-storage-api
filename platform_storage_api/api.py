@@ -1,10 +1,14 @@
 import asyncio
 import logging
+import struct
 from enum import Enum
+from errno import errorcode
 from pathlib import PurePath
-from typing import Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 import aiohttp.web
+import cbor
+from aiohttp import ClientWebSocketResponse, WSCloseCode
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
 from aiohttp_security import check_authorized, check_permission
@@ -21,6 +25,9 @@ from .storage import Storage
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
 
 logger = logging.getLogger(__name__)
+
+MAX_WS_READ_SIZE = 16 * 2 ** 20  # 16 MiB
+MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2 ** 16 + 100
 
 
 class ApiHandler:
@@ -40,6 +47,10 @@ class StorageOperation(str, Enum):
     The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     The RENAME operation handles moving of files and directories.
+    The WEBSOCKET_READ operation handles immutable operations via the WebSocket
+    protocol.
+    The WEBSOCKET_WRITE operation handles mutable operations via the WebSocket
+    protocol.
     """
 
     CREATE = "CREATE"
@@ -49,10 +60,23 @@ class StorageOperation(str, Enum):
     MKDIRS = "MKDIRS"
     DELETE = "DELETE"
     RENAME = "RENAME"
+    WEBSOCKET_READ = "WEBSOCKET_READ"
+    WEBSOCKET_WRITE = "WEBSOCKET_WRITE"
 
     @classmethod
     def values(cls):
         return [item.value for item in cls]
+
+
+class WSStorageOperation(str, Enum):
+    ACK = "ACK"
+    ERROR = "ERROR"
+    READ = "READ"
+    STAT = "STAT"
+    LIST = "LIST"
+    CREATE = "CREATE"
+    WRITE = "WRITE"
+    MKDIRS = "MKDIRS"
 
 
 class AuthAction(str, Enum):
@@ -126,6 +150,18 @@ class StorageHandler:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, str(storage_path))
             return await self._handle_getfilestatus(storage_path, tree)
+        elif operation == StorageOperation.WEBSOCKET_READ:
+            storage_path = self._get_fs_path_from_request(request)
+            await self._check_user_permissions(
+                request, str(storage_path), action="read"
+            )
+            return await self._handle_websocket(request, storage_path, write=False)
+        elif operation == StorageOperation.WEBSOCKET_WRITE:
+            storage_path = self._get_fs_path_from_request(request)
+            await self._check_user_permissions(
+                request, str(storage_path), action="write"
+            )
+            return await self._handle_websocket(request, storage_path, write=True)
         raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_delete(self, request: Request):
@@ -189,6 +225,166 @@ class StorageHandler:
 
     def _parse_post_operation(self, request: Request):
         return self._parse_operation(request) or StorageOperation.RENAME
+
+    def _validate_path(self, path: str) -> None:
+        if not path:
+            return
+        parts = path.split("/")
+        if ".." in parts:
+            raise ValueError(f"path should not contain '..' components: {path!r}")
+        if "." in parts:
+            raise ValueError(f"path should not contain '.' components: {path!r}")
+        if parts and not parts[0]:
+            raise ValueError(f"path should be relative: {path!r}")
+
+    async def _handle_websocket(
+        self, request: Request, storage_path: PurePath, write: bool
+    ) -> aiohttp.web.WebSocketResponse:
+        ws = aiohttp.web.WebSocketResponse()
+        await ws.prepare(request)
+
+        async for msg in ws:
+            if msg.type == aiohttp.WSMsgType.BINARY:
+                if len(msg.data) < 4:
+                    await ws.close(code=WSCloseCode.UNSUPPORTED_DATA)
+                    break
+                if len(msg.data) > MAX_WS_MESSAGE_SIZE:
+                    await ws.close(code=WSCloseCode.MESSAGE_TOO_BIG)
+                    break
+                try:
+                    hsize, = struct.unpack("!I", msg.data[:4])
+                    payload = cbor.loads(msg.data[4:hsize])
+                    op = payload["op"]
+                    reqid = payload["id"]
+                except Exception as e:
+                    await self._ws_send(ws, WSStorageOperation.ERROR, {"error": str(e)})
+                    continue
+                try:
+                    rel_path = payload.get("path", "")
+                    self._validate_path(rel_path)
+                    path = storage_path / rel_path if rel_path else storage_path
+                    await self._handle_websocket_message(
+                        ws,
+                        storage_path,
+                        write,
+                        op,
+                        reqid,
+                        path,
+                        payload,
+                        msg.data[hsize:],
+                    )
+                except OSError as e:
+                    await self._ws_send_error(ws, op, reqid, str(e), e.errno)
+                except Exception as e:
+                    await self._ws_send_error(ws, op, reqid, str(e))
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                exc = ws.exception()
+                logger.error(
+                    f"WS connection closed with exception {exc!s}", exc_info=exc
+                )
+        return ws
+
+    async def _handle_websocket_message(
+        self,
+        ws: aiohttp.web.WebSocketResponse,
+        storage_path: PurePath,
+        write: bool,
+        op: str,
+        reqid: int,
+        path: str,
+        payload: Dict[str, Any],
+        data: bytes,
+    ) -> None:
+        if op == WSStorageOperation.READ:
+            offset = payload["offset"]
+            size = payload["size"]
+            if size > MAX_WS_READ_SIZE:
+                await self._ws_send_error(ws, op, reqid, "Too large read size")
+            else:
+                data = await self._storage.read(path, offset, size)
+                await self._ws_send_ack(ws, op, reqid, data=data)
+
+        elif op == WSStorageOperation.STAT:
+            try:
+                fstat = await self._storage.get_filestatus(path)
+            except FileNotFoundError as e:
+                await self._ws_send_error(ws, op, reqid, "File not found", e.errno)
+            else:
+                stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
+                await self._ws_send_ack(ws, op, reqid, result=stat_dict)
+
+        elif op == WSStorageOperation.LIST:
+            try:
+                statuses = await self._storage.liststatus(path)
+            except FileNotFoundError as e:
+                await self._ws_send_error(ws, op, reqid, "File not found", e.errno)
+            except NotADirectoryError as e:
+                await self._ws_send_error(ws, op, reqid, "Not a directory", e.errno)
+            else:
+                primitive_statuses = {
+                    "FileStatuses": {
+                        "FileStatus": [
+                            self._convert_filestatus_to_primitive(s) for s in statuses
+                        ]
+                    }
+                }
+                await self._ws_send_ack(ws, op, reqid, result=primitive_statuses)
+
+        elif not write:
+            await self._ws_send_error(ws, op, reqid, "Requires writing permission")
+
+        elif op == WSStorageOperation.WRITE:
+            offset = payload["offset"]
+            await self._storage.write(path, offset, data)
+            await self._ws_send_ack(ws, op, reqid)
+
+        elif op == WSStorageOperation.CREATE:
+            size = payload["size"]
+            await self._storage.create(path, size)
+            await self._ws_send_ack(ws, op, reqid)
+
+        elif op == WSStorageOperation.MKDIRS:
+            await self._storage.mkdir(path)
+            await self._ws_send_ack(ws, op, reqid)
+
+        else:
+            await self._ws_send_error(ws, op, reqid, "Unknown operation")
+
+    async def _ws_send(
+        self,
+        ws: ClientWebSocketResponse,
+        op: WSStorageOperation,
+        payload: Dict[str, Any],
+        data: bytes = b"",
+    ) -> None:
+        payload = {"op": op.value, **payload}
+        header = cbor.dumps(payload)
+        await ws.send_bytes(struct.pack("!I", len(header) + 4) + header + data)
+
+    async def _ws_send_ack(
+        self,
+        ws: ClientWebSocketResponse,
+        op: str,
+        reqid: int,
+        *,
+        result: Dict[str, Any] = {},
+        data: bytes = b"",
+    ) -> None:
+        payload = {"rop": op, "rid": reqid, **result}
+        await self._ws_send(ws, WSStorageOperation.ACK, payload, data)
+
+    async def _ws_send_error(
+        self,
+        ws: ClientWebSocketResponse,
+        op: str,
+        reqid: int,
+        errmsg: str,
+        errno: Optional[int] = None,
+    ) -> None:
+        payload = {"rop": op, "rid": reqid, "error": errmsg}
+        if errno is not None:
+            payload["errno"] = errorcode.get(errno, errno)
+        await self._ws_send(ws, WSStorageOperation.ERROR, payload)
 
     async def _handle_open(self, request: Request, storage_path: PurePath):
         try:
@@ -335,12 +531,15 @@ class StorageHandler:
         tree = await auth_client.get_permissions_tree(username.name, target_path_uri)
         return tree
 
-    async def _check_user_permissions(self, request, target_path: str) -> None:
+    async def _check_user_permissions(
+        self, request, target_path: str, action: str = ""
+    ) -> None:
         uri = f"storage:/{target_path}"
-        if request.method in ("HEAD", "GET"):
-            action = "read"
-        else:  # POST, PUT, PATCH, DELETE
-            action = "write"
+        if not action:
+            if request.method in ("HEAD", "GET"):
+                action = "read"
+            else:  # POST, PUT, PATCH, DELETE
+                action = "write"
         permission = Permission(uri=uri, action=action)
         logger.info(f"Checking {permission}")
         # TODO (Rafa Zubairov): test if user accessing his own data,
