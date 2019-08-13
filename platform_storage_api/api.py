@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import struct
 from enum import Enum
@@ -8,6 +7,7 @@ from pathlib import PurePath
 from typing import Any, Dict, Iterator, List, Optional
 
 import aiohttp.web
+import cbor
 from aiohttp import ClientWebSocketResponse, WSCloseCode
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
@@ -253,7 +253,7 @@ class StorageHandler:
                     break
                 try:
                     hsize, = struct.unpack("!I", msg.data[:4])
-                    payload = json.loads(msg.data[4:hsize])
+                    payload = cbor.loads(msg.data[4:hsize])
                     op = payload["op"]
                     reqid = payload["id"]
                 except Exception as e:
@@ -358,7 +358,7 @@ class StorageHandler:
         data: bytes = b"",
     ) -> None:
         payload = {"op": op.value, **payload}
-        header = json.dumps(payload).encode()
+        header = cbor.dumps(payload)
         await ws.send_bytes(struct.pack("!I", len(header) + 4) + header + data)
 
     async def _ws_send_ack(

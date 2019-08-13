@@ -1,10 +1,10 @@
-import json
 import struct
 import uuid
 from time import time as current_time
 from typing import Any, Dict, Optional
 from unittest import mock
 
+import cbor
 import pytest
 
 from platform_storage_api.api import WSStorageOperation
@@ -18,13 +18,13 @@ def ws_request(
     payload = {"op": op, "id": id, **kwargs}
     if path is not None:
         payload["path"] = path
-    header = json.dumps(payload).encode()
+    header = cbor.dumps(payload)
     return struct.pack("!I", len(header) + 4) + header
 
 
 def parse_ws_response(resp: bytes) -> Dict[str, Any]:
     hsize, = struct.unpack("!I", resp[:4])
-    return json.loads(resp[4:hsize])
+    return cbor.loads(resp[4:hsize])
 
 
 def get_ws_response_data(resp: bytes) -> bytes:
