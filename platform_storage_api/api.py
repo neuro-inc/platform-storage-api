@@ -12,7 +12,7 @@ from aiohttp import ClientWebSocketResponse, WSCloseCode
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
 from aiohttp.web_request import Request
 from aiohttp_security import check_authorized, check_permission
-from async_exit_stack import AsyncExitStack
+from contextlib import AsyncExitStack
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
