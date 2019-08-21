@@ -54,6 +54,7 @@ _test_integration:
 _lint:
 	black --check platform_storage_api tests setup.py
 	flake8 platform_storage_api tests
+	mypy platform_storage_api tests
 
 run:
 	docker run -it --rm --name platformstorageapi \
