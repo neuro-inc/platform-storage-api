@@ -7,7 +7,6 @@ install_requires = (
     "aiohttp==3.5.4",
     "cbor==1.0.0",
     "cchardet==2.1.4",
-    "dataclasses==0.6",  # backport from 3.7 stdlib
     "neuro_auth_client==1.0.7",
     # TODO (A Danshyn 04/20/18): add uvloop at some point
 )
