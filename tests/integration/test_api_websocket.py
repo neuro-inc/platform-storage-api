@@ -1,3 +1,5 @@
+import errno
+import os
 import struct
 import uuid
 from time import time as current_time
@@ -85,7 +87,11 @@ class TestStorageWebSocket:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
             assert_ws_error(
-                resp, WSStorageOperation.STAT, 1, "File not found", errno="ENOENT"
+                resp,
+                WSStorageOperation.STAT,
+                1,
+                os.strerror(errno.ENOENT),
+                errno="ENOENT",
             )
 
             size = 54321
@@ -154,7 +160,11 @@ class TestStorageWebSocket:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
             assert_ws_error(
-                resp, WSStorageOperation.STAT, 1, "File not found", errno="ENOENT"
+                resp,
+                WSStorageOperation.STAT,
+                1,
+                os.strerror(errno.ENOENT),
+                errno="ENOENT",
             )
 
             size = 543_210
@@ -242,7 +252,11 @@ class TestStorageWebSocket:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
             assert_ws_error(
-                resp, WSStorageOperation.STAT, 1, "File not found", errno="ENOENT"
+                resp,
+                WSStorageOperation.STAT,
+                1,
+                os.strerror(errno.ENOENT),
+                errno="ENOENT",
             )
 
             mtime_min = int(current_time())
@@ -445,7 +459,7 @@ class TestStorageWebSocket:
                 resp,
                 WSStorageOperation.LIST,
                 300_002,
-                "Not a directory",
+                os.strerror(errno.ENOTDIR),
                 errno="ENOTDIR",
             )
 
