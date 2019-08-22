@@ -9,10 +9,16 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import Any, AsyncContextManager, List, Optional, Type, cast
+from typing import Any, List, Optional, Type, cast, TYPE_CHECKING
+from contextlib import AbstractAsyncContextManager
 
 import aiofiles
 
+
+if TYPE_CHECKING:
+    _FSBase = AbstractAsyncContextManager["FileSystem"]
+else:
+    _FSBase = AbstractAsyncContextManager
 
 logger = logging.getLogger()
 
@@ -71,7 +77,7 @@ class FileStatus:
         return replace(self, permission=permission)
 
 
-class FileSystem(abc.ABC, AsyncContextManager["FileSystem"]):
+class FileSystem(_FSBase):
     @classmethod
     def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
         if type_ == StorageType.LOCAL:
