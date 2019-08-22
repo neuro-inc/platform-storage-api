@@ -5,17 +5,26 @@ from contextlib import AsyncExitStack
 from enum import Enum
 from errno import errorcode
 from pathlib import PurePath
-from typing import Any, Dict, Iterator, List, Optional
+from typing import (
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+)
 
-import aiohttp.web
+import aiohttp
 import cbor
-from aiohttp import ClientWebSocketResponse, WSCloseCode
-from aiohttp.web_exceptions import HTTPBadRequest, HTTPUnauthorized
-from aiohttp.web_request import Request
+from aiohttp import web
 from aiohttp_security import check_authorized, check_permission
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
+
+from async_exit_stack import AsyncExitStack
 
 from .config import Config
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
@@ -31,11 +40,11 @@ MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2 ** 16 + 100
 
 
 class ApiHandler:
-    def register(self, app):
-        app.add_routes((aiohttp.web.get("/ping", self.handle_ping),))
+    def register(self, app: web.Application) -> None:
+        app.add_routes((web.get("/ping", self.handle_ping),))
 
-    async def handle_ping(self, request):
-        return aiohttp.web.Response()
+    async def handle_ping(self, request: web.Request) -> web.Response:
+        return web.Response()
 
 
 class StorageOperation(str, Enum):
@@ -64,7 +73,7 @@ class StorageOperation(str, Enum):
     WEBSOCKET_WRITE = "WEBSOCKET_WRITE"
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         return [item.value for item in cls]
 
 
@@ -85,26 +94,24 @@ class AuthAction(str, Enum):
 
 
 class StorageHandler:
-    def __init__(
-        self, app: aiohttp.web.Application, storage: Storage, config: Config
-    ) -> None:
+    def __init__(self, app: web.Application, storage: Storage, config: Config) -> None:
         self._app = app
         self._storage = storage
         self._config = config
 
-    def register(self, app):
+    def register(self, app: web.Application) -> None:
         app.add_routes(
             (
                 # TODO (A Danshyn 04/23/18): add some unit test for path matching
-                aiohttp.web.put(r"/{path:.*}", self.handle_put),
-                aiohttp.web.post(r"/{path:.*}", self.handle_post),
-                aiohttp.web.head(r"/{path:.*}", self.handle_head),
-                aiohttp.web.get(r"/{path:.*}", self.handle_get),
-                aiohttp.web.delete(r"/{path:.*}", self.handle_delete),
+                web.put(r"/{path:.*}", self.handle_put),
+                web.post(r"/{path:.*}", self.handle_post),
+                web.head(r"/{path:.*}", self.handle_head),
+                web.get(r"/{path:.*}", self.handle_get),
+                web.delete(r"/{path:.*}", self.handle_delete),
             )
         )
 
-    async def handle_put(self, request: Request):
+    async def handle_put(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_put_operation(request)
         if operation == StorageOperation.CREATE:
             storage_path = self._get_fs_path_from_request(request)
@@ -116,27 +123,27 @@ class StorageHandler:
             return await self._handle_mkdirs(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
 
-    def _create_response(self, fstat: FileStatus) -> aiohttp.web.StreamResponse:
-        response = aiohttp.web.StreamResponse()
+    def _create_response(self, fstat: FileStatus) -> web.StreamResponse:
+        response = web.StreamResponse()
         response.content_length = fstat.size
-        response.last_modified = fstat.modification_time
+        response.last_modified = fstat.modification_time  # type: ignore
         response.headers["X-File-Type"] = str(fstat.type)
         response.headers["X-File-Permission"] = fstat.permission.value
         if fstat.type == FileStatusType.FILE:
             response.headers["X-File-Length"] = str(fstat.size)
         return response
 
-    async def handle_head(self, request: Request):
+    async def handle_head(self, request: web.Request) -> web.StreamResponse:
         storage_path = self._get_fs_path_from_request(request)
         await self._check_user_permissions(request, str(storage_path))
         try:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
-            raise aiohttp.web.HTTPNotFound
+            raise web.HTTPNotFound
 
         return self._create_response(fstat)
 
-    async def handle_get(self, request: Request):
+    async def handle_get(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
             storage_path = self._get_fs_path_from_request(request)
@@ -164,7 +171,7 @@ class StorageHandler:
             return await self._handle_websocket(request, storage_path, write=True)
         raise ValueError(f"Illegal operation: {operation}")
 
-    async def handle_delete(self, request: Request):
+    async def handle_delete(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_delete_operation(request)
         if operation == StorageOperation.DELETE:
             storage_path: PurePath = self._get_fs_path_from_request(request)
@@ -172,7 +179,7 @@ class StorageHandler:
             await self._handle_delete(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
 
-    async def handle_post(self, request: Request):
+    async def handle_post(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_post_operation(request)
         if operation == StorageOperation.RENAME:
             storage_path: PurePath = self._get_fs_path_from_request(request)
@@ -180,23 +187,25 @@ class StorageHandler:
             return await self._handle_rename(storage_path, request)
         raise ValueError(f"Illegal operation: {operation}")
 
-    def _get_fs_path_from_request(self, request):
+    def _get_fs_path_from_request(self, request: web.Request) -> PurePath:
         user_provided_path = request.match_info.get("path", "")
         return self._storage.sanitize_path(user_provided_path)
 
-    async def _handle_create(self, request, storage_path: PurePath):
+    async def _handle_create(
+        self, request: web.Request, storage_path: PurePath
+    ) -> web.Response:
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
         try:
             await self._storage.store(request.content, storage_path)
         except IsADirectoryError:
-            return aiohttp.web.json_response(
+            return web.json_response(
                 {"error": "Destination is a directory"},
-                status=aiohttp.web.HTTPBadRequest.status_code,
+                status=web.HTTPBadRequest.status_code,
             )
 
-        return aiohttp.web.Response(status=201)
+        return web.Response(status=201)
 
-    def _parse_operation(self, request) -> Optional[StorageOperation]:
+    def _parse_operation(self, request: web.Request) -> Optional[StorageOperation]:
         ops = []
 
         if "op" in request.query:
@@ -214,16 +223,16 @@ class StorageHandler:
             return StorageOperation(ops[0])
         return None
 
-    def _parse_put_operation(self, request: Request):
+    def _parse_put_operation(self, request: web.Request) -> StorageOperation:
         return self._parse_operation(request) or StorageOperation.CREATE
 
-    def _parse_get_operation(self, request: Request):
+    def _parse_get_operation(self, request: web.Request) -> StorageOperation:
         return self._parse_operation(request) or StorageOperation.OPEN
 
-    def _parse_delete_operation(self, request: Request):
+    def _parse_delete_operation(self, request: web.Request) -> StorageOperation:
         return self._parse_operation(request) or StorageOperation.DELETE
 
-    def _parse_post_operation(self, request: Request):
+    def _parse_post_operation(self, request: web.Request) -> StorageOperation:
         return self._parse_operation(request) or StorageOperation.RENAME
 
     def _validate_path(self, path: str) -> None:
@@ -238,18 +247,18 @@ class StorageHandler:
             raise ValueError(f"path should be relative: {path!r}")
 
     async def _handle_websocket(
-        self, request: Request, storage_path: PurePath, write: bool
-    ) -> aiohttp.web.WebSocketResponse:
-        ws = aiohttp.web.WebSocketResponse()
+        self, request: web.Request, storage_path: PurePath, write: bool
+    ) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse()
         await ws.prepare(request)
 
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.BINARY:
                 if len(msg.data) < 4:
-                    await ws.close(code=WSCloseCode.UNSUPPORTED_DATA)
+                    await ws.close(code=aiohttp.WSCloseCode.UNSUPPORTED_DATA)
                     break
                 if len(msg.data) > MAX_WS_MESSAGE_SIZE:
-                    await ws.close(code=WSCloseCode.MESSAGE_TOO_BIG)
+                    await ws.close(code=aiohttp.WSCloseCode.MESSAGE_TOO_BIG)
                     break
                 try:
                     hsize, = struct.unpack("!I", msg.data[:4])
@@ -286,7 +295,7 @@ class StorageHandler:
 
     async def _handle_websocket_message(
         self,
-        ws: aiohttp.web.WebSocketResponse,
+        ws: web.WebSocketResponse,
         storage_path: PurePath,
         write: bool,
         op: str,
@@ -352,7 +361,7 @@ class StorageHandler:
 
     async def _ws_send(
         self,
-        ws: ClientWebSocketResponse,
+        ws: web.WebSocketResponse,
         op: WSStorageOperation,
         payload: Dict[str, Any],
         data: bytes = b"",
@@ -363,7 +372,7 @@ class StorageHandler:
 
     async def _ws_send_ack(
         self,
-        ws: ClientWebSocketResponse,
+        ws: web.WebSocketResponse,
         op: str,
         reqid: int,
         *,
@@ -375,7 +384,7 @@ class StorageHandler:
 
     async def _ws_send_error(
         self,
-        ws: ClientWebSocketResponse,
+        ws: web.WebSocketResponse,
         op: str,
         reqid: int,
         errmsg: str,
@@ -386,33 +395,34 @@ class StorageHandler:
             payload["errno"] = errorcode.get(errno, errno)
         await self._ws_send(ws, WSStorageOperation.ERROR, payload)
 
-    async def _handle_open(self, request: Request, storage_path: PurePath):
+    async def _handle_open(
+        self, request: web.Request, storage_path: PurePath
+    ) -> web.StreamResponse:
         try:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
-            raise aiohttp.web.HTTPNotFound
+            raise web.HTTPNotFound
 
         response = self._create_response(fstat)
         await response.prepare(request)
-        await self._storage.retrieve(response, storage_path)
+        await self._storage.retrieve(response, storage_path)  # type: ignore
         await response.write_eof()
 
         return response
 
     async def _handle_liststatus(
         self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
-    ):
+    ) -> web.Response:
         if access_tree.sub_tree.action == AuthAction.DENY.value:
-            raise aiohttp.web.HTTPNotFound
+            raise web.HTTPNotFound
 
         try:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
-            raise aiohttp.web.HTTPNotFound
+            raise web.HTTPNotFound
         except NotADirectoryError:
-            return aiohttp.web.json_response(
-                {"error": "Not a directory"},
-                status=aiohttp.web.HTTPBadRequest.status_code,
+            return web.json_response(
+                {"error": "Not a directory"}, status=web.HTTPBadRequest.status_code
             )
         filtered_statuses = self._liststatus_filter(statuses, access_tree)
         primitive_statuses = {
@@ -423,7 +433,7 @@ class StorageHandler:
             }
         }
 
-        return aiohttp.web.json_response(primitive_statuses)
+        return web.json_response(primitive_statuses)
 
     def _liststatus_filter(
         self, statuses: List[FileStatus], access_tree: ClientSubTreeViewRoot
@@ -445,46 +455,47 @@ class StorageHandler:
 
     async def _handle_getfilestatus(
         self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
-    ):
+    ) -> web.StreamResponse:
         action = access_tree.sub_tree.action
         if action == AuthAction.DENY.value:
-            raise aiohttp.web.HTTPNotFound
+            raise web.HTTPNotFound
 
         try:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
-            raise aiohttp.web.HTTPNotFound
+            raise web.HTTPNotFound
 
         fstat = fstat.with_permission(self._convert_action_to_permission(action))
         stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
-        return aiohttp.web.json_response(stat_dict)
+        return web.json_response(stat_dict)
 
-    async def _handle_mkdirs(self, storage_path: PurePath):
+    async def _handle_mkdirs(self, storage_path: PurePath) -> web.StreamResponse:
         try:
             await self._storage.mkdir(storage_path)
         except FileExistsError:
-            return aiohttp.web.json_response(
-                {"error": "File exists"}, status=aiohttp.web.HTTPBadRequest.status_code
+            return web.json_response(
+                {"error": "File exists"}, status=web.HTTPBadRequest.status_code
             )
         except NotADirectoryError:
-            return aiohttp.web.json_response(
+            return web.json_response(
                 {"error": "Predescessor is not a directory"},
-                status=aiohttp.web.HTTPBadRequest.status_code,
+                status=web.HTTPBadRequest.status_code,
             )
-        raise aiohttp.web.HTTPCreated()
+        raise web.HTTPCreated()
 
-    async def _handle_delete(self, storage_path: PurePath):
+    async def _handle_delete(self, storage_path: PurePath) -> web.StreamResponse:
         try:
             await self._storage.remove(storage_path)
         except FileNotFoundError:
-            raise aiohttp.web.HTTPNotFound()
-        raise aiohttp.web.HTTPNoContent()
+            raise web.HTTPNotFound()
+        raise web.HTTPNoContent()
 
-    async def _handle_rename(self, old: PurePath, request: Request):
+    async def _handle_rename(
+        self, old: PurePath, request: web.Request
+    ) -> web.StreamResponse:
         if "destination" not in request.query:
-            return aiohttp.web.json_response(
-                {"error": "No destination"},
-                status=aiohttp.web.HTTPBadRequest.status_code,
+            return web.json_response(
+                {"error": "No destination"}, status=web.HTTPBadRequest.status_code
             )
         try:
             new = PurePath(request.query["destination"])
@@ -494,26 +505,26 @@ class StorageHandler:
             await self._check_user_permissions(request, str(new))
             await self._storage.rename(old, new)
         except FileNotFoundError:
-            raise aiohttp.web.HTTPNotFound()
+            raise web.HTTPNotFound()
         except IsADirectoryError:
-            return aiohttp.web.json_response(
+            return web.json_response(
                 {"error": "Destination is a directory"},
-                status=aiohttp.web.HTTPBadRequest.status_code,
+                status=web.HTTPBadRequest.status_code,
             )
         except NotADirectoryError:
-            return aiohttp.web.json_response(
+            return web.json_response(
                 {"error": "Destination is not a directory"},
-                status=aiohttp.web.HTTPBadRequest.status_code,
+                status=web.HTTPBadRequest.status_code,
             )
         except OSError:
-            return aiohttp.web.json_response(
+            return web.json_response(
                 {"error": "Incorrect destination"},
-                status=aiohttp.web.HTTPBadRequest.status_code,
+                status=web.HTTPBadRequest.status_code,
             )
-        raise aiohttp.web.HTTPNoContent()
+        raise web.HTTPNoContent()
 
     @classmethod
-    def _convert_filestatus_to_primitive(cls, status: FileStatus):
+    def _convert_filestatus_to_primitive(cls, status: FileStatus) -> Dict[str, Any]:
         return {
             "path": str(status.path),
             "length": status.size,
@@ -523,7 +534,7 @@ class StorageHandler:
         }
 
     async def _get_user_permissions_tree(
-        self, request: Request, target_path: str
+        self, request: web.Request, target_path: str
     ) -> ClientSubTreeViewRoot:
         username = await self._get_user_from_request(request)
         auth_client = self._get_auth_client()
@@ -532,7 +543,7 @@ class StorageHandler:
         return tree
 
     async def _check_user_permissions(
-        self, request, target_path: str, action: str = ""
+        self, request: web.Request, target_path: str, action: str = ""
     ) -> None:
         uri = f"storage:/{target_path}"
         if not action:
@@ -546,23 +557,23 @@ class StorageHandler:
         # then use JWT token claims
         try:
             await check_permission(request, action, [permission])
-        except HTTPUnauthorized:
+        except web.HTTPUnauthorized:
             # TODO (Rafa Zubairov): Use tree based approach here
             self._raise_unauthorized()
-        except aiohttp.web.HTTPForbidden:
-            raise aiohttp.web.HTTPNotFound()
+        except web.HTTPForbidden:
+            raise web.HTTPNotFound()
 
     def _raise_unauthorized(self) -> None:
-        raise HTTPUnauthorized(
+        raise web.HTTPUnauthorized(
             headers={"WWW-Authenticate": f'Bearer realm="{self._config.server.name}"'}
         )
 
-    async def _get_user_from_request(self, request: Request) -> User:
+    async def _get_user_from_request(self, request: web.Request) -> User:
         try:
             user_name = await check_authorized(request)
         except ValueError:
-            raise HTTPBadRequest()
-        except HTTPUnauthorized:
+            raise web.HTTPBadRequest()
+        except web.HTTPUnauthorized:
             self._raise_unauthorized()
         return User(name=user_name)
 
@@ -570,16 +581,17 @@ class StorageHandler:
         return self._app["auth_client"]
 
 
-@aiohttp.web.middleware
-async def handle_exceptions(request, handler):
+@web.middleware
+async def handle_exceptions(
+    request: web.Request,
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
     try:
         return await handler(request)
     except ValueError as e:
         payload = {"error": str(e)}
-        return aiohttp.web.json_response(
-            payload, status=aiohttp.web.HTTPBadRequest.status_code
-        )
-    except aiohttp.web.HTTPException:
+        return web.json_response(payload, status=web.HTTPBadRequest.status_code)
+    except web.HTTPException:
         raise
     except Exception as e:
         msg_str = (
@@ -587,16 +599,16 @@ async def handle_exceptions(request, handler):
         )
         logging.exception(msg_str)
         payload = {"error": msg_str}
-        return aiohttp.web.json_response(
-            payload, status=aiohttp.web.HTTPInternalServerError.status_code
+        return web.json_response(
+            payload, status=web.HTTPInternalServerError.status_code
         )
 
 
-async def create_app(config: Config, storage: Storage):
-    app = aiohttp.web.Application(middlewares=[handle_exceptions])
+async def create_app(config: Config, storage: Storage) -> web.Application:
+    app = web.Application(middlewares=[handle_exceptions])
     app["config"] = config
 
-    async def _init_app(app: aiohttp.web.Application):
+    async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
             logger.info("Initializing Auth Client For Storage API")
 
@@ -628,12 +640,12 @@ async def create_app(config: Config, storage: Storage):
 
     app.cleanup_ctx.append(_init_app)
 
-    api_v1_app = aiohttp.web.Application()
+    api_v1_app = web.Application()
     api_v1_handler = ApiHandler()
     api_v1_handler.register(api_v1_app)
     app["api_v1"] = api_v1_app
 
-    storage_app = aiohttp.web.Application()
+    storage_app = web.Application()
     storage_handler = StorageHandler(api_v1_app, storage, config)
     storage_handler.register(storage_app)
 
@@ -645,14 +657,14 @@ async def create_app(config: Config, storage: Storage):
     return app
 
 
-def init_logging():
+def init_logging() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
 
-def main():
+def main() -> None:
     init_logging()
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
@@ -662,7 +674,7 @@ def main():
     fs = LocalFileSystem(executor_max_workers=config.storage.fs_local_thread_pool_size)
     storage = Storage(fs, config.storage.fs_local_base_path)
 
-    async def _init_storage(app):
+    async def _init_storage(app: web.Application) -> AsyncIterator[None]:
         async with fs:
             logging.info("Initializing the storage file system")
             yield
@@ -670,4 +682,4 @@ def main():
 
     app = loop.run_until_complete(create_app(config, storage))
     app.cleanup_ctx.append(_init_storage)
-    aiohttp.web.run_app(app, host=config.server.host, port=config.server.port)
+    web.run_app(app, host=config.server.host, port=config.server.port)

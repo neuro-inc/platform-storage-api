@@ -2,6 +2,9 @@ import os
 from pathlib import PurePath
 from typing import Any, List, Union
 
+import aiohttp
+from aiohttp.abc import AbstractStreamWriter
+
 from .fs.local import FileStatus, FileSystem, copy_streams
 
 
@@ -16,7 +19,7 @@ class Storage:
         # TODO: (A Danshyn 04/23/18): validate paths
         return PurePath(self._base_path, path.relative_to("/"))
 
-    def sanitize_path(self, path: str) -> PurePath:
+    def sanitize_path(self, path: Union[str, "os.PathLike[str]"]) -> PurePath:
         """
         Sanitize path - it shall in the end depend on the implementation of the
         underlying storage subsystem, while now put it here.
@@ -26,13 +29,17 @@ class Storage:
         normpath = os.path.normpath(str(PurePath("/", path)))
         return PurePath(normpath)
 
-    async def store(self, outstream, path: Union[PurePath, str]) -> None:
+    async def store(
+        self, outstream: AbstractStreamWriter, path: Union[PurePath, str]
+    ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
         async with self._fs.open(real_path, "wb") as f:
             await copy_streams(outstream, f)
 
-    async def retrieve(self, instream, path: Union[PurePath, str]) -> None:
+    async def retrieve(
+        self, instream: aiohttp.StreamReader, path: Union[PurePath, str]
+    ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         async with self._fs.open(real_path, "rb") as f:
             await copy_streams(f, instream)

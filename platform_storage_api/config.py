@@ -13,7 +13,7 @@ class ServerConfig:
     name: str = "Storage API"
 
     @classmethod
-    def from_environ(cls, environ=None) -> "ServerConfig":
+    def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "ServerConfig":
         return EnvironConfigFactory(environ).create_server()
 
 
@@ -29,7 +29,7 @@ class StorageConfig:
     fs_local_thread_pool_size: int = 100
 
     @classmethod
-    def from_environ(cls, environ=None) -> "StorageConfig":
+    def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "StorageConfig":
         return EnvironConfigFactory(environ).create_storage()
 
 
@@ -40,7 +40,7 @@ class Config:
     auth: AuthConfig
 
     @classmethod
-    def from_environ(cls, environ=None) -> "Config":
+    def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "Config":
         return EnvironConfigFactory(environ).create()
 
 
@@ -68,12 +68,10 @@ class EnvironConfigFactory:
     def create_auth(self) -> AuthConfig:
         url = URL(self._environ["NP_STORAGE_AUTH_URL"])
         token = self._environ["NP_STORAGE_AUTH_TOKEN"]
-        return AuthConfig(server_endpoint_url=url, service_token=token)  # type: ignore
+        return AuthConfig(server_endpoint_url=url, service_token=token)
 
     def create(self) -> Config:
         server_config = self.create_server()
         storage_config = self.create_storage()
         auth_config = self.create_auth()
-        return Config(  # type: ignore
-            server=server_config, storage=storage_config, auth=auth_config
-        )
+        return Config(server=server_config, storage=storage_config, auth=auth_config)

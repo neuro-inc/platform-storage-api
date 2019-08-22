@@ -3,19 +3,39 @@ import uuid
 from io import BytesIO
 from pathlib import PurePath
 from time import time as current_time
+from typing import Any, AsyncContextManager, Awaitable, Callable
 from unittest import mock
 
 import aiohttp
 import aiohttp.web
 import pytest
+from neuro_auth_client import User
 
 from platform_storage_api.fs.local import FileStatusType
-from tests.integration.conftest import get_filestatus_dict, get_liststatus_dict
+from tests.integration.conftest import (
+    ApiConfig,
+    get_filestatus_dict,
+    get_liststatus_dict,
+)
+
+
+def make_url(server_url: str, user: User, path: str) -> str:
+    return f"{server_url}/{user.name}/{path}"
+
+
+@pytest.fixture()
+async def alice(regular_user_factory: Callable[[], User]) -> User:
+    return await regular_user_factory()
+
+
+@pytest.fixture()
+async def bob(regular_user_factory: Callable[[], User]) -> User:
+    return await regular_user_factory()
 
 
 class TestApi:
     @pytest.mark.asyncio
-    async def test_ping(self, api, client):
+    async def test_ping(self, api: ApiConfig, client: aiohttp.ClientSession) -> None:
         async with client.head(api.ping_url) as response:
             assert response.status == 200
 
@@ -25,7 +45,13 @@ class TestApi:
 
 class TestStorage:
     @pytest.mark.asyncio
-    async def test_put_head_get(self, server_url, client, regular_user_factory, api):
+    async def test_put_head_get(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -60,8 +86,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_head_non_existent(
-        self, server_url, client, regular_user_factory, api
-    ):
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/non-existent"
@@ -71,8 +101,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_get_non_existent(
-        self, server_url, client, regular_user_factory, api
-    ):
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/non-existent"
@@ -81,7 +115,13 @@ class TestStorage:
             assert response.status == 404
 
     @pytest.mark.asyncio
-    async def test_put_illegal_op(self, server_url, api, client, regular_user_factory):
+    async def test_put_illegal_op(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -93,7 +133,13 @@ class TestStorage:
             assert payload["error"] == expected_error
 
     @pytest.mark.asyncio
-    async def test_get_illegal_op(self, server_url, api, client, regular_user_factory):
+    async def test_get_illegal_op(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -105,7 +151,13 @@ class TestStorage:
             assert payload["error"] == expected_error
 
     @pytest.mark.asyncio
-    async def test_liststatus(self, server_url, api, client, regular_user_factory):
+    async def test_liststatus(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         dir_path = f"{user.name}/path/to"
@@ -136,8 +188,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_liststatus_no_op_param_no_equals(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         dir_path = f"{user.name}/path/to"
@@ -166,8 +222,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_ambiguous_operations_with_op(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         dir_url = f"{server_url}/{user.name}/"
@@ -180,8 +240,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_ambiguous_operations(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         dir_url = f"{server_url}/{user.name}/"
@@ -194,8 +258,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_unknown_operation(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         dir_url = f"{server_url}/{user.name}/"
@@ -207,8 +275,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_liststatus_non_existent_dir(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         dir_url = f"{server_url}/{user.name}/non-existent"
@@ -218,13 +290,18 @@ class TestStorage:
             assert response.status == 404
 
     @pytest.mark.asyncio
-    async def test_liststatus_file(self, server_url, api, client, regular_user_factory):
+    async def test_liststatus_file(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
-        payload = b"test"
 
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
             assert response.status == 201
 
         params = {"op": "LISTSTATUS"}
@@ -234,7 +311,13 @@ class TestStorage:
             assert payload["error"] == "Not a directory"
 
     @pytest.mark.asyncio
-    async def test_mkdirs(self, server_url, api, client, regular_user_factory):
+    async def test_mkdirs(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
@@ -254,8 +337,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_mkdirs_existent_dir(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
@@ -269,14 +356,17 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_mkdirs_existent_file(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
         url = f"{server_url}{path_str}"
-        payload = b"test"
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
             assert response.status == 201
 
         params = {"op": "MKDIRS"}
@@ -287,15 +377,18 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_mkdirs_existent_parent_file(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
         url = f"{server_url}{path_str}"
         dir_url = f"{server_url}{path_str}/dir"
-        payload = b"test"
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
             assert response.status == 201
 
         params = {"op": "MKDIRS"}
@@ -306,25 +399,32 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_put_target_is_directory(
-        self, server_url, client, regular_user_factory, api
-    ):
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
-        payload = b"test"
         params = {"op": "MKDIRS"}
         async with client.put(url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "Destination is a directory"
 
     @pytest.mark.asyncio
     async def test_head_target_is_directory(
-        self, server_url, client, regular_user_factory, api
-    ):
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -340,8 +440,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_get_target_is_directory(
-        self, server_url, client, regular_user_factory, api
-    ):
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -359,8 +463,12 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_delete_non_existent(
-        self, server_url, api, client, regular_user_factory
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
@@ -369,7 +477,13 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPNotFound.status_code
 
     @pytest.mark.asyncio
-    async def test_delete_file(self, server_url, api, client, regular_user_factory):
+    async def test_delete_file(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
@@ -394,43 +508,42 @@ class TestGetFileStatus:
     dir3_dir4 = f"{dir3}/dir4"
 
     @classmethod
-    def url(cls, server_url, user, path):
-        return f"{server_url}/{user.name}/{path}"
-
-    @pytest.fixture()
-    async def alice(self, regular_user_factory):
-        return await regular_user_factory()
-
-    @pytest.fixture()
-    async def bob(self, regular_user_factory):
-        return await regular_user_factory()
-
-    @classmethod
-    async def put_file(cls, server_url, client, user, path) -> None:
+    async def put_file(
+        cls, server_url: str, client: aiohttp.ClientSession, user: User, path: str
+    ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
-        url = cls.url(server_url, user, path)
+        url = make_url(server_url, user, path)
         async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
     @classmethod
-    async def put_dir(cls, server_url, client, user, path) -> None:
+    async def put_dir(
+        cls, server_url: str, client: aiohttp.ClientSession, user: User, path: str
+    ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
-        url = cls.url(server_url, user, path)
+        url = make_url(server_url, user, path)
         params = {"op": "MKDIRS"}
         async with client.put(url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
     @classmethod
     def get_filestatus(
-        cls, user, path, server_url, client, file_owner
-    ) -> aiohttp.web.Response:
+        cls,
+        user: User,
+        path: str,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        file_owner: User,
+    ) -> AsyncContextManager[aiohttp.ClientResponse]:
         headers = {"Authorization": "Bearer " + user.token}
         params = {"op": "GETFILESTATUS"}
-        url = cls.url(server_url, file_owner, path)
+        url = make_url(server_url, file_owner, path)
         return client.get(url, headers=headers, params=params)
 
     @classmethod
-    async def init_test_stat(self, server_url, client, alice):
+    async def init_test_stat(
+        self, server_url: str, client: aiohttp.ClientSession, alice: User
+    ) -> int:
         expected_mtime_min = int(current_time())
         # Alice creates a file in her home 'file1.txt'
         await self.put_file(server_url, client, alice, self.file1)
@@ -442,8 +555,13 @@ class TestGetFileStatus:
 
     @pytest.mark.asyncio
     async def test_filestatus_alice_checks_her_own_files(
-        self, server_url, api, client, alice, bob
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+    ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
         # Alice checks statuses of 'file1.txt', 'dir3' and 'dir3/file3.txt'
@@ -496,8 +614,13 @@ class TestGetFileStatus:
 
     @pytest.mark.asyncio
     async def test_filestatus_check_non_existing_file(
-        self, server_url, api, client, alice, bob
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+    ) -> None:
         # Alice creates a file in her home
         await self.put_file(server_url, client, alice, self.file1)
 
@@ -509,8 +632,13 @@ class TestGetFileStatus:
 
     @pytest.mark.asyncio
     async def test_filestatus_bob_checks_alices_files(
-        self, server_url, api, client, alice, bob
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+    ) -> None:
         await self.init_test_stat(server_url, client, alice)
 
         # Bob checks status of Alice's 'file1.txt' -- NOT FOUND
@@ -540,8 +668,15 @@ class TestGetFileStatus:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
     async def test_filestatus_share_file_then_check_it(
-        self, server_url, api, client, alice, bob, granter, permission
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+        granter: Callable[[str, Any, User], Awaitable[None]],
+        permission: str,
+    ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
         # Alice shares with Bob file 'file1.txt' with permission P
@@ -570,8 +705,15 @@ class TestGetFileStatus:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
     async def test_filestatus_share_dir_then_check_it(
-        self, server_url, api, client, alice, bob, granter, permission
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+        granter: Callable[[str, Any, User], Awaitable[None]],
+        permission: str,
+    ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
         # Alice shares with Bob file 'dir3' with permission P
@@ -618,8 +760,16 @@ class TestGetFileStatus:
         [("read", "read"), ("write", "read"), ("manage", "read")],
     )
     async def test_filestatus_share_file_then_check_parent_dir(
-        self, server_url, api, client, alice, bob, granter, perm_file, perm_parent_dir
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+        granter: Callable[[str, Any, User], Awaitable[None]],
+        perm_file: str,
+        perm_parent_dir: str,
+    ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
         # Alice shares with Bob file 'dir3/file3.txt' with permission P
@@ -652,8 +802,16 @@ class TestGetFileStatus:
         [("read", "read"), ("write", "read"), ("manage", "read")],
     )
     async def test_filestatus_share_dir_then_check_parent_dir(
-        self, server_url, api, client, alice, bob, granter, perm_dir, perm_parent_dir
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+        granter: Callable[[str, Any, User], Awaitable[None]],
+        perm_dir: str,
+        perm_parent_dir: str,
+    ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
         # Alice shares with Bob file 'dir3/dir4' with permission P
@@ -701,8 +859,16 @@ class TestGetFileStatus:
         [("read", "read"), ("write", "write"), ("manage", "manage")],
     )
     async def test_filestatus_share_dir_then_check_child_dir(
-        self, server_url, api, client, alice, bob, granter, perm_dir, perm_child_dir
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+        granter: Callable[[str, Any, User], Awaitable[None]],
+        perm_dir: str,
+        perm_child_dir: str,
+    ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
         # Alice shares with Bob file 'dir3' with permission P
@@ -752,44 +918,46 @@ class TestRename:
     file2 = "file2"
 
     @classmethod
-    def url(cls, server_url, user, path):
-        return f"{server_url}/{user.name}/{path}"
-
-    @pytest.fixture()
-    async def alice(self, regular_user_factory):
-        return await regular_user_factory()
-
-    @pytest.fixture()
-    async def bob(self, regular_user_factory):
-        return await regular_user_factory()
-
-    @classmethod
-    async def put_file(cls, server_url, client, user, path, payload) -> None:
+    async def put_file(
+        cls,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        user: User,
+        path: str,
+        payload: bytes,
+    ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
-        url = cls.url(server_url, user, path)
+        url = make_url(server_url, user, path)
         async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
     @classmethod
-    async def put_dir(cls, server_url, client, user, path) -> None:
+    async def put_dir(
+        cls, server_url: str, client: aiohttp.ClientSession, user: User, path: str
+    ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
-        url = cls.url(server_url, user, path)
+        url = make_url(server_url, user, path)
         params = {"op": "MKDIRS"}
         async with client.put(url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
     @classmethod
     async def get_filestatus(
-        cls, server_url, client, user, owner, path
-    ) -> aiohttp.web.Response:
+        cls,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        user: User,
+        owner: User,
+        path: str,
+    ) -> aiohttp.ClientResponse:
         headers = {"Authorization": "Bearer " + user.token}
         params = {"op": "GETFILESTATUS"}
-        url = cls.url(server_url, owner, path)
+        url = make_url(server_url, owner, path)
         return await client.get(url, headers=headers, params=params)
 
     @classmethod
     async def assert_filestatus_equal(
-        cls, response: aiohttp.web.Response, expected: aiohttp.web.Response
+        cls, response: aiohttp.ClientResponse, expected: aiohttp.ClientResponse
     ) -> None:
         assert response.status == expected.status
         values_root = await response.json()
@@ -801,34 +969,60 @@ class TestRename:
 
     @classmethod
     async def rename(
-        cls, server_url, client, user, owner1, path1, owner2, path2
-    ) -> aiohttp.web.Response:
+        cls,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        user: User,
+        owner1: User,
+        path1: str,
+        owner2: User,
+        path2: str,
+    ) -> aiohttp.ClientResponse:
         headers = {"Authorization": "Bearer " + user.token}
         params = {
             "op": "RENAME",
             "destination": str(PurePath("/") / owner2.name / path2),
         }
-        url = cls.url(server_url, owner1, path1)
+        url = make_url(server_url, owner1, path1)
         return await client.post(url, headers=headers, params=params)
 
     @classmethod
     async def rename_relative(
-        cls, server_url, client, user, owner1, path1, path2
-    ) -> aiohttp.web.Response:
+        cls,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        user: User,
+        owner1: User,
+        path1: str,
+        path2: str,
+    ) -> aiohttp.ClientResponse:
         headers = {"Authorization": "Bearer " + user.token}
         params = {"op": "RENAME", "destination": path2}
-        url = cls.url(server_url, owner1, path1)
+        url = make_url(server_url, owner1, path1)
         return await client.post(url, headers=headers, params=params)
 
     @classmethod
-    async def assert_no_file(cls, server_url, client, owner, user, path):
+    async def assert_no_file(
+        cls,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        owner: User,
+        user: User,
+        path: str,
+    ) -> None:
         response_status = await cls.get_filestatus(
             server_url, client, user, owner, path
         )
         assert response_status.status == aiohttp.web.HTTPNotFound.status_code
 
     @pytest.mark.asyncio
-    async def test_rename_file_same_dir(self, server_url, api, client, alice):
+    async def test_rename_file_same_dir(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+    ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         old_status = await self.get_filestatus(
             server_url, client, alice, alice, self.file1
@@ -844,7 +1038,13 @@ class TestRename:
         await self.assert_no_file(server_url, client, alice, alice, self.file1)
 
     @pytest.mark.asyncio
-    async def test_rename_file_same_dir_relative(self, server_url, api, client, alice):
+    async def test_rename_file_same_dir_relative(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+    ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         old_status = await self.get_filestatus(
             server_url, client, alice, alice, self.file1
@@ -860,7 +1060,13 @@ class TestRename:
         await self.assert_no_file(server_url, client, alice, alice, self.file1)
 
     @pytest.mark.asyncio
-    async def test_rename_file_to_existing_file(self, server_url, api, client, alice):
+    async def test_rename_file_to_existing_file(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+    ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         await self.put_file(server_url, client, alice, self.file2, self.payload2)
         status = await self.get_filestatus(server_url, client, alice, alice, self.file1)
@@ -875,8 +1081,13 @@ class TestRename:
 
     @pytest.mark.asyncio
     async def test_alice_rename_file_to_bobs_folder(
-        self, server_url, api, client, alice, bob
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+    ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         status = await self.get_filestatus(server_url, client, alice, alice, self.file1)
         response = await self.rename(
@@ -890,8 +1101,13 @@ class TestRename:
 
     @pytest.mark.asyncio
     async def test_alice_rename_file_to_bobs_relative(
-        self, server_url, api, client, alice, bob
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+    ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         status = await self.get_filestatus(server_url, client, alice, alice, self.file1)
         response = await self.rename_relative(
@@ -906,8 +1122,15 @@ class TestRename:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
     async def test_alice_rename_file_to_bobs_folder_shared(
-        self, server_url, api, granter, client, alice, bob, permission
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        granter: Callable[[str, Any, User], Awaitable[None]],
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+        permission: str,
+    ) -> None:
         await self.put_file(server_url, client, bob, self.file1, self.payload2)
         await granter(
             alice.name, [{"uri": f"storage://{bob.name}", "action": permission}], bob
@@ -935,8 +1158,15 @@ class TestRename:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
     async def test_alice_rename_bobs_files_shared(
-        self, server_url, api, granter, client, alice, bob, permission
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        granter: Callable[[str, Any, User], Awaitable[None]],
+        client: aiohttp.ClientSession,
+        alice: User,
+        bob: User,
+        permission: str,
+    ) -> None:
         await self.put_file(server_url, client, bob, self.file2, self.payload2)
         await granter(
             alice.name, [{"uri": f"storage://{bob.name}", "action": permission}], bob
