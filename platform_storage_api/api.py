@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import struct
+from contextlib import AsyncExitStack
 from enum import Enum
 from errno import errorcode
 from pathlib import PurePath
@@ -22,8 +23,6 @@ from aiohttp_security import check_authorized, check_permission
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.client import ClientSubTreeViewRoot
 from neuro_auth_client.security import AuthScheme, setup_security
-
-from async_exit_stack import AsyncExitStack
 
 from .config import Config
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
