@@ -1,15 +1,21 @@
 import struct
 import uuid
 from time import time as current_time
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 from unittest import mock
 
+import aiohttp
 import cbor
 import pytest
+from neuro_auth_client import User
 
 from platform_storage_api.api import WSStorageOperation
 from platform_storage_api.fs.local import FileStatusType
-from tests.integration.conftest import get_filestatus_dict, get_liststatus_dict
+from tests.integration.conftest import (
+    ApiConfig,
+    get_filestatus_dict,
+    get_liststatus_dict,
+)
 
 
 def ws_request(
@@ -33,7 +39,11 @@ def get_ws_response_data(resp: bytes) -> bytes:
 
 
 def assert_ws_response(
-    resp: bytes, op: WSStorageOperation, rop: WSStorageOperation, rid: int, **kwargs
+    resp: bytes,
+    op: WSStorageOperation,
+    rop: WSStorageOperation,
+    rid: int,
+    **kwargs: Any,
 ) -> None:
     payload = parse_ws_response(resp)
     assert payload["op"] == op
@@ -43,19 +53,27 @@ def assert_ws_response(
         assert payload[key] == value
 
 
-def assert_ws_ack(resp: bytes, rop: WSStorageOperation, rid: int, **kwargs) -> None:
+def assert_ws_ack(
+    resp: bytes, rop: WSStorageOperation, rid: int, **kwargs: Any
+) -> None:
     assert_ws_response(resp, WSStorageOperation.ACK, rop, rid, **kwargs)
 
 
 def assert_ws_error(
-    resp: bytes, rop: WSStorageOperation, rid: int, error: str, **kwargs
+    resp: bytes, rop: WSStorageOperation, rid: int, error: str, **kwargs: Any
 ) -> None:
     assert_ws_response(resp, WSStorageOperation.ERROR, rop, rid, error=error, **kwargs)
 
 
 class TestStorageWebSocket:
     @pytest.mark.asyncio
-    async def test_create_write(self, server_url, api, client, regular_user_factory):
+    async def test_create_write(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         base_path = f"/{user.name}/root-{uuid.uuid4()}"
@@ -118,7 +136,13 @@ class TestStorageWebSocket:
             assert get_ws_response_data(resp) == data
 
     @pytest.mark.asyncio
-    async def test_write_create(self, server_url, api, client, regular_user_factory):
+    async def test_write_create(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         base_path = f"/{user.name}/root-{uuid.uuid4()}"
@@ -198,7 +222,14 @@ class TestStorageWebSocket:
             assert get_ws_response_data(resp) == data
 
     @pytest.mark.asyncio
-    async def test_mkdirs(self, server_url, api, client, regular_user_factory):
+    async def test_mkdirs(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
+
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         base_path = f"/{user.name}/root-{uuid.uuid4()}"
@@ -266,7 +297,13 @@ class TestStorageWebSocket:
             assert statuses[0]["modificationTime"] >= mtime_min
 
     @pytest.mark.asyncio
-    async def test_stat_list(self, server_url, api, client, regular_user_factory):
+    async def test_stat_list(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         base_path = f"/{user.name}/root-{uuid.uuid4()}"
@@ -413,7 +450,13 @@ class TestStorageWebSocket:
             )
 
     @pytest.mark.asyncio
-    async def test_readonly(self, server_url, api, client, regular_user_factory):
+    async def test_readonly(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         file_name = f"file-{uuid.uuid4()}"
