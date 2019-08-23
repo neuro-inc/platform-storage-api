@@ -247,16 +247,13 @@ class StorageHandler:
     async def _handle_websocket(
         self, request: web.Request, storage_path: PurePath, write: bool
     ) -> web.WebSocketResponse:
-        ws = web.WebSocketResponse()
+        ws = web.WebSocketResponse(max_msg_size=MAX_WS_MESSAGE_SIZE)
         await ws.prepare(request)
 
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.BINARY:
                 if len(msg.data) < 4:
                     await ws.close(code=aiohttp.WSCloseCode.UNSUPPORTED_DATA)
-                    break
-                if len(msg.data) > MAX_WS_MESSAGE_SIZE:
-                    await ws.close(code=aiohttp.WSCloseCode.MESSAGE_TOO_BIG)
                     break
                 try:
                     hsize, = struct.unpack("!I", msg.data[:4])
@@ -281,7 +278,8 @@ class StorageHandler:
                         msg.data[hsize:],
                     )
                 except OSError as e:
-                    await self._ws_send_error(ws, op, reqid, str(e), e.errno)
+                    errmsg = e.strerror or str(e)
+                    await self._ws_send_error(ws, op, reqid, errmsg, e.errno)
                 except Exception as e:
                     await self._ws_send_error(ws, op, reqid, str(e))
             elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -312,30 +310,20 @@ class StorageHandler:
                 await self._ws_send_ack(ws, op, reqid, data=data)
 
         elif op == WSStorageOperation.STAT:
-            try:
-                fstat = await self._storage.get_filestatus(path)
-            except FileNotFoundError as e:
-                await self._ws_send_error(ws, op, reqid, "File not found", e.errno)
-            else:
-                stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
-                await self._ws_send_ack(ws, op, reqid, result=stat_dict)
+            fstat = await self._storage.get_filestatus(path)
+            stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
+            await self._ws_send_ack(ws, op, reqid, result=stat_dict)
 
         elif op == WSStorageOperation.LIST:
-            try:
-                statuses = await self._storage.liststatus(path)
-            except FileNotFoundError as e:
-                await self._ws_send_error(ws, op, reqid, "File not found", e.errno)
-            except NotADirectoryError as e:
-                await self._ws_send_error(ws, op, reqid, "Not a directory", e.errno)
-            else:
-                primitive_statuses = {
-                    "FileStatuses": {
-                        "FileStatus": [
-                            self._convert_filestatus_to_primitive(s) for s in statuses
-                        ]
-                    }
+            statuses = await self._storage.liststatus(path)
+            primitive_statuses = {
+                "FileStatuses": {
+                    "FileStatus": [
+                        self._convert_filestatus_to_primitive(s) for s in statuses
+                    ]
                 }
-                await self._ws_send_ack(ws, op, reqid, result=primitive_statuses)
+            }
+            await self._ws_send_ack(ws, op, reqid, result=primitive_statuses)
 
         elif not write:
             await self._ws_send_error(ws, op, reqid, "Requires writing permission")
