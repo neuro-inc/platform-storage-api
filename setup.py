@@ -8,7 +8,7 @@ install_requires = (
     "cbor==1.0.0",
     "cchardet==2.1.4",
     "neuro_auth_client==1.0.7",
-    # TODO (A Danshyn 04/20/18): add uvloop at some point
+    "uvloop==0.13.0",
 )
 
 setup(

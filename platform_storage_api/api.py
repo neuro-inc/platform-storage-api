@@ -18,6 +18,7 @@ from typing import (
 
 import aiohttp
 import cbor
+import uvloop
 from aiohttp import web
 from aiohttp_security import check_authorized, check_permission
 from neuro_auth_client import AuthClient, Permission, User
@@ -27,6 +28,9 @@ from neuro_auth_client.security import AuthScheme, setup_security
 from .config import Config
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .storage import Storage
+
+
+uvloop.install()
 
 
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
