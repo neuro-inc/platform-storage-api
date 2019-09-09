@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import struct
+import time
 from contextlib import AsyncExitStack
 from enum import Enum
 from errno import errorcode
@@ -369,7 +370,7 @@ class StorageHandler:
         result: Dict[str, Any] = {},
         data: bytes = b"",
     ) -> None:
-        payload = {"rop": op, "rid": reqid, **result}
+        payload = {"rop": op, "rid": reqid, "timestamp": int(time.time()), **result}
         await self._ws_send(ws, WSStorageOperation.ACK, payload, data)
 
     async def _ws_send_error(
@@ -380,7 +381,12 @@ class StorageHandler:
         errmsg: str,
         errno: Optional[int] = None,
     ) -> None:
-        payload = {"rop": op, "rid": reqid, "error": errmsg}
+        payload = {
+            "rop": op,
+            "rid": reqid,
+            "timestamp": int(time.time()),
+            "error": errmsg,
+        }
         if errno is not None:
             payload["errno"] = errorcode.get(errno, errno)
         await self._ws_send(ws, WSStorageOperation.ERROR, payload)
