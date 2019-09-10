@@ -51,6 +51,8 @@ def assert_ws_response(
     assert payload["op"] == op
     assert payload["rop"] == rop
     assert payload["rid"] == rid
+    curtime = int(current_time())
+    assert curtime - 1 <= payload["timestamp"] <= curtime
     for key, value in kwargs.items():
         assert payload[key] == value
 
