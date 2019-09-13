@@ -38,6 +38,10 @@ spec:
             secretKeyRef:
               name: platformservices-secret
               key: storage_token
+        - name: NP_PERMISSION_EXPIRATION_INTERVAL
+          value: {{ printf "%s" (pluck .Values.global.env .Values.NP_PERMISSION_EXPIRATION_INTERVAL | first | default .Values.NP_PERMISSION_EXPIRATION_INTERVAL._default) | quote }}
+        - name: NP_PERMISSION_FORGETTING_INTERVAL
+          value: {{ printf "%s" (pluck .Values.global.env .Values.NP_PERMISSION_FORGETTING_INTERVAL | first | default .Values.NP_PERMISSION_FORGETTING_INTERVAL._default) | quote }}
         volumeMounts:
         - name: storage
           mountPath: /var/storage

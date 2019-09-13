@@ -23,9 +23,10 @@ import uvloop
 from aiohttp import web
 from aiohttp_security import check_authorized, check_permission
 from neuro_auth_client import AuthClient, Permission, User
-from neuro_auth_client.client import ClientSubTreeViewRoot
+from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
 
+from .cache import PermissionsCache
 from .config import Config
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .storage import Storage
@@ -94,6 +95,8 @@ class WSStorageOperation(str, Enum):
 class AuthAction(str, Enum):
     DENY = "deny"
     LIST = "list"
+    READ = "read"
+    WRITE = "write"
 
 
 class StorageHandler:
@@ -101,6 +104,22 @@ class StorageHandler:
         self._app = app
         self._storage = storage
         self._config = config
+        self._permission_cache: PermissionsCache = PermissionsCache(
+            self._get_user_permissions_tree_uncached,
+            self._check_user_permissions_uncached,
+            expiration_interval_s=config.permission_expiration_interval_s,
+            forgetting_interval_s=config.permission_forgetting_interval_s,
+        )
+        if config.permission_expiration_interval_s > 0:
+            self._get_user_permissions_tree = (
+                self._permission_cache.get_user_permissions_tree
+            )
+            self._check_user_permissions_impl = (
+                self._permission_cache.check_user_permissions
+            )
+        else:
+            self._get_user_permissions_tree = self._get_user_permissions_tree_uncached
+            self._check_user_permissions_impl = self._check_user_permissions_uncached
 
     def register(self, app: web.Application) -> None:
         app.add_routes(
@@ -118,11 +137,11 @@ class StorageHandler:
         operation = self._parse_put_operation(request)
         if operation == StorageOperation.CREATE:
             storage_path = self._get_fs_path_from_request(request)
-            await self._check_user_permissions(request, str(storage_path))
+            await self._check_user_permissions(request, storage_path)
             return await self._handle_create(request, storage_path)
         elif operation == StorageOperation.MKDIRS:
             storage_path = self._get_fs_path_from_request(request)
-            await self._check_user_permissions(request, str(storage_path))
+            await self._check_user_permissions(request, storage_path)
             return await self._handle_mkdirs(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
 
@@ -138,7 +157,7 @@ class StorageHandler:
 
     async def handle_head(self, request: web.Request) -> web.StreamResponse:
         storage_path = self._get_fs_path_from_request(request)
-        await self._check_user_permissions(request, str(storage_path))
+        await self._check_user_permissions(request, storage_path)
         try:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
@@ -150,26 +169,26 @@ class StorageHandler:
         operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
             storage_path = self._get_fs_path_from_request(request)
-            await self._check_user_permissions(request, str(storage_path))
+            await self._check_user_permissions(request, storage_path)
             return await self._handle_open(request, storage_path)
         elif operation == StorageOperation.LISTSTATUS:
             storage_path = self._get_fs_path_from_request(request)
-            tree = await self._get_user_permissions_tree(request, str(storage_path))
+            tree = await self._get_user_permissions_tree(request, storage_path)
             return await self._handle_liststatus(storage_path, tree)
         elif operation == StorageOperation.GETFILESTATUS:
             storage_path = self._get_fs_path_from_request(request)
-            tree = await self._get_user_permissions_tree(request, str(storage_path))
+            tree = await self._get_user_permissions_tree(request, storage_path)
             return await self._handle_getfilestatus(storage_path, tree)
         elif operation == StorageOperation.WEBSOCKET_READ:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(
-                request, str(storage_path), action="read"
+                request, storage_path, action=AuthAction.READ.value
             )
             return await self._handle_websocket(request, storage_path, write=False)
         elif operation == StorageOperation.WEBSOCKET_WRITE:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(
-                request, str(storage_path), action="write"
+                request, storage_path, action=AuthAction.WRITE.value
             )
             return await self._handle_websocket(request, storage_path, write=True)
         raise ValueError(f"Illegal operation: {operation}")
@@ -178,7 +197,7 @@ class StorageHandler:
         operation = self._parse_delete_operation(request)
         if operation == StorageOperation.DELETE:
             storage_path: PurePath = self._get_fs_path_from_request(request)
-            await self._check_user_permissions(request, str(storage_path))
+            await self._check_user_permissions(request, storage_path)
             await self._handle_delete(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
 
@@ -186,7 +205,7 @@ class StorageHandler:
         operation = self._parse_post_operation(request)
         if operation == StorageOperation.RENAME:
             storage_path: PurePath = self._get_fs_path_from_request(request)
-            await self._check_user_permissions(request, str(storage_path))
+            await self._check_user_permissions(request, storage_path)
             return await self._handle_rename(storage_path, request)
         raise ValueError(f"Illegal operation: {operation}")
 
@@ -407,11 +426,8 @@ class StorageHandler:
         return response
 
     async def _handle_liststatus(
-        self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
+        self, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.Response:
-        if access_tree.sub_tree.action == AuthAction.DENY.value:
-            raise web.HTTPNotFound
-
         try:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
@@ -420,7 +436,7 @@ class StorageHandler:
             return web.json_response(
                 {"error": "Not a directory"}, status=web.HTTPBadRequest.status_code
             )
-        filtered_statuses = self._liststatus_filter(statuses, access_tree)
+        filtered_statuses = self._liststatus_filter(statuses, tree)
         primitive_statuses = {
             "FileStatuses": {
                 "FileStatus": [
@@ -432,16 +448,17 @@ class StorageHandler:
         return web.json_response(primitive_statuses)
 
     def _liststatus_filter(
-        self, statuses: List[FileStatus], access_tree: ClientSubTreeViewRoot
+        self, statuses: List[FileStatus], tree: ClientAccessSubTreeView
     ) -> Iterator[FileStatus]:
-        tree = access_tree.sub_tree
         is_list_action = tree.action == AuthAction.LIST.value
         for status in statuses:
             sub_tree = tree.children.get(str(status.path))
-            if is_list_action and not sub_tree:
-                continue
-
-            action = sub_tree.action if sub_tree else tree.action
+            if sub_tree:
+                action = sub_tree.action
+            else:
+                if is_list_action:
+                    continue
+                action = tree.action
             yield status.with_permission(self._convert_action_to_permission(action))
 
     def _convert_action_to_permission(self, action: str) -> FileStatusPermission:
@@ -450,18 +467,14 @@ class StorageHandler:
         return FileStatusPermission(action)
 
     async def _handle_getfilestatus(
-        self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
+        self, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.StreamResponse:
-        action = access_tree.sub_tree.action
-        if action == AuthAction.DENY.value:
-            raise web.HTTPNotFound
-
         try:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
             raise web.HTTPNotFound
 
-        fstat = fstat.with_permission(self._convert_action_to_permission(action))
+        fstat = fstat.with_permission(self._convert_action_to_permission(tree.action))
         stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
         return web.json_response(stat_dict)
 
@@ -498,7 +511,7 @@ class StorageHandler:
             if new.root == "":
                 new = old.parent / new
             new = self._storage.sanitize_path(new)
-            await self._check_user_permissions(request, str(new))
+            await self._check_user_permissions(request, new)
             await self._storage.rename(old, new)
         except FileNotFoundError:
             raise web.HTTPNotFound()
@@ -529,24 +542,31 @@ class StorageHandler:
             "type": str(status.type),
         }
 
-    async def _get_user_permissions_tree(
-        self, request: web.Request, target_path: str
-    ) -> ClientSubTreeViewRoot:
+    async def _get_user_permissions_tree_uncached(
+        self, request: web.Request, target_path: PurePath
+    ) -> ClientAccessSubTreeView:
         username = await self._get_user_from_request(request)
         auth_client = self._get_auth_client()
-        target_path_uri = f"storage:/{target_path}"
+        target_path_uri = f"storage:/{target_path!s}"
         tree = await auth_client.get_permissions_tree(username.name, target_path_uri)
-        return tree
+        if tree.sub_tree.action == AuthAction.DENY.value:
+            raise web.HTTPNotFound
+        return tree.sub_tree
 
     async def _check_user_permissions(
-        self, request: web.Request, target_path: str, action: str = ""
+        self, request: web.Request, target_path: PurePath, action: str = ""
     ) -> None:
-        uri = f"storage:/{target_path}"
         if not action:
             if request.method in ("HEAD", "GET"):
-                action = "read"
+                action = AuthAction.READ.value
             else:  # POST, PUT, PATCH, DELETE
-                action = "write"
+                action = AuthAction.WRITE.value
+        await self._check_user_permissions_impl(request, target_path, action)
+
+    async def _check_user_permissions_uncached(
+        self, request: web.Request, target_path: PurePath, action: str
+    ) -> None:
+        uri = f"storage:/{target_path!s}"
         permission = Permission(uri=uri, action=action)
         logger.info(f"Checking {permission}")
         # TODO (Rafa Zubairov): test if user accessing his own data,
