@@ -23,7 +23,7 @@ import uvloop
 from aiohttp import web
 from aiohttp_security import check_authorized, check_permission
 from neuro_auth_client import AuthClient, Permission, User
-from neuro_auth_client.client import ClientSubTreeViewRoot
+from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
 
 from .config import Config
@@ -59,10 +59,11 @@ class StorageOperation(str, Enum):
     The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     The RENAME operation handles moving of files and directories.
+    The WEBSOCKET operation handles operations via the WebSocket protocol.
     The WEBSOCKET_READ operation handles immutable operations via the WebSocket
-    protocol.
+    protocol (deprecated).
     The WEBSOCKET_WRITE operation handles mutable operations via the WebSocket
-    protocol.
+    protocol (deprecated).
     """
 
     CREATE = "CREATE"
@@ -72,6 +73,7 @@ class StorageOperation(str, Enum):
     MKDIRS = "MKDIRS"
     DELETE = "DELETE"
     RENAME = "RENAME"
+    WEBSOCKET = "WEBSOCKET"
     WEBSOCKET_READ = "WEBSOCKET_READ"
     WEBSOCKET_WRITE = "WEBSOCKET_WRITE"
 
@@ -94,6 +96,8 @@ class WSStorageOperation(str, Enum):
 class AuthAction(str, Enum):
     DENY = "deny"
     LIST = "list"
+    READ = "read"
+    WRITE = "write"
 
 
 class StorageHandler:
@@ -160,18 +164,30 @@ class StorageHandler:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, str(storage_path))
             return await self._handle_getfilestatus(storage_path, tree)
+        elif operation == StorageOperation.WEBSOCKET:
+            storage_path = self._get_fs_path_from_request(request)
+            tree = await self._get_user_permissions_tree(request, str(storage_path))
+            return await self._handle_websocket(request, storage_path, tree)
         elif operation == StorageOperation.WEBSOCKET_READ:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(
-                request, str(storage_path), action="read"
+                request, str(storage_path), action=AuthAction.READ.value
             )
-            return await self._handle_websocket(request, storage_path, write=False)
+            return await self._handle_websocket(
+                request,
+                storage_path,
+                ClientAccessSubTreeView(action=AuthAction.READ.value, children={}),
+            )
         elif operation == StorageOperation.WEBSOCKET_WRITE:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(
-                request, str(storage_path), action="write"
+                request, str(storage_path), action=AuthAction.WRITE.value
             )
-            return await self._handle_websocket(request, storage_path, write=True)
+            return await self._handle_websocket(
+                request,
+                storage_path,
+                ClientAccessSubTreeView(action=AuthAction.WRITE.value, children={}),
+            )
         raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_delete(self, request: web.Request) -> web.StreamResponse:
@@ -250,8 +266,18 @@ class StorageHandler:
             raise ValueError(f"path should be relative: {path!r}")
 
     async def _handle_websocket(
-        self, request: web.Request, storage_path: PurePath, write: bool
+        self,
+        request: web.Request,
+        storage_path: PurePath,
+        tree: ClientAccessSubTreeView,
     ) -> web.WebSocketResponse:
+        if tree.action == AuthAction.READ:
+            write = False
+        elif tree.action == AuthAction.WRITE or tree.action == "manage":
+            write = True
+        else:
+            raise web.HTTPForbidden
+
         ws = web.WebSocketResponse(max_msg_size=MAX_WS_MESSAGE_SIZE)
         await ws.prepare(request)
 
@@ -407,11 +433,8 @@ class StorageHandler:
         return response
 
     async def _handle_liststatus(
-        self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
+        self, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.Response:
-        if access_tree.sub_tree.action == AuthAction.DENY.value:
-            raise web.HTTPNotFound
-
         try:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
@@ -420,7 +443,7 @@ class StorageHandler:
             return web.json_response(
                 {"error": "Not a directory"}, status=web.HTTPBadRequest.status_code
             )
-        filtered_statuses = self._liststatus_filter(statuses, access_tree)
+        filtered_statuses = self._liststatus_filter(statuses, tree)
         primitive_statuses = {
             "FileStatuses": {
                 "FileStatus": [
@@ -432,9 +455,8 @@ class StorageHandler:
         return web.json_response(primitive_statuses)
 
     def _liststatus_filter(
-        self, statuses: List[FileStatus], access_tree: ClientSubTreeViewRoot
+        self, statuses: List[FileStatus], tree: ClientAccessSubTreeView
     ) -> Iterator[FileStatus]:
-        tree = access_tree.sub_tree
         is_list_action = tree.action == AuthAction.LIST.value
         for status in statuses:
             sub_tree = tree.children.get(str(status.path))
@@ -450,18 +472,14 @@ class StorageHandler:
         return FileStatusPermission(action)
 
     async def _handle_getfilestatus(
-        self, storage_path: PurePath, access_tree: ClientSubTreeViewRoot
+        self, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.StreamResponse:
-        action = access_tree.sub_tree.action
-        if action == AuthAction.DENY.value:
-            raise web.HTTPNotFound
-
         try:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
             raise web.HTTPNotFound
 
-        fstat = fstat.with_permission(self._convert_action_to_permission(action))
+        fstat = fstat.with_permission(self._convert_action_to_permission(tree.action))
         stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
         return web.json_response(stat_dict)
 
@@ -531,12 +549,14 @@ class StorageHandler:
 
     async def _get_user_permissions_tree(
         self, request: web.Request, target_path: str
-    ) -> ClientSubTreeViewRoot:
+    ) -> ClientAccessSubTreeView:
         username = await self._get_user_from_request(request)
         auth_client = self._get_auth_client()
         target_path_uri = f"storage:/{target_path}"
         tree = await auth_client.get_permissions_tree(username.name, target_path_uri)
-        return tree
+        if tree.sub_tree.action == AuthAction.DENY.value:
+            raise web.HTTPNotFound
+        return tree.sub_tree
 
     async def _check_user_permissions(
         self, request: web.Request, target_path: str, action: str = ""
@@ -544,9 +564,9 @@ class StorageHandler:
         uri = f"storage:/{target_path}"
         if not action:
             if request.method in ("HEAD", "GET"):
-                action = "read"
+                action = AuthAction.READ.value
             else:  # POST, PUT, PATCH, DELETE
-                action = "write"
+                action = AuthAction.WRITE.value
         permission = Permission(uri=uri, action=action)
         logger.info(f"Checking {permission}")
         # TODO (Rafa Zubairov): test if user accessing his own data,
