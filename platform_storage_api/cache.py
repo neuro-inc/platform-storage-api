@@ -1,5 +1,6 @@
 import collections
 import time
+from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Awaitable, Callable, Optional, Tuple
 
@@ -9,6 +10,14 @@ from neuro_auth_client.client import ClientAccessSubTreeView
 
 
 TimeFactory = Callable[[], float]
+PermissionsCacheKey = Tuple[str, str]  # authorization, path
+
+
+@dataclass(frozen=True)
+class PermissionsCacheValue:
+    tree: ClientAccessSubTreeView
+    expired_at: float
+    drop_at: float
 
 
 class PermissionsCache:
@@ -27,7 +36,7 @@ class PermissionsCache:
         self._check_user_permissions_uncached = check_user_permissions
         self._time_factory = time_factory
         self._cache: """collections.OrderedDict[
-            Tuple[str, str], Tuple[ClientAccessSubTreeView, float, float]
+            PermissionsCacheKey, PermissionsCacheValue
         ]""" = collections.OrderedDict()
         self.expiration_interval_s = expiration_interval_s
         self.forgetting_interval_s = forgetting_interval_s
@@ -35,7 +44,6 @@ class PermissionsCache:
     async def get_user_permissions_tree(
         self, request: Request, target_path: PurePath
     ) -> ClientAccessSubTreeView:
-        self._cleanup_cache()
         tree = await self._get_user_permissions_tree_cached(request, target_path)
         if tree is not None:
             return tree
@@ -46,14 +54,13 @@ class PermissionsCache:
         auth_header_value = request.headers.get(AUTHORIZATION)
         key = auth_header_value, str(target_path)
         expired_at = now + self.expiration_interval_s
-        drop_at = now + self.forgetting_interval_s
-        self._cache[key] = tree, expired_at, drop_at
-        self._cache.move_to_end(key)
+        self._add_to_cache(key, tree, expired_at)
         return tree
 
     async def _get_user_permissions_tree_cached(
         self, request: Request, target_path: PurePath
     ) -> Optional[ClientAccessSubTreeView]:
+        self._cleanup_cache()
         stack = []
         auth_header_value = request.headers.get(AUTHORIZATION)
         while True:
@@ -68,7 +75,8 @@ class PermissionsCache:
             stack.append(target_path.name)
             target_path = parent_path
 
-        tree, expired_at, drop_at = cached
+        tree = cached.tree
+        expired_at = cached.expired_at
         now = self._time_factory()
         if expired_at < now:
             if not stack:
@@ -81,9 +89,7 @@ class PermissionsCache:
                 self._cache.pop(key, None)
                 return None
             expired_at = now + self.expiration_interval_s
-        drop_at = now + self.forgetting_interval_s
-        self._cache[key] = tree, expired_at, drop_at
-        self._cache.move_to_end(key)
+        self._add_to_cache(key, tree, expired_at)
 
         while stack:
             action = tree.action
@@ -92,10 +98,18 @@ class PermissionsCache:
                 return ClientAccessSubTreeView(action=action, children={})
         return tree
 
+    def _add_to_cache(
+        self, key: PermissionsCacheKey, tree: ClientAccessSubTreeView, expired_at: float
+    ) -> None:
+        drop_at = self._time_factory() + self.forgetting_interval_s
+        self._cache[key] = PermissionsCacheValue(
+            tree=tree, expired_at=expired_at, drop_at=drop_at
+        )
+        self._cache.move_to_end(key)
+
     async def check_user_permissions(
         self, request: Request, target_path: PurePath, action: str
     ) -> None:
-        self._cleanup_cache()
         tree = await self._get_user_permissions_tree_cached(request, target_path)
         if tree and _has_permissions(action, tree.action):
             return
@@ -107,8 +121,7 @@ class PermissionsCache:
         now = self._time_factory()
         while self._cache:
             key, value = next(iter(self._cache.items()))
-            tree, expired_at, drop_at = value
-            if drop_at > now:
+            if value.drop_at > now:
                 break
             self._cache.pop(key, None)
 
