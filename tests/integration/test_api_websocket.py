@@ -3,7 +3,7 @@ import os
 import struct
 import uuid
 from time import time as current_time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 from unittest import mock
 
 import aiohttp
@@ -84,7 +84,7 @@ class TestStorageWebSocket:
         rel_path = f"path/to/file-{uuid.uuid4()}"
 
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET_WRITE", headers=headers, timeout=10
+            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers, timeout=10
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
@@ -157,7 +157,7 @@ class TestStorageWebSocket:
         rel_path = f"path/to/file-{uuid.uuid4()}"
 
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET_WRITE", headers=headers
+            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
@@ -249,7 +249,7 @@ class TestStorageWebSocket:
         rel_path = f"nested/{dir_name}"
 
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET_WRITE", headers=headers
+            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
@@ -331,7 +331,7 @@ class TestStorageWebSocket:
         dir2_path = f"{dir1_name}/{dir2_name}"
 
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET_WRITE", headers=headers
+            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers
         ) as ws:
             mtime_min = int(current_time())
             await ws.send_bytes(
@@ -360,7 +360,7 @@ class TestStorageWebSocket:
             mtime_min2 = int(current_time())
 
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET_READ", headers=headers
+            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 200_001))
             resp = await ws.receive_bytes()
@@ -466,20 +466,26 @@ class TestStorageWebSocket:
             )
 
     @pytest.mark.asyncio
-    async def test_readonly(
+    async def test_shared(
         self,
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
+        granter: Callable[[str, Any, User], Awaitable[None]],
     ) -> None:
-        user = await regular_user_factory()
-        headers = {"Authorization": "Bearer " + user.token}
+        user1 = await regular_user_factory()
+        user2 = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user2.token}
         file_name = f"file-{uuid.uuid4()}"
         dir_name = f"dir-{uuid.uuid4()}"
 
+        await granter(
+            user2.name, [{"uri": f"storage://{user1.name}/", "action": "read"}], user1
+        )
+
         async with client.ws_connect(
-            f"{server_url}/{user.name}?op=WEBSOCKET_READ", headers=headers
+            f"{server_url}/{user1.name}?op=WEBSOCKET", headers=headers
         ) as ws:
             await ws.send_bytes(
                 ws_request(WSStorageOperation.CREATE, 400_001, file_name, size=123)
@@ -504,3 +510,28 @@ class TestStorageWebSocket:
             assert_ws_error(
                 resp, WSStorageOperation.MKDIRS, 400_003, "Requires writing permission"
             )
+
+        await granter(
+            user2.name, [{"uri": f"storage://{user1.name}/", "action": "write"}], user1
+        )
+
+        async with client.ws_connect(
+            f"{server_url}/{user1.name}?op=WEBSOCKET", headers=headers
+        ) as ws:
+            await ws.send_bytes(
+                ws_request(WSStorageOperation.CREATE, 500_001, file_name, size=123)
+            )
+            resp = await ws.receive_bytes()
+            assert_ws_ack(resp, WSStorageOperation.CREATE, 500_001)
+
+            await ws.send_bytes(
+                ws_request(WSStorageOperation.WRITE, 500_002, file_name, offset=0) + b""
+            )
+            resp = await ws.receive_bytes()
+            assert_ws_ack(resp, WSStorageOperation.WRITE, 500_002)
+
+            await ws.send_bytes(
+                ws_request(WSStorageOperation.MKDIRS, 500_003, dir_name)
+            )
+            resp = await ws.receive_bytes()
+            assert_ws_ack(resp, WSStorageOperation.MKDIRS, 500_003)
