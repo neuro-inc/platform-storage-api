@@ -60,10 +60,11 @@ class StorageOperation(str, Enum):
     The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     The RENAME operation handles moving of files and directories.
+    The WEBSOCKET operation handles operations via the WebSocket protocol.
     The WEBSOCKET_READ operation handles immutable operations via the WebSocket
-    protocol.
+    protocol (deprecated).
     The WEBSOCKET_WRITE operation handles mutable operations via the WebSocket
-    protocol.
+    protocol (deprecated).
     """
 
     CREATE = "CREATE"
@@ -73,6 +74,7 @@ class StorageOperation(str, Enum):
     MKDIRS = "MKDIRS"
     DELETE = "DELETE"
     RENAME = "RENAME"
+    WEBSOCKET = "WEBSOCKET"
     WEBSOCKET_READ = "WEBSOCKET_READ"
     WEBSOCKET_WRITE = "WEBSOCKET_WRITE"
 
@@ -179,18 +181,30 @@ class StorageHandler:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._get_user_permissions_tree(request, storage_path)
             return await self._handle_getfilestatus(storage_path, tree)
+        elif operation == StorageOperation.WEBSOCKET:
+            storage_path = self._get_fs_path_from_request(request)
+            tree = await self._get_user_permissions_tree(request, storage_path)
+            return await self._handle_websocket(request, storage_path, tree)
         elif operation == StorageOperation.WEBSOCKET_READ:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(
                 request, storage_path, action=AuthAction.READ.value
             )
-            return await self._handle_websocket(request, storage_path, write=False)
+            return await self._handle_websocket(
+                request,
+                storage_path,
+                ClientAccessSubTreeView(action=AuthAction.READ.value, children={}),
+            )
         elif operation == StorageOperation.WEBSOCKET_WRITE:
             storage_path = self._get_fs_path_from_request(request)
             await self._check_user_permissions(
                 request, storage_path, action=AuthAction.WRITE.value
             )
-            return await self._handle_websocket(request, storage_path, write=True)
+            return await self._handle_websocket(
+                request,
+                storage_path,
+                ClientAccessSubTreeView(action=AuthAction.WRITE.value, children={}),
+            )
         raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_delete(self, request: web.Request) -> web.StreamResponse:
@@ -269,8 +283,18 @@ class StorageHandler:
             raise ValueError(f"path should be relative: {path!r}")
 
     async def _handle_websocket(
-        self, request: web.Request, storage_path: PurePath, write: bool
+        self,
+        request: web.Request,
+        storage_path: PurePath,
+        tree: ClientAccessSubTreeView,
     ) -> web.WebSocketResponse:
+        if tree.action == AuthAction.READ:
+            write = False
+        elif tree.action == AuthAction.WRITE or tree.action == "manage":
+            write = True
+        else:
+            raise web.HTTPForbidden
+
         ws = web.WebSocketResponse(max_msg_size=MAX_WS_MESSAGE_SIZE)
         await ws.prepare(request)
 
