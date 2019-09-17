@@ -21,14 +21,14 @@ import aiohttp
 import cbor
 import uvloop
 from aiohttp import web
-from aiohttp_security import check_authorized, check_permission
-from neuro_auth_client import AuthClient, Permission, User
+from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
 
 from .cache import PermissionsCache
 from .config import Config
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
+from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
 
 
@@ -94,34 +94,20 @@ class WSStorageOperation(str, Enum):
     MKDIRS = "MKDIRS"
 
 
-class AuthAction(str, Enum):
-    DENY = "deny"
-    LIST = "list"
-    READ = "read"
-    WRITE = "write"
-
-
 class StorageHandler:
     def __init__(self, app: web.Application, storage: Storage, config: Config) -> None:
         self._app = app
         self._storage = storage
         self._config = config
-        self._permission_cache: PermissionsCache = PermissionsCache(
-            self._get_user_permissions_tree_uncached,
-            self._check_user_permissions_uncached,
-            expiration_interval_s=config.permission_expiration_interval_s,
-            forgetting_interval_s=config.permission_forgetting_interval_s,
+        self._permission_checker: AbstractPermissionChecker = PermissionChecker(
+            app, config
         )
         if config.permission_expiration_interval_s > 0:
-            self._get_user_permissions_tree = (
-                self._permission_cache.get_user_permissions_tree
+            self._permission_checker = PermissionsCache(
+                self._permission_checker,
+                expiration_interval_s=config.permission_expiration_interval_s,
+                forgetting_interval_s=config.permission_forgetting_interval_s,
             )
-            self._check_user_permissions_impl = (
-                self._permission_cache.check_user_permissions
-            )
-        else:
-            self._get_user_permissions_tree = self._get_user_permissions_tree_uncached
-            self._check_user_permissions_impl = self._check_user_permissions_uncached
 
     def register(self, app: web.Application) -> None:
         app.add_routes(
@@ -566,16 +552,12 @@ class StorageHandler:
             "type": str(status.type),
         }
 
-    async def _get_user_permissions_tree_uncached(
+    async def _get_user_permissions_tree(
         self, request: web.Request, target_path: PurePath
     ) -> ClientAccessSubTreeView:
-        username = await self._get_user_from_request(request)
-        auth_client = self._get_auth_client()
-        target_path_uri = f"storage:/{target_path!s}"
-        tree = await auth_client.get_permissions_tree(username.name, target_path_uri)
-        if tree.sub_tree.action == AuthAction.DENY.value:
-            raise web.HTTPNotFound
-        return tree.sub_tree
+        return await self._permission_checker.get_user_permissions_tree(
+            request, target_path
+        )
 
     async def _check_user_permissions(
         self, request: web.Request, target_path: PurePath, action: str = ""
@@ -585,40 +567,9 @@ class StorageHandler:
                 action = AuthAction.READ.value
             else:  # POST, PUT, PATCH, DELETE
                 action = AuthAction.WRITE.value
-        await self._check_user_permissions_impl(request, target_path, action)
-
-    async def _check_user_permissions_uncached(
-        self, request: web.Request, target_path: PurePath, action: str
-    ) -> None:
-        uri = f"storage:/{target_path!s}"
-        permission = Permission(uri=uri, action=action)
-        logger.info(f"Checking {permission}")
-        # TODO (Rafa Zubairov): test if user accessing his own data,
-        # then use JWT token claims
-        try:
-            await check_permission(request, action, [permission])
-        except web.HTTPUnauthorized:
-            # TODO (Rafa Zubairov): Use tree based approach here
-            self._raise_unauthorized()
-        except web.HTTPForbidden:
-            raise web.HTTPNotFound()
-
-    def _raise_unauthorized(self) -> None:
-        raise web.HTTPUnauthorized(
-            headers={"WWW-Authenticate": f'Bearer realm="{self._config.server.name}"'}
+        await self._permission_checker.check_user_permissions(
+            request, target_path, action
         )
-
-    async def _get_user_from_request(self, request: web.Request) -> User:
-        try:
-            user_name = await check_authorized(request)
-        except ValueError:
-            raise web.HTTPBadRequest()
-        except web.HTTPUnauthorized:
-            self._raise_unauthorized()
-        return User(name=user_name)
-
-    def _get_auth_client(self) -> AuthClient:
-        return self._app["auth_client"]
 
 
 @web.middleware
