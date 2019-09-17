@@ -5,14 +5,14 @@ from pathlib import PurePath
 from typing import Callable, Optional, Tuple
 
 from aiohttp import web
-from aiohttp.hdrs import AUTHORIZATION
+from aiohttp_security.api import IDENTITY_KEY
 from neuro_auth_client.client import ClientAccessSubTreeView
 
 from .security import AbstractPermissionChecker
 
 
 TimeFactory = Callable[[], float]
-PermissionsCacheKey = Tuple[str, str]  # authorization, path
+PermissionsCacheKey = Tuple[str, str]  # identity, path
 
 
 @dataclass(frozen=True)
@@ -49,8 +49,9 @@ class PermissionsCache(AbstractPermissionChecker):
         now = self._time_factory()
         tree = await self._checker.get_user_permissions_tree(request, target_path)
 
-        auth_header_value = request.headers.get(AUTHORIZATION)
-        key = auth_header_value, str(target_path)
+        identity = await self._get_identity(request)
+        assert identity
+        key = identity, str(target_path)
         expired_at = now + self.expiration_interval_s
         self._add_to_cache(key, tree, expired_at)
         return tree
@@ -60,9 +61,12 @@ class PermissionsCache(AbstractPermissionChecker):
     ) -> Optional[ClientAccessSubTreeView]:
         self._cleanup_cache()
         stack = []
-        auth_header_value = request.headers.get(AUTHORIZATION)
+        identity = await self._get_identity(request)
+        if not identity:
+            return None
+
         while True:
-            key = auth_header_value, str(target_path)
+            key = identity, str(target_path)
             cached = self._cache.get(key, None)
             if cached is not None:
                 break
@@ -95,6 +99,10 @@ class PermissionsCache(AbstractPermissionChecker):
             if tree is None:
                 return ClientAccessSubTreeView(action=action, children={})
         return tree
+
+    async def _get_identity(self, request: web.Request) -> Optional[str]:
+        identity_policy = request.config_dict[IDENTITY_KEY]
+        return await identity_policy.identify(request)
 
     def _add_to_cache(
         self, key: PermissionsCacheKey, tree: ClientAccessSubTreeView, expired_at: float

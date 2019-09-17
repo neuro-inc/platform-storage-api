@@ -5,7 +5,9 @@ from typing import Any, List
 import pytest
 from aiohttp.test_utils import make_mocked_request
 from aiohttp.web import HTTPNotFound, Request
+from aiohttp_security.api import IDENTITY_KEY
 from neuro_auth_client.client import ClientAccessSubTreeView
+from neuro_auth_client.security import IdentityPolicy
 
 from platform_storage_api.cache import AbstractPermissionChecker, PermissionsCache
 
@@ -84,16 +86,17 @@ async def test_permission_cache() -> None:
         },
     )
 
-    checker = MockPermissionChecker(call_log, permission_tree)
     cache = PermissionsCache(
-        checker,
+        MockPermissionChecker(call_log, permission_tree),
         time_factory=mock_time,
         expiration_interval_s=100.0,
         forgetting_interval_s=1000.0,
     )
     request = make_mocked_request(
-        "GET", "/", headers={"Authorization": "authorization"}
+        "GET", "/", headers={"Authorization": "Bearer authorization"}
     )
+    request.app[IDENTITY_KEY] = IdentityPolicy()
+
     tree = await cache.get_user_permissions_tree(request, PurePath("/alice/folder"))
     assert tree == ClientAccessSubTreeView("manage", {})
     assert call_log == [("tree", PurePath("/alice/folder"))]
