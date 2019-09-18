@@ -77,10 +77,16 @@ class EnvironConfigFactory:
         storage_config = self.create_storage()
         auth_config = self.create_auth()
         permission_expiration_interval_s: float = float(
-            self._environ.get("NP_PERMISSION_EXPIRATION_INTERVAL", Config.permission_expiration_interval_s)
+            self._environ.get(
+                "NP_PERMISSION_EXPIRATION_INTERVAL",
+                Config.permission_expiration_interval_s,
+            )
         )
         permission_forgetting_interval_s: float = float(
-            self._environ.get("NP_PERMISSION_FORGETTING_INTERVAL", Config.permission_forgetting_interval_s)
+            self._environ.get(
+                "NP_PERMISSION_FORGETTING_INTERVAL",
+                Config.permission_forgetting_interval_s,
+            )
         )
         return Config(
             server=server_config,
