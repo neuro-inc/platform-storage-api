@@ -161,15 +161,21 @@ class StorageHandler:
             return await self._handle_open(request, storage_path)
         elif operation == StorageOperation.LISTSTATUS:
             storage_path = self._get_fs_path_from_request(request)
-            tree = await self._get_user_permissions_tree(request, storage_path)
+            tree = await self._permission_checker.get_user_permissions_tree(
+                request, storage_path
+            )
             return await self._handle_liststatus(storage_path, tree)
         elif operation == StorageOperation.GETFILESTATUS:
             storage_path = self._get_fs_path_from_request(request)
-            tree = await self._get_user_permissions_tree(request, storage_path)
-            return await self._handle_getfilestatus(storage_path, tree)
+            action = await self._permission_checker.get_user_permissions(
+                request, storage_path
+            )
+            return await self._handle_getfilestatus(storage_path, action)
         elif operation == StorageOperation.WEBSOCKET:
             storage_path = self._get_fs_path_from_request(request)
-            tree = await self._get_user_permissions_tree(request, storage_path)
+            tree = await self._permission_checker.get_user_permissions_tree(
+                request, storage_path
+            )
             return await self._handle_websocket(request, storage_path, tree)
         elif operation == StorageOperation.WEBSOCKET_READ:
             storage_path = self._get_fs_path_from_request(request)
@@ -477,14 +483,14 @@ class StorageHandler:
         return FileStatusPermission(action)
 
     async def _handle_getfilestatus(
-        self, storage_path: PurePath, tree: ClientAccessSubTreeView
+        self, storage_path: PurePath, action: str
     ) -> web.StreamResponse:
         try:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
             raise web.HTTPNotFound
 
-        fstat = fstat.with_permission(self._convert_action_to_permission(tree.action))
+        fstat = fstat.with_permission(self._convert_action_to_permission(action))
         stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
         return web.json_response(stat_dict)
 
@@ -551,13 +557,6 @@ class StorageHandler:
             "permission": status.permission.value,
             "type": str(status.type),
         }
-
-    async def _get_user_permissions_tree(
-        self, request: web.Request, target_path: PurePath
-    ) -> ClientAccessSubTreeView:
-        return await self._permission_checker.get_user_permissions_tree(
-            request, target_path
-        )
 
     async def _check_user_permissions(
         self, request: web.Request, target_path: PurePath, action: str = ""
