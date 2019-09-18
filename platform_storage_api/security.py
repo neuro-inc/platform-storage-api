@@ -57,12 +57,6 @@ class PermissionChecker(AbstractPermissionChecker):
             raise web.HTTPNotFound
         return tree.sub_tree
 
-    async def get_user_permissions(
-        self, request: web.Request, target_path: PurePath
-    ) -> str:
-        tree = await self.get_user_permissions_tree(request, target_path)
-        return tree.action
-
     async def check_user_permissions(
         self, request: web.Request, target_path: PurePath, action: str
     ) -> None:
