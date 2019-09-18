@@ -9,8 +9,14 @@ from aiohttp_security.api import IDENTITY_KEY
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import IdentityPolicy
 
-from platform_storage_api.cache import AbstractPermissionChecker, PermissionsCache
+from platform_storage_api.cache import (
+    AbstractPermissionChecker,
+    PermissionsCache,
+    TimeFactory,
+)
 
+
+P = PurePath
 
 _actions = ("deny", "list", "read", "write", "manage")
 
@@ -59,16 +65,9 @@ class MockPermissionChecker(AbstractPermissionChecker):
             raise HTTPNotFound
 
 
-@pytest.mark.asyncio
-async def test_permission_cache() -> None:
-    time: float = 0.0
-
-    def mock_time() -> float:
-        return time
-
-    call_log: List[Any] = []
-
-    permission_tree = ClientAccessSubTreeView(
+@pytest.fixture
+def permission_tree() -> ClientAccessSubTreeView:
+    return ClientAccessSubTreeView(
         action="deny",
         children={
             "alice": ClientAccessSubTreeView(action="manage", children={}),
@@ -86,161 +85,278 @@ async def test_permission_cache() -> None:
         },
     )
 
-    cache = PermissionsCache(
+
+@pytest.fixture
+def call_log() -> List[Any]:
+    return []
+
+
+@pytest.fixture
+def mock_time() -> TimeFactory:
+    def mock_time() -> float:
+        return mock_time.time  # type: ignore
+
+    mock_time.time = 0.0  # type: ignore
+    return mock_time
+
+
+@pytest.fixture
+def cache(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: TimeFactory,
+) -> PermissionsCache:
+    return PermissionsCache(
         MockPermissionChecker(call_log, permission_tree),
         time_factory=mock_time,
         expiration_interval_s=100.0,
         forgetting_interval_s=1000.0,
     )
-    request = make_mocked_request(
+
+
+@pytest.fixture
+def webrequest() -> Request:
+    webrequest = make_mocked_request(
         "GET", "/", headers={"Authorization": "Bearer authorization"}
     )
-    request.app[IDENTITY_KEY] = IdentityPolicy()
+    webrequest.app[IDENTITY_KEY] = IdentityPolicy()
+    return webrequest
 
-    tree = await cache.get_user_permissions_tree(request, PurePath("/alice/folder"))
+
+@pytest.mark.asyncio
+async def test_cached_permissions(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: Any,
+    cache: PermissionsCache,
+    webrequest: Request,
+) -> None:
+    # Warm up the cache
+    tree = await cache.get_user_permissions_tree(webrequest, P("/alice/folder"))
     assert tree == ClientAccessSubTreeView("manage", {})
-    assert call_log == [("tree", PurePath("/alice/folder"))]
+    assert call_log == [("tree", P("/alice/folder"))]
     call_log.clear()
 
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder"))
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
     assert tree == ClientAccessSubTreeView(
-        action="read",
-        children={"file": ClientAccessSubTreeView(action="write", children={})},
+        "read", {"file": ClientAccessSubTreeView("write", {})}
     )
-    assert call_log == [("tree", PurePath("/bob/folder"))]
+    assert call_log == [("tree", P("/bob/folder"))]
     call_log.clear()
 
-    with pytest.raises(HTTPNotFound):
-        await cache.get_user_permissions_tree(request, PurePath("/charlie/folder"))
-    assert call_log == [("tree", PurePath("/charlie/folder"))]
-    call_log.clear()
-
-    # Cached result
-    time = 99.0
-    await cache.check_user_permissions(request, PurePath("/alice/folder"), "read")
+    # Use cached results
+    mock_time.time = 99.0
+    await cache.check_user_permissions(webrequest, P("/alice/folder"), "read")
+    tree = await cache.get_user_permissions_tree(webrequest, P("/alice/folder"))
+    assert tree == ClientAccessSubTreeView("manage", {})
     assert call_log == []
 
-    await cache.check_user_permissions(request, PurePath("/alice/folder/file"), "read")
-    assert call_log == []
-
-    tree = await cache.get_user_permissions_tree(request, PurePath("/alice/folder"))
-    assert tree == ClientAccessSubTreeView(action="manage", children={})
-    assert call_log == []
-
-    tree = await cache.get_user_permissions_tree(
-        request, PurePath("/alice/folder/file")
-    )
-    assert tree == ClientAccessSubTreeView(action="manage", children={})
-    assert call_log == []
-
-    await cache.check_user_permissions(request, PurePath("/bob/folder"), "read")
-    assert call_log == []
-
-    await cache.check_user_permissions(request, PurePath("/bob/folder/file"), "read")
-    assert call_log == []
-
-    await cache.check_user_permissions(
-        request, PurePath("/bob/folder/otherfile"), "read"
-    )
-    assert call_log == []
-
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder"))
+    await cache.check_user_permissions(webrequest, P("/bob/folder"), "read")
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
     assert tree == ClientAccessSubTreeView(
-        action="read",
-        children={"file": ClientAccessSubTreeView(action="write", children={})},
+        "read", {"file": ClientAccessSubTreeView("write", {})}
     )
     assert call_log == []
 
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder/file"))
-    assert tree == ClientAccessSubTreeView(action="write", children={})
-    assert call_log == []
 
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/otherfolder"))
-    assert tree == ClientAccessSubTreeView(action="list", children={})
-    assert call_log == [("tree", PurePath("/bob/otherfolder"))]
+@pytest.mark.asyncio
+async def test_cached_parent_permissions(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: Any,
+    cache: PermissionsCache,
+    webrequest: Request,
+) -> None:
+    # Warm up the cache
+    tree = await cache.get_user_permissions_tree(webrequest, P("/alice/folder"))
+    assert tree == ClientAccessSubTreeView("manage", {})
+    assert call_log == [("tree", P("/alice/folder"))]
     call_log.clear()
 
-    with pytest.raises(HTTPNotFound):
-        await cache.get_user_permissions_tree(request, PurePath("/charlie/folder"))
-    assert call_log == [("tree", PurePath("/charlie/folder"))]
-    call_log.clear()
-
-    # Expired cache
-    time = 101.0
-    await cache.check_user_permissions(request, PurePath("/bob/folder/file"), "write")
-    assert call_log == [("tree", PurePath("/bob/folder"))]
-    call_log.clear()
-
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder/file"))
-    assert tree == ClientAccessSubTreeView(action="write", children={})
-    assert call_log == []
-
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder"))
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
     assert tree == ClientAccessSubTreeView(
-        action="read",
-        children={"file": ClientAccessSubTreeView(action="write", children={})},
+        "read", {"file": ClientAccessSubTreeView("write", {})}
     )
-    assert call_log == []
-
-    time = 202.0
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder/file"))
-    assert tree == ClientAccessSubTreeView(action="write", children={})
-    assert call_log == [("tree", PurePath("/bob/folder"))]
+    assert call_log == [("tree", P("/bob/folder"))]
     call_log.clear()
 
-    await cache.check_user_permissions(request, PurePath("/bob/folder/file"), "write")
+    # Use cached results
+    mock_time.time = 99.0
+    await cache.check_user_permissions(webrequest, P("/alice/folder/file"), "read")
+    tree = await cache.get_user_permissions_tree(webrequest, P("/alice/folder/file"))
+    assert tree == ClientAccessSubTreeView("manage", {})
     assert call_log == []
 
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder"))
+    await cache.check_user_permissions(webrequest, P("/bob/folder/file"), "read")
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder/file"))
+    assert tree == ClientAccessSubTreeView("write", {})
+    assert call_log == []
+
+    await cache.check_user_permissions(webrequest, P("/bob/folder/otherfile"), "read")
+    assert call_log == []
+
+
+@pytest.mark.asyncio
+async def test_expired_permissions_check(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: Any,
+    cache: PermissionsCache,
+    webrequest: Request,
+) -> None:
+    # Warm up the cache
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
     assert tree == ClientAccessSubTreeView(
-        action="read",
-        children={"file": ClientAccessSubTreeView(action="write", children={})},
+        "read", {"file": ClientAccessSubTreeView("write", {})}
+    )
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
+
+    # Expire cached permissions
+    mock_time.time += 101.0
+    # Trigger the repeat of the request by check_user_permissions() for child
+    await cache.check_user_permissions(webrequest, P("/bob/folder/file"), "write")
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
+
+    # Use cached results
+    await cache.check_user_permissions(webrequest, P("/bob/folder/file"), "write")
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder/file"))
+    assert tree == ClientAccessSubTreeView("write", {})
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert tree == ClientAccessSubTreeView(
+        "read", {"file": ClientAccessSubTreeView("write", {})}
     )
     assert call_log == []
+
+
+@pytest.mark.asyncio
+async def test_expired_permissions_tree(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: Any,
+    cache: PermissionsCache,
+    webrequest: Request,
+) -> None:
+    # Warm up the cache
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert tree == ClientAccessSubTreeView(
+        "read", {"file": ClientAccessSubTreeView("write", {})}
+    )
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
+
+    # Expire cached permissions
+    mock_time.time += 101.0
+    # Trigger the repeat of the request by get_user_permissions_tree() for child
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder/file"))
+    assert tree == ClientAccessSubTreeView("write", {})
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
+
+    # Use cached results
+    await cache.check_user_permissions(webrequest, P("/bob/folder/file"), "write")
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder/file"))
+    assert tree == ClientAccessSubTreeView("write", {})
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert tree == ClientAccessSubTreeView(
+        "read", {"file": ClientAccessSubTreeView("write", {})}
+    )
+    assert call_log == []
+
+
+@pytest.mark.asyncio
+async def test_forget_path(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: Any,
+    cache: PermissionsCache,
+    webrequest: Request,
+) -> None:
+    # Warm up the cache
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert tree == ClientAccessSubTreeView(
+        "read", {"file": ClientAccessSubTreeView("write", {})}
+    )
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
 
     # Positive result is cached
     del permission_tree.children["bob"].children["folder"].children["file"]
-
-    await cache.check_user_permissions(request, PurePath("/bob/folder/file"), "write")
-    assert call_log == []
-
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder"))
+    await cache.check_user_permissions(webrequest, P("/bob/folder/file"), "write")
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
     assert tree == ClientAccessSubTreeView(
-        action="read",
-        children={"file": ClientAccessSubTreeView(action="write", children={})},
+        "read", {"file": ClientAccessSubTreeView("write", {})}
     )
     assert call_log == []
 
     # Forget all cached values
-    time = 2000.0
+    mock_time.time = 1001.0
     with pytest.raises(HTTPNotFound):
-        await cache.check_user_permissions(
-            request, PurePath("/bob/folder/file"), "write"
-        )
-    assert call_log == [("check", PurePath("/bob/folder/file"))]
+        await cache.check_user_permissions(webrequest, P("/bob/folder/file"), "write")
+    assert call_log == [("check", P("/bob/folder/file"))]
     call_log.clear()
 
-    tree = await cache.get_user_permissions_tree(request, PurePath("/bob/folder"))
-    assert tree == ClientAccessSubTreeView(action="read", children={})
-    assert call_log == [("tree", PurePath("/bob/folder"))]
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert tree == ClientAccessSubTreeView("read", {})
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
+
+
+@pytest.mark.asyncio
+async def test_cached_path(
+    call_log: List[Any], mock_time: Any, cache: PermissionsCache, webrequest: Request
+) -> None:
+    # Warm up the cache
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert tree == ClientAccessSubTreeView(
+        "read", {"file": ClientAccessSubTreeView("write", {})}
+    )
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
+
+    # Keep the path in the cache
+    for i in range(10):
+        # Expire cached permissions
+        mock_time.time += 101.0
+        await cache.check_user_permissions(webrequest, P("/bob/folder/file"), "write")
+        assert call_log == [("tree", P("/bob/folder"))]
+        call_log.clear()
+
+    assert mock_time.time > 1000.0
+
+
+@pytest.mark.asyncio
+async def test_access_denied(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: Any,
+    cache: PermissionsCache,
+    webrequest: Request,
+) -> None:
+    with pytest.raises(HTTPNotFound):
+        await cache.get_user_permissions_tree(webrequest, P("/charlie/folder"))
+    assert call_log == [("tree", P("/charlie/folder"))]
     call_log.clear()
 
     # Negative result is not cached
     with pytest.raises(HTTPNotFound):
-        await cache.get_user_permissions_tree(request, PurePath("/charlie/folder"))
-    assert call_log == [("tree", PurePath("/charlie/folder"))]
+        await cache.check_user_permissions(webrequest, P("/charlie/folder"), "read")
+    assert call_log == [("check", P("/charlie/folder"))]
     call_log.clear()
 
-    permission_tree.children["bob"].children["folder"].children[
-        "file"
-    ] = ClientAccessSubTreeView(action="write", children={})
-    permission_tree.children["charlie"] = ClientAccessSubTreeView(
-        action="list", children={}
-    )
-    await cache.check_user_permissions(request, PurePath("/bob/folder/file"), "write")
-    assert call_log == [("check", PurePath("/bob/folder/file"))]
+    with pytest.raises(HTTPNotFound):
+        await cache.get_user_permissions_tree(webrequest, P("/charlie/folder"))
+    assert call_log == [("tree", P("/charlie/folder"))]
     call_log.clear()
 
-    tree = await cache.get_user_permissions_tree(request, PurePath("/charlie/folder"))
-    assert call_log == [("tree", PurePath("/charlie/folder"))]
+    # Grant permissions
+    permission_tree.children["charlie"] = ClientAccessSubTreeView("read", {})
+    await cache.check_user_permissions(webrequest, P("/charlie/folder"), "read")
+    assert call_log == [("check", P("/charlie/folder"))]
+    call_log.clear()
+
+    tree = await cache.get_user_permissions_tree(webrequest, P("/charlie/folder"))
+    assert tree == ClientAccessSubTreeView("read", {})
+    assert call_log == [("tree", P("/charlie/folder"))]
     call_log.clear()
