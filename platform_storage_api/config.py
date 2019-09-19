@@ -38,6 +38,8 @@ class Config:
     server: ServerConfig
     storage: StorageConfig
     auth: AuthConfig
+    permission_expiration_interval_s: float = 0
+    permission_forgetting_interval_s: float = 0
 
     @classmethod
     def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "Config":
@@ -74,4 +76,22 @@ class EnvironConfigFactory:
         server_config = self.create_server()
         storage_config = self.create_storage()
         auth_config = self.create_auth()
-        return Config(server=server_config, storage=storage_config, auth=auth_config)
+        permission_expiration_interval_s: float = float(
+            self._environ.get(
+                "NP_PERMISSION_EXPIRATION_INTERVAL",
+                Config.permission_expiration_interval_s,
+            )
+        )
+        permission_forgetting_interval_s: float = float(
+            self._environ.get(
+                "NP_PERMISSION_FORGETTING_INTERVAL",
+                Config.permission_forgetting_interval_s,
+            )
+        )
+        return Config(
+            server=server_config,
+            storage=storage_config,
+            auth=auth_config,
+            permission_expiration_interval_s=permission_expiration_interval_s,
+            permission_forgetting_interval_s=permission_forgetting_interval_s,
+        )
