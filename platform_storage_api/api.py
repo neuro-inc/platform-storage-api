@@ -280,12 +280,9 @@ class StorageHandler:
         storage_path: PurePath,
         tree: ClientAccessSubTreeView,
     ) -> web.WebSocketResponse:
-        if tree.action == AuthAction.READ:
-            write = False
-        elif tree.action == AuthAction.WRITE or tree.action == "manage":
-            write = True
-        else:
+        if not tree.can_read():
             raise web.HTTPForbidden
+        write = tree.can_write()
 
         ws = web.WebSocketResponse(max_msg_size=MAX_WS_MESSAGE_SIZE)
         await ws.prepare(request)
@@ -466,15 +463,15 @@ class StorageHandler:
     def _liststatus_filter(
         self, statuses: List[FileStatus], tree: ClientAccessSubTreeView
     ) -> Iterator[FileStatus]:
-        is_list_action = tree.action == AuthAction.LIST.value
+        can_read = tree.can_read()
         for status in statuses:
             sub_tree = tree.children.get(str(status.path))
             if sub_tree:
                 action = sub_tree.action
-            else:
-                if is_list_action:
-                    continue
+            elif can_read:
                 action = tree.action
+            else:
+                continue
             yield status.with_permission(self._convert_action_to_permission(action))
 
     def _convert_action_to_permission(self, action: str) -> FileStatusPermission:
