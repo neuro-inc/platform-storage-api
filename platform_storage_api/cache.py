@@ -6,7 +6,7 @@ from typing import Callable, Optional, Tuple
 
 from aiohttp import web
 from aiohttp_security.api import IDENTITY_KEY
-from neuro_auth_client.client import ClientAccessSubTreeView, has_permission
+from neuro_auth_client.client import ClientAccessSubTreeView
 
 from .security import AbstractPermissionChecker
 
@@ -117,7 +117,7 @@ class PermissionsCache(AbstractPermissionChecker):
         self, request: web.Request, target_path: PurePath, action: str
     ) -> None:
         tree = await self._get_user_permissions_tree_cached(request, target_path)
-        if tree and has_permission(tree.action, action):
+        if tree and tree.check_action_allowed(action):
             return
 
         await self._checker.check_user_permissions(request, target_path, action)

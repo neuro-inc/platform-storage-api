@@ -6,7 +6,7 @@ import pytest
 from aiohttp.test_utils import make_mocked_request
 from aiohttp.web import HTTPNotFound, Request
 from aiohttp_security.api import IDENTITY_KEY
-from neuro_auth_client.client import ClientAccessSubTreeView, has_permission
+from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import IdentityPolicy
 
 from platform_storage_api.cache import (
@@ -55,7 +55,7 @@ class MockPermissionChecker(AbstractPermissionChecker):
     ) -> None:
         self.call_log.append(("check", target_path))
         tree = await self._get_user_permissions_tree(request, target_path)
-        if not has_permission(tree.action, action):
+        if not tree.check_action_allowed(action):
             raise HTTPNotFound
 
 
