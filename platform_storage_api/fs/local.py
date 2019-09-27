@@ -2,18 +2,33 @@ import abc
 import asyncio
 import enum
 import errno
-import io
 import logging
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
-from typing import Any, AsyncContextManager, AsyncIterator, Iterator, List, Optional
+from types import TracebackType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncContextManager,
+    AsyncIterator,
+    Iterator,
+    List,
+    Optional,
+    Type,
+    cast,
+)
 
 import aiofiles
-from async_generator import asynccontextmanager
 
+
+if TYPE_CHECKING:
+    _FSBase = AbstractAsyncContextManager["FileSystem"]
+else:
+    _FSBase = AbstractAsyncContextManager
 
 logger = logging.getLogger()
 
@@ -28,8 +43,8 @@ class FileStatusType(str, enum.Enum):
     DIRECTORY = "DIRECTORY"
     FILE = "FILE"
 
-    def __str__(self):
-        return self.value
+    def __str__(self) -> str:
+        return cast(str, self.value)
 
 
 class FileStatusPermission(str, enum.Enum):
@@ -72,9 +87,9 @@ class FileStatus:
         return replace(self, permission=permission)
 
 
-class FileSystem(metaclass=abc.ABCMeta):
+class FileSystem(_FSBase):
     @classmethod
-    def create(cls, type_: StorageType, *args, **kwargs) -> "FileSystem":
+    def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
         if type_ == StorageType.LOCAL:
             return LocalFileSystem(**kwargs)
         raise ValueError(f"Unsupported storage type: {type_}")
@@ -83,8 +98,14 @@ class FileSystem(metaclass=abc.ABCMeta):
         await self.init()
         return self
 
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
         await self.close()
+        return None
 
     @abc.abstractmethod
     async def init(self) -> None:
@@ -94,8 +115,9 @@ class FileSystem(metaclass=abc.ABCMeta):
     async def close(self) -> None:
         pass
 
+    # Actual return type is an async version of io.FileIO
     @abc.abstractmethod
-    def open(self, path: PurePath, mode="r") -> io.FileIO:
+    def open(self, path: PurePath, mode: str = "r") -> Any:
         pass
 
     @abc.abstractmethod
@@ -132,7 +154,11 @@ class FileSystem(metaclass=abc.ABCMeta):
 
 class LocalFileSystem(FileSystem):
     def __init__(
-        self, *, executor_max_workers: Optional[int] = None, loop=None, **kwargs
+        self,
+        *,
+        executor_max_workers: Optional[int] = None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+        **kwargs: Any,
     ) -> None:
         self._executor_max_workers = executor_max_workers
         self._executor: Optional[ThreadPoolExecutor] = None
@@ -160,10 +186,11 @@ class LocalFileSystem(FileSystem):
     async def listdir(self, path: PurePath) -> List[PurePath]:
         return await self._loop.run_in_executor(self._executor, self._listdir, path)
 
-    def open(self, path: PurePath, mode="r") -> io.FileIO:
+    # Actual return type is an async version of io.FileIO
+    def open(self, path: PurePath, mode: str = "r") -> Any:
         return aiofiles.open(path, mode=mode, executor=self._executor)
 
-    def _mkdir(self, path: PurePath):
+    def _mkdir(self, path: PurePath) -> None:
         # TODO (A Danshyn 04/23/18): consider setting mode
         Path(path).mkdir(parents=True, exist_ok=True)
 
@@ -260,7 +287,9 @@ class LocalFileSystem(FileSystem):
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
 
 
-async def copy_streams(outstream, instream, chunk_size=DEFAULT_CHUNK_SIZE):
+async def copy_streams(
+    outstream: Any, instream: Any, chunk_size: int = DEFAULT_CHUNK_SIZE
+) -> None:
     """perform chunked copying of data between two streams.
 
     It is assumed that stream implementations would handle retries themselves.

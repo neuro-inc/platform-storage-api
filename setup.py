@@ -1,16 +1,14 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 
 install_requires = (
     "aiodns==2.0.0",
-    "aiofiles==0.3.2",
-    "aiohttp==3.5.4",
-    "async-exit-stack==1.0.1",  # backport from 3.7 stdlib
-    "async-generator==1.10",  # backport from 3.7 stdlib
+    "aiofiles==0.4.0",
+    "aiohttp==3.6.1",
+    "cbor==1.0.0",
     "cchardet==2.1.4",
-    "dataclasses==0.6",  # backport from 3.7 stdlib
-    "neuro_auth_client==0.0.1b5",
-    # TODO (A Danshyn 04/20/18): add uvloop at some point
+    "neuro_auth_client==1.0.7",
+    "uvloop==0.13.0",
 )
 
 setup(

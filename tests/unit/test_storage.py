@@ -1,23 +1,26 @@
 import os
 from io import BytesIO
-from pathlib import PurePath
+from pathlib import Path, PurePath
+from typing import Any
 
 import pytest
 
-from platform_storage_api.fs.local import FileStatusType, LocalFileSystem
+from platform_storage_api.fs.local import FileStatusType, FileSystem, LocalFileSystem
 from platform_storage_api.storage import Storage
 
 
 class AsyncBytesIO(BytesIO):
-    async def read(self, *args, **kwargs):
+    async def read(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore
         return super().read(*args, **kwargs)
 
-    async def write(self, *args, **kwargs):
+    async def write(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore
         return super().write(*args, **kwargs)
 
 
 class TestStorage:
-    def test_path_sanitize(self, local_fs, local_tmp_dir_path) -> None:
+    def test_path_sanitize(
+        self, local_fs: FileSystem, local_tmp_dir_path: Path
+    ) -> None:
         base_path = local_tmp_dir_path
         storage = Storage(fs=local_fs, base_path=base_path)
 
@@ -31,14 +34,16 @@ class TestStorage:
         assert PurePath("/") == storage.sanitize_path("/super/../path/../..")
 
     @pytest.mark.asyncio
-    async def test_store(self, local_fs, local_tmp_dir_path):
+    async def test_store(self, local_fs: FileSystem, local_tmp_dir_path: Path) -> None:
         base_path = local_tmp_dir_path
         storage = Storage(fs=local_fs, base_path=base_path)
 
         expected_payload = b"test"
         outstream = AsyncBytesIO(expected_payload)
         path = "/path/to/file"
-        await storage.store(outstream, path)
+
+        # outstream should be aiohttp.AbstractStreamWriter actually
+        await storage.store(outstream, path)  # type: ignore
 
         real_dir_path = local_tmp_dir_path / "path/to"
         real_file_path = real_dir_path / "file"
@@ -50,7 +55,9 @@ class TestStorage:
             assert payload == expected_payload
 
     @pytest.mark.asyncio
-    async def test_retrieve(self, local_fs, local_tmp_dir_path):
+    async def test_retrieve(
+        self, local_fs: FileSystem, local_tmp_dir_path: Path
+    ) -> None:
         base_path = local_tmp_dir_path
         storage = Storage(fs=local_fs, base_path=base_path)
 
@@ -61,7 +68,8 @@ class TestStorage:
             await f.write(expected_payload)
 
         instream = AsyncBytesIO()
-        await storage.retrieve(instream, "/file")
+        # instream should be aiohttp.StreamReader actually
+        await storage.retrieve(instream, "/file")  # type: ignore
         instream.seek(0)
         payload = await instream.read()
         assert payload == expected_payload
@@ -69,7 +77,7 @@ class TestStorage:
     @pytest.mark.asyncio
     async def test_filestatus_file(
         self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
-    ):
+    ) -> None:
         base_path = local_tmp_dir_path
         storage = Storage(fs=local_fs, base_path=base_path)
 
@@ -90,7 +98,7 @@ class TestStorage:
     @pytest.mark.asyncio
     async def test_filestatus_dir(
         self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
-    ):
+    ) -> None:
         base_path = local_tmp_dir_path
         storage = Storage(fs=local_fs, base_path=base_path)
 

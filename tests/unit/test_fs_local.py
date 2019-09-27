@@ -2,6 +2,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path, PurePath
+from typing import IO, AsyncIterator, Iterable, Iterator, Set
 
 import pytest
 
@@ -17,45 +18,47 @@ from platform_storage_api.fs.local import (
 
 class TestFileSystem:
     @pytest.mark.asyncio
-    async def test_create_local(self):
+    async def test_create_local(self) -> None:
         fs = FileSystem.create(StorageType.LOCAL)
         try:
             assert isinstance(fs, LocalFileSystem)
         finally:
             await fs.close()
 
-    def test_create_s3(self):
+    def test_create_s3(self) -> None:
         with pytest.raises(ValueError, match="Unsupported storage type: s3"):
             FileSystem.create(StorageType.S3)
 
 
 class TestLocalFileSystem:
     @pytest.fixture
-    def tmp_dir_path(self):
+    def tmp_dir_path(self) -> Iterator[Path]:
         # although blocking, this is fine for tests
         with tempfile.TemporaryDirectory() as d:
             yield Path(d)
 
     @pytest.fixture
-    def tmp_file(self, tmp_dir_path):
+    def tmp_file(self, tmp_dir_path: Path) -> Iterator[IO[str]]:
         # although blocking, this is fine for tests
-        with tempfile.NamedTemporaryFile(dir=tmp_dir_path) as f:
+        with tempfile.NamedTemporaryFile(dir=tmp_dir_path) as f:  # type: ignore
             f.flush()
             yield f
 
     @pytest.fixture
-    async def fs(self):
+    async def fs(self) -> AsyncIterator[FileSystem]:
         async with FileSystem.create(StorageType.LOCAL) as fs:
             yield fs
 
     @pytest.mark.asyncio
-    async def test_open_empty_file_for_reading(self, fs, tmp_file):
+    async def test_open_empty_file_for_reading(
+        self, fs: FileSystem, tmp_file: Path
+    ) -> None:
         async with fs.open(Path(tmp_file.name)) as f:
             payload = await f.read()
             assert not payload
 
     @pytest.mark.asyncio
-    async def test_open_for_writing(self, fs, tmp_file):
+    async def test_open_for_writing(self, fs: FileSystem, tmp_file: Path) -> None:
         expected_payload = b"test"
 
         async with fs.open(Path(tmp_file.name), "wb") as f:
@@ -67,7 +70,7 @@ class TestLocalFileSystem:
             assert payload == expected_payload
 
     @pytest.mark.asyncio
-    async def test_copy_streams(self, fs, tmp_dir_path):
+    async def test_copy_streams(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         expected_payload = b"test"
         chunk_size = 1
 
@@ -87,17 +90,19 @@ class TestLocalFileSystem:
             assert payload == expected_payload
 
     @pytest.mark.asyncio
-    async def test_listdir(self, fs, tmp_dir_path, tmp_file):
+    async def test_listdir(
+        self, fs: FileSystem, tmp_dir_path: Path, tmp_file: IO[str]
+    ) -> None:
         files = await fs.listdir(tmp_dir_path)
         assert files == [Path(tmp_file.name)]
 
     @pytest.mark.asyncio
-    async def test_listdir_empty(self, fs, tmp_dir_path):
+    async def test_listdir_empty(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         files = await fs.listdir(tmp_dir_path)
         assert not files
 
     @pytest.mark.asyncio
-    async def test_mkdir(self, fs, tmp_dir_path):
+    async def test_mkdir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         dir_name = "new"
         path = tmp_dir_path / dir_name
         await fs.mkdir(path)
@@ -105,7 +110,7 @@ class TestLocalFileSystem:
         assert files == [path]
 
     @pytest.mark.asyncio
-    async def test_mkdir_existing(self, fs, tmp_dir_path):
+    async def test_mkdir_existing(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         dir_name = "new"
         path = tmp_dir_path / dir_name
         await fs.mkdir(path)
@@ -116,7 +121,9 @@ class TestLocalFileSystem:
         await fs.mkdir(path)
 
     @pytest.mark.asyncio
-    async def test_liststatus_single_empty_file(self, fs, tmp_dir_path, tmp_file):
+    async def test_liststatus_single_empty_file(
+        self, fs: FileSystem, tmp_dir_path: Path, tmp_file: IO[str]
+    ) -> None:
         expected_path = Path(Path(tmp_file.name).name)
         stat = os.stat(tmp_file.name)
         expected_mtime = int(stat.st_mtime)
@@ -132,7 +139,9 @@ class TestLocalFileSystem:
         ]
 
     @pytest.mark.asyncio
-    async def test_liststatus_single_file(self, fs, tmp_dir_path, tmp_file):
+    async def test_liststatus_single_file(
+        self, fs: FileSystem, tmp_dir_path: Path, tmp_file: IO[str]
+    ) -> None:
         expected_path = Path(Path(tmp_file.name).name)
         expected_payload = b"test"
         expected_size = len(expected_payload)
@@ -153,7 +162,9 @@ class TestLocalFileSystem:
         ]
 
     @pytest.mark.asyncio
-    async def test_liststatus_single_dir(self, fs, tmp_dir_path):
+    async def test_liststatus_single_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
         await fs.mkdir(path)
@@ -171,19 +182,25 @@ class TestLocalFileSystem:
         ]
 
     @pytest.mark.asyncio
-    async def test_liststatus_non_existent_dir(self, fs, tmp_dir_path):
+    async def test_liststatus_non_existent_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         path = tmp_dir_path / "nested"
 
         with pytest.raises(FileNotFoundError):
             await fs.liststatus(path)
 
     @pytest.mark.asyncio
-    async def test_liststatus_empty_dir(self, fs, tmp_dir_path):
+    async def test_liststatus_empty_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
     @pytest.mark.asyncio
-    async def test_iterstatus_non_existent_dir(self, fs, tmp_dir_path):
+    async def test_iterstatus_non_existent_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         path = tmp_dir_path / "nested"
 
         cm = fs.iterstatus(path)
@@ -192,7 +209,9 @@ class TestLocalFileSystem:
                 pass
 
     @pytest.mark.asyncio
-    async def test_iterstatus_broken_directory_link(self, fs, tmp_dir_path):
+    async def test_iterstatus_broken_directory_link(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         path = tmp_dir_path / "nested"
         os.symlink("nonexisting", path, target_is_directory=True)
 
@@ -202,7 +221,9 @@ class TestLocalFileSystem:
                 pass
 
     @pytest.mark.asyncio
-    async def test_iterstatus_broken_entry_link(self, fs, tmp_dir_path):
+    async def test_iterstatus_broken_entry_link(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         path = tmp_dir_path / "nested"
         os.symlink("nonexisting", path)
 
@@ -211,13 +232,13 @@ class TestLocalFileSystem:
                 await it.__anext__()
 
     @pytest.mark.asyncio
-    async def test_rm_non_existent(self, fs, tmp_dir_path):
+    async def test_rm_non_existent(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         path = tmp_dir_path / "nested"
         with pytest.raises(FileNotFoundError):
             await fs.remove(path)
 
     @pytest.mark.asyncio
-    async def test_rm_empty_dir(self, fs, tmp_dir_path):
+    async def test_rm_empty_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
         await fs.mkdir(path)
@@ -240,7 +261,7 @@ class TestLocalFileSystem:
         assert statuses == []
 
     @pytest.mark.asyncio
-    async def test_rm_dir(self, fs, tmp_dir_path):
+    async def test_rm_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         expected_path = Path("nested")
         dir_path = tmp_dir_path / expected_path
         file_path = dir_path / "file"
@@ -268,7 +289,7 @@ class TestLocalFileSystem:
         assert statuses == []
 
     @pytest.mark.asyncio
-    async def test_rm_file(self, fs, tmp_dir_path):
+    async def test_rm_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
 
@@ -294,7 +315,7 @@ class TestLocalFileSystem:
         assert statuses == []
 
     @pytest.mark.asyncio
-    async def test_rm_symlink_to_dir(self, fs, tmp_dir_path):
+    async def test_rm_symlink_to_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         dir_path = tmp_dir_path / "dir"
         await fs.mkdir(dir_path)
         link_path = tmp_dir_path / "link"
@@ -332,7 +353,9 @@ class TestLocalFileSystem:
         ]
 
     @pytest.mark.asyncio
-    async def test_get_filestatus_file(self, fs, tmp_dir_path):
+    async def test_get_filestatus_file(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
 
@@ -354,7 +377,7 @@ class TestLocalFileSystem:
         await fs.remove(expected_file_path)
 
     @pytest.mark.asyncio
-    async def test_get_filestatus_dir(self, fs, tmp_dir_path):
+    async def test_get_filestatus_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
 
@@ -377,20 +400,26 @@ class TestLocalFileSystem:
 
     # helper methods for working with sets of statuses
     @classmethod
-    def statuses_get(cls, statuses, path):
+    def statuses_get(cls, statuses: Iterable[FileStatus], path: PurePath) -> FileStatus:
         return next(st for st in statuses if st.path == path)
 
     @classmethod
-    def statuses_add(cls, statuses, status):
+    def statuses_add(
+        cls, statuses: Set[FileStatus], status: FileStatus
+    ) -> Set[FileStatus]:
         return statuses | {status}
 
     @classmethod
-    def statuses_drop(cls, statuses, path):
+    def statuses_drop(
+        cls, statuses: Iterable[FileStatus], path: PurePath
+    ) -> Set[FileStatus]:
         return set(filter(lambda st: st.path != path, statuses))
 
     @classmethod
-    def statuses_rename(cls, statuses, old_path, new_path):
-        def rename(status):
+    def statuses_rename(
+        cls, statuses: Iterable[FileStatus], old_path: PurePath, new_path: PurePath
+    ) -> Set[FileStatus]:
+        def rename(status: FileStatus) -> FileStatus:
             if status.path == old_path:
                 return FileStatus(
                     path=new_path,
@@ -405,7 +434,9 @@ class TestLocalFileSystem:
         return set(map(rename, statuses))
 
     @pytest.mark.asyncio
-    async def test_rename_file_same_dir(self, fs, tmp_dir_path):
+    async def test_rename_file_same_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         old_name = PurePath("old")
         new_name = PurePath("new")
         payload = b"test"
@@ -431,7 +462,9 @@ class TestLocalFileSystem:
         await fs.remove(new_path)
 
     @pytest.mark.asyncio
-    async def test_rename_file_different_dir(self, fs, tmp_dir_path):
+    async def test_rename_file_different_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         old_name = PurePath("old")
         subdir = PurePath("nested")
         new_name = PurePath("new")
@@ -454,6 +487,8 @@ class TestLocalFileSystem:
 
         statuses = set(await fs.liststatus(tmp_dir_path))
         new_subdir_status = self.statuses_get(statuses, subdir)
+        assert new_subdir_status.modification_time is not None
+        assert old_subdir_status.modification_time is not None
         assert (
             new_subdir_status.modification_time >= old_subdir_status.modification_time
         )
@@ -469,7 +504,9 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_file_nonexistent_dir(self, fs, tmp_dir_path):
+    async def test_rename_file_nonexistent_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         old_name = PurePath("old")
         subdir = PurePath("nested")
         new_name = PurePath("new")
@@ -495,7 +532,7 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_file_to_dir(self, fs, tmp_dir_path):
+    async def test_rename_file_to_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         old_name = PurePath("old")
         subdir = PurePath("nested")
         payload = b"test"
@@ -517,15 +554,17 @@ class TestLocalFileSystem:
 
         assert statuses == old_statuses
 
-        statuses = await fs.liststatus(subdir_path)
-        assert statuses == []
+        statuses_list = await fs.liststatus(subdir_path)
+        assert statuses_list == []
 
         async with fs.open(old_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_file_no_file(self, fs, tmp_dir_path):
+    async def test_rename_file_no_file(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         old_name = PurePath("old")
         new_name = PurePath("new")
         payload = b"test"
@@ -549,7 +588,7 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_file_self(self, fs, tmp_dir_path):
+    async def test_rename_file_self(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         name = PurePath("file")
         payload = b"test"
         path = tmp_dir_path / name
@@ -570,7 +609,9 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_file_to_existing_file(self, fs, tmp_dir_path):
+    async def test_rename_file_to_existing_file(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         old_name = PurePath("old")
         new_name = PurePath("new")
         old_payload = b"test"
@@ -600,7 +641,9 @@ class TestLocalFileSystem:
             assert real_payload == old_payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_same_dir(self, fs, tmp_dir_path):
+    async def test_rename_dir_same_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         file_name = PurePath("file")
         old_dir = PurePath("old")
         new_dir = PurePath("new")
@@ -632,7 +675,9 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_different_dir(self, fs, tmp_dir_path):
+    async def test_rename_dir_different_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         file_name = PurePath("file")
         old_dir = PurePath("old")
         new_dir = PurePath("new")
@@ -659,6 +704,8 @@ class TestLocalFileSystem:
 
         statuses = set(await fs.liststatus(tmp_dir_path))
         new_subdir_status = self.statuses_get(statuses, nested_dir)
+        assert new_subdir_status.modification_time is not None
+        assert old_subdir_status.modification_time is not None
         assert (
             new_subdir_status.modification_time >= old_subdir_status.modification_time
         )
@@ -679,7 +726,9 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_nonexistent_dir(self, fs, tmp_dir_path):
+    async def test_rename_dir_nonexistent_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         file_name = PurePath("file")
         old_dir = PurePath("old")
         new_dir = PurePath("new")
@@ -713,7 +762,7 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_to_file(self, fs, tmp_dir_path):
+    async def test_rename_dir_to_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         old_dir = PurePath("old")
         new_file = PurePath("new")
         payload = b"test"
@@ -743,7 +792,9 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_to_empty_dir(self, fs, tmp_dir_path):
+    async def test_rename_dir_to_empty_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         file_name = PurePath("file")
         old_dir = PurePath("old")
         new_dir = PurePath("new")
@@ -778,7 +829,9 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_to_nonempty_dir(self, fs, tmp_dir_path):
+    async def test_rename_dir_to_nonempty_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         old_file_name = PurePath("old_file")
         new_file_name = PurePath("new_file")
         old_dir = PurePath("old")
@@ -826,7 +879,9 @@ class TestLocalFileSystem:
             assert real_payload == new_payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_to_ancestor_dir(self, fs, tmp_dir_path):
+    async def test_rename_dir_to_ancestor_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         old_file_name = PurePath("old_file")
         new_file_name = PurePath("new_file")
         old_dir = PurePath("old")
@@ -867,7 +922,9 @@ class TestLocalFileSystem:
             assert real_payload == new_payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_to_descended_dir(self, fs, tmp_dir_path):
+    async def test_rename_dir_to_descended_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
         file_name = PurePath("file")
         old_dir = PurePath("old")
         new_dir = PurePath("new")
@@ -899,7 +956,7 @@ class TestLocalFileSystem:
             assert real_payload == payload
 
     @pytest.mark.asyncio
-    async def test_rename_dir_to_dot(self, fs, tmp_dir_path):
+    async def test_rename_dir_to_dot(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         file_name = PurePath("file")
         old_dir = PurePath("old")
         payload = b"test"

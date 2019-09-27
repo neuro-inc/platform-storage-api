@@ -1,23 +1,30 @@
 import asyncio
 from io import BytesIO
 from time import time as current_time
+from typing import Any, Awaitable, Callable, Dict
 from unittest import mock
 
+import aiohttp
 import pytest
 import yarl
+from neuro_auth_client import User
 
 from platform_storage_api.fs.local import FileStatusType
-from tests.integration.conftest import get_iterstatus_list
+from tests.integration.conftest import ApiConfig, get_iterstatus_list
 
 
 class TestStorageListAndResourceSharing:
-    def file_status_sort(self, file_status):
+    def file_status_sort(self, file_status: Dict[str, Any]) -> Any:
         return file_status["path"]
 
     @pytest.mark.asyncio
     async def test_ls_other_user_data_no_permission(
-        self, server_url, api, client, regular_user_factory, granter
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         user1 = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user1.token}
         dir_url = f"{server_url}/{user1.name}/path/to"
@@ -34,8 +41,12 @@ class TestStorageListAndResourceSharing:
 
     @pytest.mark.asyncio
     async def test_ls_other_user_data_no_permission_issue(
-        self, server_url, api, client, regular_user_factory, granter
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
         # user1 uploads a file
         user1 = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user1.token}
@@ -68,8 +79,13 @@ class TestStorageListAndResourceSharing:
 
     @pytest.mark.asyncio
     async def test_ls_other_user_data_shared_with_files(
-        self, server_url, api, client, regular_user_factory, granter
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        granter: Callable[[str, Any, User], Awaitable[None]],
+    ) -> None:
         user1 = await regular_user_factory()
         headers1 = {"Authorization": "Bearer " + user1.token}
 
@@ -125,8 +141,13 @@ class TestStorageListAndResourceSharing:
 
     @pytest.mark.asyncio
     async def test_ls_other_user_data_exclude_files(
-        self, server_url, api, client, regular_user_factory, granter
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        granter: Callable[[str, Any, User], Awaitable[None]],
+    ) -> None:
         user1 = await regular_user_factory()
         headers1 = {"Authorization": "Bearer " + user1.token}
 
@@ -176,8 +197,13 @@ class TestStorageListAndResourceSharing:
 
     @pytest.mark.asyncio
     async def test_liststatus_other_user_data_two_subdirs(
-        self, server_url, api, client, regular_user_factory, granter
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        granter: Callable[[str, Any, User], Awaitable[None]],
+    ) -> None:
         user1 = await regular_user_factory()
         headers1 = {"Authorization": "Bearer " + user1.token}
 
@@ -251,8 +277,13 @@ class TestStorageListAndResourceSharing:
 
     @pytest.mark.asyncio
     async def test_liststatus_permissions(
-        self, server_url, api, client, regular_user_factory, granter
-    ):
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        granter: Callable[[str, Any, User], Awaitable[None]],
+    ) -> None:
         user1 = await regular_user_factory()
         headers1 = {"Authorization": "Bearer " + user1.token}
 

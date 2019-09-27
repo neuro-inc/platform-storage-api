@@ -38,6 +38,10 @@ spec:
             secretKeyRef:
               name: platformservices-secret
               key: storage_token
+        - name: NP_PERMISSION_EXPIRATION_INTERVAL
+          value: "{{ .Values.NP_PERMISSION_EXPIRATION_INTERVAL }}"
+        - name: NP_PERMISSION_FORGETTING_INTERVAL
+          value: "{{ .Values.NP_PERMISSION_FORGETTING_INTERVAL }}"
         volumeMounts:
         - name: storage
           mountPath: /var/storage
