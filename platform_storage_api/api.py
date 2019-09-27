@@ -497,7 +497,7 @@ class StorageHandler:
         except FileExistsError as e:
             raise _http_bad_request("File exists", errno=e.errno)
         except NotADirectoryError as e:
-            raise _http_bad_request("Predescessor is not a directory", errno=e.errno)
+            raise _http_bad_request("Predecessor is not a directory", errno=e.errno)
         raise web.HTTPCreated
 
     async def _handle_delete(self, storage_path: PurePath) -> web.StreamResponse:

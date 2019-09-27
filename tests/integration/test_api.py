@@ -309,6 +309,7 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "Not a directory"
+            assert payload["errno"] == "ENOTDIR"
 
     @pytest.mark.asyncio
     async def test_mkdirs(
@@ -374,6 +375,7 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "File exists"
+            assert payload["errno"] == "EEXIST"
 
     @pytest.mark.asyncio
     async def test_mkdirs_existent_parent_file(
@@ -395,7 +397,8 @@ class TestStorage:
         async with client.put(dir_url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
-            assert payload["error"] == "Predescessor is not a directory"
+            assert payload["error"] == "Predecessor is not a directory"
+            assert payload["errno"] == "ENOTDIR"
 
     @pytest.mark.asyncio
     async def test_put_target_is_directory(
@@ -416,6 +419,7 @@ class TestStorage:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "Destination is a directory"
+            assert payload["errno"] == "EISDIR"
 
     @pytest.mark.asyncio
     async def test_head_target_is_directory(
