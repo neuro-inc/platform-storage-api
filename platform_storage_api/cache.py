@@ -28,8 +28,8 @@ class PermissionsCache(AbstractPermissionChecker):
         checker: AbstractPermissionChecker,
         *,
         time_factory: TimeFactory = time.monotonic,
-        expiration_interval_s: float = 5.0,
-        forgetting_interval_s: float = 300.0,
+        expiration_interval_s: float = 60.0,
+        forgetting_interval_s: float = 600.0,
     ) -> None:
         self._checker = checker
         self._time_factory = time_factory
