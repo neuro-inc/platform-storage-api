@@ -1,3 +1,4 @@
+import asyncio
 import copy
 from pathlib import PurePath
 from typing import Any, List
@@ -263,6 +264,45 @@ async def test_expired_permissions_tree(
         "read", {"file": ClientAccessSubTreeView("write", {})}
     )
     assert call_log == []
+
+
+@pytest.mark.asyncio
+async def test_expired_permissions_tree_concurrent(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: Any,
+    cache: PermissionsCache,
+    webrequest: Request,
+) -> None:
+    # Warm up the cache
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert tree == ClientAccessSubTreeView(
+        "read", {"file": ClientAccessSubTreeView("write", {})}
+    )
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
+
+    # Expire cached permissions
+    mock_time.time += 101.0
+
+    ready = asyncio.Semaphore(0)
+    start = asyncio.Event()
+
+    async def coro() -> None:
+        ready.release()
+        await start.wait()
+        # Trigger the repeat of the request by get_user_permissions_tree() for child
+        tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder/file"))
+        assert tree == ClientAccessSubTreeView("write", {})
+
+    ntasks = 10
+    tasks = [asyncio.create_task(coro()) for i in range(ntasks)]
+    for i in range(ntasks):
+        await ready.acquire()
+    start.set()
+    await asyncio.gather(*tasks)
+
+    assert call_log == [("tree", P("/bob/folder"))]
 
 
 @pytest.mark.asyncio
