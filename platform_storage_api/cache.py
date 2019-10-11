@@ -92,6 +92,8 @@ class PermissionsCache(AbstractPermissionChecker):
                 tree = cached.tree
                 expired_at = cached.expired_at
                 if expired_at < now:
+                    if not stack:
+                        return None
                     try:
                         tree = await self._checker.get_user_permissions_tree(
                             request, target_path

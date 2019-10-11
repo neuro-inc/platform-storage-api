@@ -365,6 +365,33 @@ async def test_forget_path(
 
 
 @pytest.mark.asyncio
+async def test_forbidden_permissions_tree(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: Any,
+    cache: PermissionsCache,
+    webrequest: Request,
+) -> None:
+    # Warm up the cache
+    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert tree == ClientAccessSubTreeView(
+        "read", {"file": ClientAccessSubTreeView("write", {})}
+    )
+    assert call_log == [("tree", P("/bob/folder"))]
+    call_log.clear()
+
+    # Expire cached permissions
+    mock_time.time += 101.0
+
+    # Forbid permissions
+    del permission_tree.children["bob"]
+
+    with pytest.raises(HTTPNotFound):
+        await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    assert call_log == [("tree", P("/bob/folder"))]
+
+
+@pytest.mark.asyncio
 async def test_cached_path(
     call_log: List[Any], mock_time: Any, cache: PermissionsCache, webrequest: Request
 ) -> None:
