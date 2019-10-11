@@ -55,7 +55,7 @@ class PermissionsCache(AbstractPermissionChecker):
         assert identity
         key = identity, str(target_path)
         expired_at = now + self.expiration_interval_s
-        drop_at = self._time_factory() + self.forgetting_interval_s
+        drop_at = now + self.forgetting_interval_s
         self._cache[key] = PermissionsCacheValue(
             tree=tree, expired_at=expired_at, drop_at=drop_at
         )
