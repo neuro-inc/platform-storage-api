@@ -28,14 +28,19 @@ def _has_permissions(requested: str, permitted: str) -> bool:
 
 class MockPermissionChecker(AbstractPermissionChecker):
     def __init__(
-        self, call_log: List[Any], permission_tree: ClientAccessSubTreeView
+        self,
+        call_log: List[Any],
+        permission_tree: ClientAccessSubTreeView,
+        delay: float = 0.0,
     ) -> None:
         self.call_log = call_log
         self.permission_tree = permission_tree
+        self.delay = delay
 
     async def _get_user_permissions_tree(
         self, request: Request, target_path: PurePath
     ) -> ClientAccessSubTreeView:
+        await asyncio.sleep(self.delay)
         tree = self.permission_tree
         parts = target_path.parts
         assert parts[0] == "/"
@@ -109,6 +114,20 @@ def cache(
 ) -> PermissionsCache:
     return PermissionsCache(
         MockPermissionChecker(call_log, permission_tree),
+        time_factory=mock_time,
+        expiration_interval_s=100.0,
+        forgetting_interval_s=1000.0,
+    )
+
+
+@pytest.fixture
+def slow_cache(
+    call_log: List[Any],
+    permission_tree: ClientAccessSubTreeView,
+    mock_time: TimeFactory,
+) -> PermissionsCache:
+    return PermissionsCache(
+        MockPermissionChecker(call_log, permission_tree, delay=0.5),
         time_factory=mock_time,
         expiration_interval_s=100.0,
         forgetting_interval_s=1000.0,
@@ -271,11 +290,11 @@ async def test_expired_permissions_tree_concurrent(
     call_log: List[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
-    cache: PermissionsCache,
+    slow_cache: PermissionsCache,
     webrequest: Request,
 ) -> None:
     # Warm up the cache
-    tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
+    tree = await slow_cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
     assert tree == ClientAccessSubTreeView(
         "read", {"file": ClientAccessSubTreeView("write", {})}
     )
@@ -292,7 +311,9 @@ async def test_expired_permissions_tree_concurrent(
         ready.release()
         await start.wait()
         # Trigger the repeat of the request by get_user_permissions_tree() for child
-        tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder/file"))
+        tree = await slow_cache.get_user_permissions_tree(
+            webrequest, P("/bob/folder/file")
+        )
         assert tree == ClientAccessSubTreeView("write", {})
 
     ntasks = 10
