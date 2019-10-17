@@ -2,7 +2,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path, PurePath
-from typing import IO, AsyncIterator, Iterable, Iterator, Set
+from typing import AsyncIterator, Iterable, Iterator, Set
 
 import pytest
 
@@ -38,11 +38,11 @@ class TestLocalFileSystem:
             yield Path(d)
 
     @pytest.fixture
-    def tmp_file(self, tmp_dir_path: Path) -> Iterator[IO[str]]:
+    def tmp_file_path(self, tmp_dir_path: Path) -> Iterator[Path]:
         # although blocking, this is fine for tests
-        with tempfile.NamedTemporaryFile(dir=tmp_dir_path) as f:  # type: ignore
+        with tempfile.NamedTemporaryFile(dir=tmp_dir_path) as f:
             f.flush()
-            yield f
+            yield Path(f.name)
 
     @pytest.fixture
     async def fs(self) -> AsyncIterator[FileSystem]:
@@ -51,21 +51,21 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_open_empty_file_for_reading(
-        self, fs: FileSystem, tmp_file: Path
+        self, fs: FileSystem, tmp_file_path: Path
     ) -> None:
-        async with fs.open(Path(tmp_file.name)) as f:
+        async with fs.open(tmp_file_path) as f:
             payload = await f.read()
             assert not payload
 
     @pytest.mark.asyncio
-    async def test_open_for_writing(self, fs: FileSystem, tmp_file: Path) -> None:
+    async def test_open_for_writing(self, fs: FileSystem, tmp_file_path: Path) -> None:
         expected_payload = b"test"
 
-        async with fs.open(Path(tmp_file.name), "wb") as f:
+        async with fs.open(tmp_file_path, "wb") as f:
             await f.write(expected_payload)
             await f.flush()
 
-        async with fs.open(Path(tmp_file.name), "rb") as f:
+        async with fs.open(tmp_file_path, "rb") as f:
             payload = await f.read()
             assert payload == expected_payload
 
@@ -91,10 +91,10 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_listdir(
-        self, fs: FileSystem, tmp_dir_path: Path, tmp_file: IO[str]
+        self, fs: FileSystem, tmp_dir_path: Path, tmp_file_path: Path
     ) -> None:
         files = await fs.listdir(tmp_dir_path)
-        assert files == [Path(tmp_file.name)]
+        assert files == [tmp_file_path]
 
     @pytest.mark.asyncio
     async def test_listdir_empty(self, fs: FileSystem, tmp_dir_path: Path) -> None:
@@ -122,10 +122,10 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_liststatus_single_empty_file(
-        self, fs: FileSystem, tmp_dir_path: Path, tmp_file: IO[str]
+        self, fs: FileSystem, tmp_dir_path: Path, tmp_file_path: Path
     ) -> None:
-        expected_path = Path(Path(tmp_file.name).name)
-        stat = os.stat(tmp_file.name)
+        expected_path = Path(tmp_file_path.name)
+        stat = os.stat(tmp_file_path)
         expected_mtime = int(stat.st_mtime)
 
         statuses = await fs.liststatus(tmp_dir_path)
@@ -140,15 +140,15 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_liststatus_single_file(
-        self, fs: FileSystem, tmp_dir_path: Path, tmp_file: IO[str]
+        self, fs: FileSystem, tmp_dir_path: Path, tmp_file_path: Path
     ) -> None:
-        expected_path = Path(Path(tmp_file.name).name)
+        expected_path = Path(tmp_file_path.name)
         expected_payload = b"test"
         expected_size = len(expected_payload)
-        async with fs.open(Path(tmp_file.name), "wb") as f:
+        async with fs.open(tmp_file_path, "wb") as f:
             await f.write(expected_payload)
             await f.flush()
-        stat = os.stat(tmp_file.name)
+        stat = os.stat(tmp_file_path)
         expected_mtime = int(stat.st_mtime)
 
         statuses = await fs.liststatus(tmp_dir_path)

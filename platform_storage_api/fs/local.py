@@ -10,15 +10,10 @@ from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, List, Optional, Type, cast
+from typing import Any, List, Optional, Type, cast
 
 import aiofiles
 
-
-if TYPE_CHECKING:
-    _FSBase = AbstractAsyncContextManager["FileSystem"]
-else:
-    _FSBase = AbstractAsyncContextManager
 
 logger = logging.getLogger()
 
@@ -77,7 +72,7 @@ class FileStatus:
         return replace(self, permission=permission)
 
 
-class FileSystem(_FSBase):
+class FileSystem(AbstractAsyncContextManager):  # type: ignore
     @classmethod
     def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
         if type_ == StorageType.LOCAL:
