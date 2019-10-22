@@ -51,7 +51,7 @@ spec:
       {{- end }}
       volumes:
         - name: storage
-          {- if .Values.NP_STORAGE_PVC_CLAIM_NAME }}
+          {{- if .Values.NP_STORAGE_PVC_CLAIM_NAME }}
           persistentVolumeClaim:
             claimName: {{ .Values.NP_STORAGE_PVC_CLAIM_NAME }}
           {{- else }}
