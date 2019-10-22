@@ -51,9 +51,14 @@ spec:
       {{- end }}
       volumes:
         - name: storage
+          {- if .Values.NP_STORAGE_PVC_CLAIM_NAME }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.NP_STORAGE_PVC_CLAIM_NAME }}
+          {{- else }}
           nfs:
             server: {{ .Values.NP_STORAGE_NFS_SERVER }}
             path: {{ .Values.NP_STORAGE_NFS_PATH }}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service
