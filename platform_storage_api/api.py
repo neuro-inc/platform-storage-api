@@ -26,6 +26,7 @@ from aiohttp import web
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
+from platform_logging import init_logging
 
 from .cache import PermissionsCache
 from .config import Config
@@ -645,13 +646,6 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     logger.info("Storage API has been initialized, ready to serve.")
 
     return app
-
-
-def init_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
 
 
 def main() -> None:

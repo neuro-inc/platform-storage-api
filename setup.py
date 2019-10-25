@@ -9,6 +9,7 @@ install_requires = (
     "cchardet==2.1.4",
     "neuro_auth_client==1.0.10",
     "uvloop==0.13.0",
+    "platform-logging==0.3",
 )
 
 setup(
