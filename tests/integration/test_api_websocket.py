@@ -31,12 +31,12 @@ def ws_request(
 
 
 def parse_ws_response(resp: bytes) -> Dict[str, Any]:
-    hsize, = struct.unpack("!I", resp[:4])
+    (hsize,) = struct.unpack("!I", resp[:4])
     return cbor.loads(resp[4:hsize])
 
 
 def get_ws_response_data(resp: bytes) -> bytes:
-    hsize, = struct.unpack("!I", resp[:4])
+    (hsize,) = struct.unpack("!I", resp[:4])
     return resp[hsize:]
 
 

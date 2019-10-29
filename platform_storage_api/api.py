@@ -26,6 +26,7 @@ from aiohttp import web
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
+
 from platform_logging import init_logging
 
 from .cache import PermissionsCache
@@ -296,7 +297,7 @@ class StorageHandler:
                     await ws.close(code=aiohttp.WSCloseCode.UNSUPPORTED_DATA)
                     break
                 try:
-                    hsize, = struct.unpack("!I", msg.data[:4])
+                    (hsize,) = struct.unpack("!I", msg.data[:4])
                     payload = cbor.loads(msg.data[4:hsize])
                     op = payload["op"]
                     reqid = payload["id"]
