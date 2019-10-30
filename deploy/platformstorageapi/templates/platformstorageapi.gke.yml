@@ -39,9 +39,9 @@ spec:
               name: platformservices-secret
               key: storage_token
         - name: NP_PERMISSION_EXPIRATION_INTERVAL
-          value: {{ .Values.NP_PERMISSION_EXPIRATION_INTERVAL }}
+          value: "{{ .Values.NP_PERMISSION_EXPIRATION_INTERVAL }}"
         - name: NP_PERMISSION_FORGETTING_INTERVAL
-          value: {{ .Values.NP_PERMISSION_FORGETTING_INTERVAL }}
+          value: "{{ .Values.NP_PERMISSION_FORGETTING_INTERVAL }}"
         volumeMounts:
         - name: storage
           mountPath: /var/storage
@@ -51,9 +51,14 @@ spec:
       {{- end }}
       volumes:
         - name: storage
+          {{- if .Values.NP_STORAGE_PVC_CLAIM_NAME }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.NP_STORAGE_PVC_CLAIM_NAME }}
+          {{- else }}
           nfs:
             server: {{ .Values.NP_STORAGE_NFS_SERVER }}
             path: {{ .Values.NP_STORAGE_NFS_PATH }}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service

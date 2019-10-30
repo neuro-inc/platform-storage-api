@@ -81,8 +81,6 @@ class PermissionChecker(AbstractPermissionChecker):
     async def _get_user_from_request(self, request: web.Request) -> User:
         try:
             user_name = await check_authorized(request)
-        except ValueError:
-            raise web.HTTPBadRequest()
         except web.HTTPUnauthorized:
             self._raise_unauthorized()
         return User(name=user_name)

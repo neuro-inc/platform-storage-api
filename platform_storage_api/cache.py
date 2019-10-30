@@ -1,6 +1,7 @@
+import asyncio
 import collections
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PurePath
 from typing import Callable, Optional, Tuple
 
@@ -15,11 +16,12 @@ TimeFactory = Callable[[], float]
 PermissionsCacheKey = Tuple[str, str]  # identity, path
 
 
-@dataclass(frozen=True)
+@dataclass
 class PermissionsCacheValue:
     tree: ClientAccessSubTreeView
     expired_at: float
     drop_at: float
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 class PermissionsCache(AbstractPermissionChecker):
@@ -28,8 +30,8 @@ class PermissionsCache(AbstractPermissionChecker):
         checker: AbstractPermissionChecker,
         *,
         time_factory: TimeFactory = time.monotonic,
-        expiration_interval_s: float = 5.0,
-        forgetting_interval_s: float = 300.0,
+        expiration_interval_s: float = 60.0,
+        forgetting_interval_s: float = 600.0,
     ) -> None:
         self._checker = checker
         self._time_factory = time_factory
@@ -53,7 +55,11 @@ class PermissionsCache(AbstractPermissionChecker):
         assert identity
         key = identity, str(target_path)
         expired_at = now + self.expiration_interval_s
-        self._add_to_cache(key, tree, expired_at)
+        drop_at = now + self.forgetting_interval_s
+        self._cache[key] = PermissionsCacheValue(
+            tree=tree, expired_at=expired_at, drop_at=drop_at
+        )
+        self._cache.move_to_end(key)
         return tree
 
     async def _get_user_permissions_tree_cached(
@@ -80,18 +86,24 @@ class PermissionsCache(AbstractPermissionChecker):
         tree = cached.tree
         expired_at = cached.expired_at
         now = self._time_factory()
+        self._update_cache(key, cached)
         if expired_at < now:
-            if not stack:
-                return None
-            try:
-                tree = await self._checker.get_user_permissions_tree(
-                    request, target_path
-                )
-            except web.HTTPNotFound:
-                self._cache.pop(key, None)
-                return None
-            expired_at = now + self.expiration_interval_s
-        self._add_to_cache(key, tree, expired_at)
+            async with cached.lock:
+                tree = cached.tree
+                expired_at = cached.expired_at
+                if expired_at < now:
+                    if not stack:
+                        return None
+                    try:
+                        tree = await self._checker.get_user_permissions_tree(
+                            request, target_path
+                        )
+                    except web.HTTPNotFound:
+                        self._cache.pop(key, None)
+                        return None
+                    expired_at = now + self.expiration_interval_s
+                    cached.tree = tree
+                    cached.expired_at = expired_at
 
         while stack:
             action = tree.action
@@ -104,13 +116,10 @@ class PermissionsCache(AbstractPermissionChecker):
         identity_policy = request.config_dict[IDENTITY_KEY]
         return await identity_policy.identify(request)
 
-    def _add_to_cache(
-        self, key: PermissionsCacheKey, tree: ClientAccessSubTreeView, expired_at: float
+    def _update_cache(
+        self, key: PermissionsCacheKey, cached: PermissionsCacheValue
     ) -> None:
-        drop_at = self._time_factory() + self.forgetting_interval_s
-        self._cache[key] = PermissionsCacheValue(
-            tree=tree, expired_at=expired_at, drop_at=drop_at
-        )
+        cached.drop_at = self._time_factory() + self.forgetting_interval_s
         self._cache.move_to_end(key)
 
     async def check_user_permissions(

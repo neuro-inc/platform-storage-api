@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import struct
 import time
@@ -15,6 +16,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Type,
 )
 
 import aiohttp
@@ -24,6 +26,7 @@ from aiohttp import web
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
+from platform_logging import init_logging
 
 from .cache import PermissionsCache
 from .config import Config
@@ -225,11 +228,8 @@ class StorageHandler:
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
         try:
             await self._storage.store(request.content, storage_path)
-        except IsADirectoryError:
-            return web.json_response(
-                {"error": "Destination is a directory"},
-                status=web.HTTPBadRequest.status_code,
-            )
+        except IsADirectoryError as e:
+            raise _http_bad_request("Destination is a directory", errno=e.errno)
 
         return web.Response(status=201)
 
@@ -293,7 +293,7 @@ class StorageHandler:
                     await ws.close(code=aiohttp.WSCloseCode.UNSUPPORTED_DATA)
                     break
                 try:
-                    hsize, = struct.unpack("!I", msg.data[:4])
+                    (hsize,) = struct.unpack("!I", msg.data[:4])
                     payload = cbor.loads(msg.data[4:hsize])
                     op = payload["op"]
                     reqid = payload["id"]
@@ -445,10 +445,8 @@ class StorageHandler:
             statuses = await self._storage.liststatus(storage_path)
         except FileNotFoundError:
             raise web.HTTPNotFound
-        except NotADirectoryError:
-            return web.json_response(
-                {"error": "Not a directory"}, status=web.HTTPBadRequest.status_code
-            )
+        except NotADirectoryError as e:
+            raise _http_bad_request("Not a directory", errno=e.errno)
         filtered_statuses = self._liststatus_filter(statuses, tree)
         primitive_statuses = {
             "FileStatuses": {
@@ -494,31 +492,24 @@ class StorageHandler:
     async def _handle_mkdirs(self, storage_path: PurePath) -> web.StreamResponse:
         try:
             await self._storage.mkdir(storage_path)
-        except FileExistsError:
-            return web.json_response(
-                {"error": "File exists"}, status=web.HTTPBadRequest.status_code
-            )
-        except NotADirectoryError:
-            return web.json_response(
-                {"error": "Predescessor is not a directory"},
-                status=web.HTTPBadRequest.status_code,
-            )
-        raise web.HTTPCreated()
+        except FileExistsError as e:
+            raise _http_bad_request("File exists", errno=e.errno)
+        except NotADirectoryError as e:
+            raise _http_bad_request("Predecessor is not a directory", errno=e.errno)
+        raise web.HTTPCreated
 
     async def _handle_delete(self, storage_path: PurePath) -> web.StreamResponse:
         try:
             await self._storage.remove(storage_path)
         except FileNotFoundError:
-            raise web.HTTPNotFound()
-        raise web.HTTPNoContent()
+            raise web.HTTPNotFound
+        raise web.HTTPNoContent
 
     async def _handle_rename(
         self, old: PurePath, request: web.Request
     ) -> web.StreamResponse:
         if "destination" not in request.query:
-            return web.json_response(
-                {"error": "No destination"}, status=web.HTTPBadRequest.status_code
-            )
+            raise _http_bad_request("No destination")
         try:
             new = PurePath(request.query["destination"])
             if new.root == "":
@@ -527,23 +518,14 @@ class StorageHandler:
             await self._check_user_permissions(request, new)
             await self._storage.rename(old, new)
         except FileNotFoundError:
-            raise web.HTTPNotFound()
-        except IsADirectoryError:
-            return web.json_response(
-                {"error": "Destination is a directory"},
-                status=web.HTTPBadRequest.status_code,
-            )
-        except NotADirectoryError:
-            return web.json_response(
-                {"error": "Destination is not a directory"},
-                status=web.HTTPBadRequest.status_code,
-            )
-        except OSError:
-            return web.json_response(
-                {"error": "Incorrect destination"},
-                status=web.HTTPBadRequest.status_code,
-            )
-        raise web.HTTPNoContent()
+            raise web.HTTPNotFound
+        except IsADirectoryError as e:
+            raise _http_bad_request("Destination is a directory", errno=e.errno)
+        except NotADirectoryError as e:
+            raise _http_bad_request("Destination is not a directory", errno=e.errno)
+        except OSError as e:
+            raise _http_bad_request("Incorrect destination", errno=e.errno)
+        raise web.HTTPNoContent
 
     @classmethod
     def _convert_filestatus_to_primitive(cls, status: FileStatus) -> Dict[str, Any]:
@@ -568,6 +550,26 @@ class StorageHandler:
         )
 
 
+def _http_exception(
+    error_class: Type[web.HTTPError],
+    message: str,
+    errno: Optional[int] = None,
+    **kwargs: Any,
+) -> web.HTTPError:
+    error_payload: Dict[str, Any] = {"error": message, **kwargs}
+    if errno is not None:
+        if errno in errorcode:
+            error_payload["errno"] = errorcode[errno]
+        else:
+            error_payload["errno"] = errno
+    data = json.dumps(error_payload)
+    return error_class(text=data, content_type="application/json")
+
+
+def _http_bad_request(message: str, **kwargs: Any) -> web.HTTPError:
+    return _http_exception(web.HTTPBadRequest, message, **kwargs)
+
+
 @web.middleware
 async def handle_exceptions(
     request: web.Request,
@@ -576,19 +578,18 @@ async def handle_exceptions(
     try:
         return await handler(request)
     except ValueError as e:
-        payload = {"error": str(e)}
-        return web.json_response(payload, status=web.HTTPBadRequest.status_code)
+        raise _http_bad_request(str(e))
+    except OSError as e:
+        raise _http_bad_request(e.strerror or str(e), errno=e.errno)
     except web.HTTPException:
         raise
     except Exception as e:
         msg_str = (
-            f"Unexpected exception: {str(e)}. " f"Path with query: {request.path_qs}."
+            f"Unexpected exception {e.__class__.__name__}: {str(e)}. "
+            f"Path with query: {request.path_qs}."
         )
         logging.exception(msg_str)
-        payload = {"error": msg_str}
-        return web.json_response(
-            payload, status=web.HTTPInternalServerError.status_code
-        )
+        raise _http_exception(web.HTTPInternalServerError, msg_str)
 
 
 async def create_app(config: Config, storage: Storage) -> web.Application:
@@ -642,13 +643,6 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     logger.info("Storage API has been initialized, ready to serve.")
 
     return app
-
-
-def init_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
 
 
 def main() -> None:
