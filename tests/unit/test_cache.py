@@ -19,12 +19,6 @@ from platform_storage_api.cache import (
 
 P = PurePath
 
-_actions = ("deny", "list", "read", "write", "manage")
-
-
-def _has_permissions(requested: str, permitted: str) -> bool:
-    return _actions.index(requested) <= _actions.index(permitted)
-
 
 class MockPermissionChecker(AbstractPermissionChecker):
     def __init__(
@@ -50,7 +44,7 @@ class MockPermissionChecker(AbstractPermissionChecker):
             if tree is None:
                 tree = ClientAccessSubTreeView(action=action, children={})
                 break
-        if tree.action == "deny":
+        if not tree.can_list():
             raise HTTPNotFound
         return tree
 
@@ -67,7 +61,7 @@ class MockPermissionChecker(AbstractPermissionChecker):
     ) -> None:
         self.call_log.append(("check", target_path))
         tree = await self._get_user_permissions_tree(request, target_path)
-        if not _has_permissions(action, tree.action):
+        if not tree.check_action_allowed(action):
             raise HTTPNotFound
 
 
