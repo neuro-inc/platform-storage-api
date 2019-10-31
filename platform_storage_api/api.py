@@ -20,6 +20,7 @@ from typing import (
 )
 
 import aiohttp
+import aiozipkin
 import cbor
 import uvloop
 from aiohttp import web
@@ -592,6 +593,17 @@ async def handle_exceptions(
         raise _http_exception(web.HTTPInternalServerError, msg_str)
 
 
+async def create_tracer(config: Config) -> aiozipkin.Tracer:
+    endpoint = aiozipkin.create_endpoint(
+        'platformstorageapi',  # the same name as pod prefix on a cluster
+        ipv4=config.server.host,
+        port=config.server.port)
+
+    zipkin_address = config.zipkin.url / 'api/v2/spans'
+    tracer = await aiozipkin.create(str(zipkin_address), endpoint, sample_rate=config.zipkin.sample_rate)
+    return tracer
+
+
 async def create_app(config: Config, storage: Storage) -> web.Application:
     app = web.Application(middlewares=[handle_exceptions])
     app["config"] = config
@@ -639,6 +651,9 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)
+
+    tracer = await create_tracer(config)
+    aiozipkin.setup(app, tracer)
 
     logger.info("Storage API has been initialized, ready to serve.")
 

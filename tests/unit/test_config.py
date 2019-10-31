@@ -37,6 +37,8 @@ class TestConfig:
             "NP_STORAGE_LOCAL_BASE_PATH": "/path/to/dir",
             "NP_STORAGE_AUTH_URL": "http://127.0.0.1/",
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
+            "NP_STORAGE_ZIPKIN_URL": "https://zipkin.io:9411/",
+            "NP_STORAGE_ZIPKIN_SAMPLE_RATE": "0.3",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
@@ -44,6 +46,8 @@ class TestConfig:
         assert config.storage.fs_local_thread_pool_size == 100
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
         assert config.auth.service_token == "hello-token"
+        assert config.zipkin.url == URL("https://zipkin.io:9411/")
+        assert config.zipkin.sample_rate == 0.3
 
     def test_from_environ_custom(self) -> None:
         environ = {
@@ -51,6 +55,8 @@ class TestConfig:
             "NP_STORAGE_LOCAL_THREAD_POOL_SIZE": "123",
             "NP_STORAGE_AUTH_URL": "http://127.0.0.1/",
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
+            "NP_STORAGE_ZIPKIN_URL": "https://zipkin.io:9411/",
+            "NP_STORAGE_ZIPKIN_SAMPLE_RATE": "0.3",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
@@ -58,3 +64,5 @@ class TestConfig:
         assert config.storage.fs_local_thread_pool_size == 123
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
         assert config.auth.service_token == "hello-token"
+        assert config.zipkin.url == URL("https://zipkin.io:9411/")
+        assert config.zipkin.sample_rate == 0.3
