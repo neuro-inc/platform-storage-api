@@ -595,12 +595,15 @@ async def handle_exceptions(
 
 async def create_tracer(config: Config) -> aiozipkin.Tracer:
     endpoint = aiozipkin.create_endpoint(
-        'platformstorageapi',  # the same name as pod prefix on a cluster
+        "platformstorageapi",  # the same name as pod prefix on a cluster
         ipv4=config.server.host,
-        port=config.server.port)
+        port=config.server.port,
+    )
 
-    zipkin_address = config.zipkin.url / 'api/v2/spans'
-    tracer = await aiozipkin.create(str(zipkin_address), endpoint, sample_rate=config.zipkin.sample_rate)
+    zipkin_address = config.zipkin.url / "api/v2/spans"
+    tracer = await aiozipkin.create(
+        str(zipkin_address), endpoint, sample_rate=config.zipkin.sample_rate
+    )
     return tracer
 
 
