@@ -87,7 +87,7 @@ def config(in_docker: bool, admin_token: str) -> Config:
     auth = AuthConfig(
         server_endpoint_url=URL("http://localhost:5003"), service_token=admin_token
     )
-    zipkin = ZipkinConfig("http://localhost:9441", 0)
+    zipkin = ZipkinConfig(URL("http://localhost:9441"), 0)
     return Config(
         server=server_config, storage=storage_config, auth=auth, zipkin=zipkin
     )
