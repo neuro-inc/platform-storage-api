@@ -18,6 +18,12 @@ class ServerConfig:
 
 
 @dataclass(frozen=True)
+class ZipkinConfig:
+    url: URL
+    sample_rate: float
+
+
+@dataclass(frozen=True)
 class AuthConfig:
     server_endpoint_url: URL
     service_token: str = field(repr=False)
@@ -38,6 +44,7 @@ class Config:
     server: ServerConfig
     storage: StorageConfig
     auth: AuthConfig
+    zipkin: ZipkinConfig
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -72,10 +79,16 @@ class EnvironConfigFactory:
         token = self._environ["NP_STORAGE_AUTH_TOKEN"]
         return AuthConfig(server_endpoint_url=url, service_token=token)
 
+    def create_zipkin(self) -> ZipkinConfig:
+        url = URL(self._environ["NP_STORAGE_ZIPKIN_URL"])
+        sample_rate = float(self._environ["NP_STORAGE_ZIPKIN_SAMPLE_RATE"])
+        return ZipkinConfig(url=url, sample_rate=sample_rate)
+
     def create(self) -> Config:
         server_config = self.create_server()
         storage_config = self.create_storage()
         auth_config = self.create_auth()
+        zipkin_config = self.create_zipkin()
         permission_expiration_interval_s: float = float(
             self._environ.get(
                 "NP_PERMISSION_EXPIRATION_INTERVAL",
@@ -92,6 +105,7 @@ class EnvironConfigFactory:
             server=server_config,
             storage=storage_config,
             auth=auth_config,
+            zipkin=zipkin_config,
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )

@@ -42,6 +42,10 @@ spec:
           value: "{{ .Values.NP_PERMISSION_EXPIRATION_INTERVAL }}"
         - name: NP_PERMISSION_FORGETTING_INTERVAL
           value: "{{ .Values.NP_PERMISSION_FORGETTING_INTERVAL }}"
+        - name: NP_STORAGE_ZIPKIN_URL
+          value: {{ .Values.NP_STORAGE_ZIPKIN_URL }}
+        - name: NP_STORAGE_ZIPKIN_SAMPLE_RATE
+          value: "{{ .Values.NP_STORAGE_ZIPKIN_SAMPLE_RATE }}"
         volumeMounts:
         - name: storage
           mountPath: /var/storage
