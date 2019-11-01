@@ -17,6 +17,7 @@ from platform_storage_api.config import (
     EnvironConfigFactory,
     ServerConfig,
     StorageConfig,
+    ZipkinConfig,
 )
 from platform_storage_api.fs.local import FileSystem
 from platform_storage_api.storage import Storage
@@ -86,7 +87,8 @@ def config(in_docker: bool, admin_token: str) -> Config:
     auth = AuthConfig(
         server_endpoint_url=URL("http://localhost:5003"), service_token=admin_token
     )
-    return Config(server=server_config, storage=storage_config, auth=auth)
+    zipkin = ZipkinConfig("http://localhost:9441", 0)
+    return Config(server=server_config, storage=storage_config, auth=auth, zipkin=zipkin)
 
 
 @pytest.fixture
