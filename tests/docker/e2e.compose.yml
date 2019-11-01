@@ -8,6 +8,11 @@ services:
     - NP_AUTH_API_PORT=5003
     - NP_JWT_SECRET=secret
 
+  zipkin:
+    image: openzipkin/zipkin-slim:latest
+    ports:
+    - "9411:9411"
+
   storage:
     image: platformstorageapi:latest
     ports:
@@ -17,8 +22,11 @@ services:
     - NP_STORAGE_AUTH_URL=http://auth_server:5003
     - NP_STORAGE_AUTH_TOKEN=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6ImFkbWluIn0.ZWS9jwSdIbCxWfihvJfKwMkO27-R1Q5X7fQUwYbuO_E
     - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
+    - NP_STORAGE_ZIPKIN_URL=http://zipkin:9411
+    - NP_STORAGE_ZIPKIN_SAMPLE_RATE=1.0
     links:
     - auth_server
+    - zipkin
 
   test:
     image: platformstorageapi-test
@@ -27,6 +35,9 @@ services:
     - NP_STORAGE_AUTH_URL=http://auth_server:5003
     - NP_STORAGE_AUTH_TOKEN=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6ImFkbWluIn0.ZWS9jwSdIbCxWfihvJfKwMkO27-R1Q5X7fQUwYbuO_E
     - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
+    - NP_STORAGE_ZIPKIN_URL=http://zipkin:9411
+    - NP_STORAGE_ZIPKIN_SAMPLE_RATE=1.0
     links:
     - auth_server
     - storage
+    - zipkin
