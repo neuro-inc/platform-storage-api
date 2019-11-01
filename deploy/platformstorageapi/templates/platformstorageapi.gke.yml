@@ -45,7 +45,7 @@ spec:
         - name: NP_STORAGE_ZIPKIN_URL
           value: {{ .Values.NP_STORAGE_ZIPKIN_URL }}
         - name: NP_STORAGE_ZIPKIN_SAMPLE_RATE
-          value: {{ .Values.NP_STORAGE_ZIPKIN_SAMPLE_RATE }}
+          value: "{{ .Values.NP_STORAGE_ZIPKIN_SAMPLE_RATE }}"
         volumeMounts:
         - name: storage
           mountPath: /var/storage
