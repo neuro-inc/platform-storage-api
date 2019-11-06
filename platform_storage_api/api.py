@@ -611,13 +611,19 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     app = web.Application(middlewares=[handle_exceptions])
     app["config"] = config
 
+    tracer = await create_tracer(config)
+
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
             logger.info("Initializing Auth Client For Storage API")
 
+            trace_config = aiozipkin.make_trace_config(tracer)
+
             auth_client = await exit_stack.enter_async_context(
                 AuthClient(
-                    url=config.auth.server_endpoint_url, token=config.auth.service_token
+                    url=config.auth.server_endpoint_url,
+                    token=config.auth.service_token,
+                    trace_config=trace_config,
                 )
             )
 
@@ -655,7 +661,6 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)
 
-    tracer = await create_tracer(config)
     aiozipkin.setup(app, tracer)
 
     logger.info("Storage API has been initialized, ready to serve.")
