@@ -33,7 +33,7 @@ async def tracing_cm(name: str) -> AsyncIterator[SpanAbc]:
 def trace(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
     @functools.wraps(func)
     async def tracer(*args: Any, **kwargs: Any) -> Any:
-        async with tracing_cm(op=func.__name__):
+        async with tracing_cm(func.__name__):
             return await func(*args, **kwargs)
 
     return tracer
