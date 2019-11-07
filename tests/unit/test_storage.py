@@ -2,11 +2,13 @@ import os
 from io import BytesIO
 from pathlib import Path, PurePath
 from typing import Any
+from unittest import mock
 
 import pytest
 
 from platform_storage_api.fs.local import FileStatusType, FileSystem, LocalFileSystem
 from platform_storage_api.storage import Storage
+from platform_storage_api.trace import CURRENT_TRACER
 
 
 class AsyncBytesIO(BytesIO):
@@ -18,6 +20,10 @@ class AsyncBytesIO(BytesIO):
 
 
 class TestStorage:
+    @pytest.fixture(autouse=True)
+    def setup_tracer(self):
+        CURRENT_TRACER.set(mock.MagicMock())
+
     def test_path_sanitize(
         self, local_fs: FileSystem, local_tmp_dir_path: Path
     ) -> None:
