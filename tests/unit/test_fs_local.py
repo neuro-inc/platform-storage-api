@@ -34,7 +34,7 @@ class TestFileSystem:
 
 class TestLocalFileSystem:
     @pytest.fixture(autouse=True)
-    def setup_tracer(self):
+    def setup_tracer(self) -> None:
         CURRENT_TRACER.set(mock.MagicMock())
 
     @pytest.fixture
