@@ -43,7 +43,7 @@ class TestStorage:
         path = "/path/to/file"
 
         # outstream should be aiohttp.AbstractStreamWriter actually
-        await storage.store(outstream, path)  # type: ignore
+        await storage.store(outstream, path)
 
         real_dir_path = local_tmp_dir_path / "path/to"
         real_file_path = real_dir_path / "file"
@@ -69,7 +69,7 @@ class TestStorage:
 
         instream = AsyncBytesIO()
         # instream should be aiohttp.StreamReader actually
-        await storage.retrieve(instream, "/file")  # type: ignore
+        await storage.retrieve(instream, "/file")
         instream.seek(0)
         payload = await instream.read()
         assert payload == expected_payload

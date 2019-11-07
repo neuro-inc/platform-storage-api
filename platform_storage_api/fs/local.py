@@ -14,6 +14,8 @@ from typing import Any, List, Optional, Type, cast
 
 import aiofiles
 
+from platform_storage_api.trace import trace, tracing_cm
+
 
 logger = logging.getLogger()
 
@@ -161,18 +163,21 @@ class LocalFileSystem(FileSystem):
         path = Path(path)
         return list(path.iterdir())
 
-    async def listdir(self, path: PurePath) -> List[PurePath]:
+    @trace
+    async def listdir(self, path: PurePath) -> List[PurePath]:  # type: ignore
         return await self._loop.run_in_executor(self._executor, self._listdir, path)
 
     # Actual return type is an async version of io.FileIO
     def open(self, path: PurePath, mode: str = "r") -> Any:
-        return aiofiles.open(path, mode=mode, executor=self._executor)
+        async with tracing_cm("open"):
+            return aiofiles.open(path, mode=mode, executor=self._executor)
 
     def _mkdir(self, path: PurePath) -> None:
         # TODO (A Danshyn 04/23/18): consider setting mode
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    async def mkdir(self, path: PurePath) -> None:
+    @trace
+    async def mkdir(self, path: PurePath) -> None:  # type: ignore
         await self._loop.run_in_executor(self._executor, self._mkdir, path)
 
     @classmethod
@@ -201,7 +206,8 @@ class LocalFileSystem(FileSystem):
                 statuses.append(status)
         return statuses
 
-    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+    @trace
+    async def liststatus(self, path: PurePath) -> List[FileStatus]:  # type: ignore
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
         return await self._loop.run_in_executor(self._executor, self._scandir, path)
 
@@ -209,7 +215,8 @@ class LocalFileSystem(FileSystem):
     def _get_file_or_dir_status(cls, path: PurePath) -> FileStatus:
         return cls._create_filestatus(path, basename_only=False)
 
-    async def get_filestatus(self, path: PurePath) -> FileStatus:
+    @trace
+    async def get_filestatus(self, path: PurePath) -> FileStatus:  # type: ignore
         return await self._loop.run_in_executor(
             self._executor, self._get_file_or_dir_status, path
         )
@@ -252,7 +259,8 @@ class LocalFileSystem(FileSystem):
         else:
             concrete_path.unlink()
 
-    async def remove(self, path: PurePath) -> None:
+    @trace
+    async def remove(self, path: PurePath) -> None:  # type: ignore
         await self._loop.run_in_executor(self._executor, self._remove, path)
 
     def _rename(self, old: PurePath, new: PurePath) -> None:
@@ -260,7 +268,8 @@ class LocalFileSystem(FileSystem):
         concrete_new_path = Path(new)
         concrete_old_path.rename(concrete_new_path)
 
-    async def rename(self, old: PurePath, new: PurePath) -> None:
+    @trace
+    async def rename(self, old: PurePath, new: PurePath) -> None:  # type: ignore
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
 
 
@@ -275,7 +284,9 @@ async def copy_streams(
     It is assumed that stream implementations would handle retries themselves.
     """
     while True:
-        chunk = await outstream.read(chunk_size)
+        async with tracing_cm("recv_chunk"):
+            chunk = await outstream.read(chunk_size)
         if not chunk:
             break
-        await instream.write(chunk)
+        async with tracing_cm("send_chunk"):
+            await instream.write(chunk)

@@ -34,6 +34,7 @@ from .config import Config
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
+from .trace import store_span_middleware
 
 
 uvloop.install()
@@ -434,7 +435,7 @@ class StorageHandler:
 
         response = self._create_response(fstat)
         await response.prepare(request)
-        await self._storage.retrieve(response, storage_path)  # type: ignore
+        await self._storage.retrieve(response, storage_path)
         await response.write_eof()
 
         return response
@@ -662,6 +663,7 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     app.add_subapp("/api/v1", api_v1_app)
 
     aiozipkin.setup(app, tracer)
+    app.middlewares.append(store_span_middleware)
 
     logger.info("Storage API has been initialized, ready to serve.")
 
