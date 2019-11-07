@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import contextlib
 import enum
 import errno
 import logging
@@ -168,9 +169,11 @@ class LocalFileSystem(FileSystem):
         return await self._loop.run_in_executor(self._executor, self._listdir, path)
 
     # Actual return type is an async version of io.FileIO
+    @contextlib.asynccontextmanager
     def open(self, path: PurePath, mode: str = "r") -> Any:
         async with tracing_cm("open"):
-            return aiofiles.open(path, mode=mode, executor=self._executor)
+            async with aiofiles.open(path, mode=mode, executor=self._executor) as f:
+                yield f
 
     def _mkdir(self, path: PurePath) -> None:
         # TODO (A Danshyn 04/23/18): consider setting mode

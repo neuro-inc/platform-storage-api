@@ -1,3 +1,4 @@
+import contextlib
 import os
 from pathlib import PurePath
 from typing import Any, List, Union
@@ -47,30 +48,27 @@ class Storage:
         async with self._fs.open(real_path, "rb") as f:
             await copy_streams(f, instream)
 
+    @contextlib.asynccontextmanager
     async def _open(self, path: Union[PurePath, str]) -> Any:
         real_path = self._resolve_real_path(PurePath(path))
         try:
-            return await self._fs.open(real_path, "rb+")
+            async with self._fs.open(real_path, "rb+") as f:
+                yield f
         except FileNotFoundError:
             await self._fs.mkdir(real_path.parent)
-            return await self._fs.open(real_path, "xb+")
+            async with self._fs.open(real_path, "xb+") as f:
+                yield f
 
     @trace
     async def create(self, path: Union[PurePath, str], size: int) -> None:
-        f = await self._open(path)
-        try:
+        async with self._open(path) as f:
             await f.truncate(size)
-        finally:
-            await f.close()
 
     @trace
     async def write(self, path: Union[PurePath, str], offset: int, data: bytes) -> None:
-        f = await self._open(path)
-        try:
+        async with self._open(path) as f:
             await f.seek(offset)
             await f.write(data)
-        finally:
-            await f.close()
 
     @trace
     async def read(self, path: Union[PurePath, str], offset: int, size: int) -> bytes:
