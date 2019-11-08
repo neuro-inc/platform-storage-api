@@ -23,8 +23,8 @@ async def tracing_cm(name: str) -> AsyncIterator[SpanAbc]:
         child = tracer.new_child(span.context)
     except LookupError:
         child = tracer.new_trace(sampled=False)
+    reset_token = CURRENT_SPAN.set(child)
     try:
-        reset_token = CURRENT_SPAN.set(child)
         with child:
             child.name(name)
             yield child
