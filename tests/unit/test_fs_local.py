@@ -3,6 +3,7 @@ import tempfile
 import uuid
 from pathlib import Path, PurePath
 from typing import AsyncIterator, Iterable, Iterator, Set
+from unittest import mock
 
 import pytest
 
@@ -14,6 +15,7 @@ from platform_storage_api.fs.local import (
     StorageType,
     copy_streams,
 )
+from platform_storage_api.trace import CURRENT_TRACER
 
 
 class TestFileSystem:
@@ -31,6 +33,10 @@ class TestFileSystem:
 
 
 class TestLocalFileSystem:
+    @pytest.fixture(autouse=True)
+    def setup_tracer(self) -> None:
+        CURRENT_TRACER.set(mock.MagicMock())
+
     @pytest.fixture
     def tmp_dir_path(self) -> Iterator[Path]:
         # although blocking, this is fine for tests

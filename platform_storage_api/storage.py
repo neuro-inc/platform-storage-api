@@ -1,3 +1,4 @@
+import contextlib
 import os
 from pathlib import PurePath
 from typing import Any, List, Union
@@ -6,6 +7,7 @@ import aiohttp
 from aiohttp.abc import AbstractStreamWriter
 
 from .fs.local import FileStatus, FileSystem, copy_streams
+from .trace import trace
 
 
 class Storage:
@@ -29,6 +31,7 @@ class Storage:
         normpath = os.path.normpath(str(PurePath("/", path)))
         return PurePath(normpath)
 
+    @trace
     async def store(
         self, outstream: AbstractStreamWriter, path: Union[PurePath, str]
     ) -> None:
@@ -37,6 +40,7 @@ class Storage:
         async with self._fs.open(real_path, "wb") as f:
             await copy_streams(outstream, f)
 
+    @trace
     async def retrieve(
         self, instream: aiohttp.StreamReader, path: Union[PurePath, str]
     ) -> None:
@@ -44,29 +48,29 @@ class Storage:
         async with self._fs.open(real_path, "rb") as f:
             await copy_streams(f, instream)
 
+    @contextlib.asynccontextmanager
     async def _open(self, path: Union[PurePath, str]) -> Any:
         real_path = self._resolve_real_path(PurePath(path))
         try:
-            return await self._fs.open(real_path, "rb+")
+            async with self._fs.open(real_path, "rb+") as f:
+                yield f
         except FileNotFoundError:
             await self._fs.mkdir(real_path.parent)
-            return await self._fs.open(real_path, "xb+")
+            async with self._fs.open(real_path, "xb+") as f:
+                yield f
 
+    @trace
     async def create(self, path: Union[PurePath, str], size: int) -> None:
-        f = await self._open(path)
-        try:
+        async with self._open(path) as f:
             await f.truncate(size)
-        finally:
-            await f.close()
 
+    @trace
     async def write(self, path: Union[PurePath, str], offset: int, data: bytes) -> None:
-        f = await self._open(path)
-        try:
+        async with self._open(path) as f:
             await f.seek(offset)
             await f.write(data)
-        finally:
-            await f.close()
 
+    @trace
     async def read(self, path: Union[PurePath, str], offset: int, size: int) -> bytes:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
@@ -74,22 +78,27 @@ class Storage:
             await f.seek(offset)
             return await f.read(size)
 
+    @trace
     async def liststatus(self, path: Union[PurePath, str]) -> List[FileStatus]:
         real_path = self._resolve_real_path(PurePath(path))
         return await self._fs.liststatus(real_path)
 
+    @trace
     async def get_filestatus(self, path: Union[PurePath, str]) -> FileStatus:
         real_path = self._resolve_real_path(PurePath(path))
         return await self._fs.get_filestatus(real_path)
 
+    @trace
     async def mkdir(self, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path)
 
+    @trace
     async def remove(self, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.remove(real_path)
 
+    @trace
     async def rename(
         self, old: Union[PurePath, str], new: Union[PurePath, str]
     ) -> None:
