@@ -287,9 +287,7 @@ async def copy_streams(
     It is assumed that stream implementations would handle retries themselves.
     """
     while True:
-        async with tracing_cm("recv_chunk"):
-            chunk = await outstream.read(chunk_size)
+        chunk = await outstream.read(chunk_size)
         if not chunk:
             break
-        async with tracing_cm("send_chunk"):
-            await instream.write(chunk)
+        await instream.write(chunk)
