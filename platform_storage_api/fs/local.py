@@ -170,10 +170,10 @@ class LocalFileSystem(FileSystem):
 
     # Actual return type is an async version of io.FileIO
     @contextlib.asynccontextmanager
-    @trace
     async def open(self, path: PurePath, mode: str = "r") -> Any:
-        async with aiofiles.open(path, mode=mode, executor=self._executor) as f:
-            yield f
+        async with tracing_cm("open"):
+            async with aiofiles.open(path, mode=mode, executor=self._executor) as f:
+                yield f
 
     def _mkdir(self, path: PurePath) -> None:
         # TODO (A Danshyn 04/23/18): consider setting mode
