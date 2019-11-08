@@ -19,7 +19,7 @@ setup(
     url="https://github.com/neuromation/platform-storage-api",
     packages=find_packages(),
     install_requires=install_requires,
-    python_requires='>=3.7',
+    python_requires=">=3.7",
     entry_points={
         "console_scripts": "platform-storage-api=platform_storage_api.api:main"
     },
