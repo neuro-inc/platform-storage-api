@@ -45,6 +45,7 @@ class Config:
     storage: StorageConfig
     auth: AuthConfig
     zipkin: ZipkinConfig
+    cluster_name: str
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -89,6 +90,7 @@ class EnvironConfigFactory:
         storage_config = self.create_storage()
         auth_config = self.create_auth()
         zipkin_config = self.create_zipkin()
+        cluster_name = self._environ["NP_CLUSTER_NAME"]
         permission_expiration_interval_s: float = float(
             self._environ.get(
                 "NP_PERMISSION_EXPIRATION_INTERVAL",
@@ -106,6 +108,7 @@ class EnvironConfigFactory:
             storage=storage_config,
             auth=auth_config,
             zipkin=zipkin_config,
+            cluster_name=cluster_name,
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )

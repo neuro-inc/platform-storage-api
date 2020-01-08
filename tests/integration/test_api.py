@@ -679,6 +679,7 @@ class TestGetFileStatus:
         alice: User,
         bob: User,
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
         permission: str,
     ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
@@ -686,7 +687,12 @@ class TestGetFileStatus:
         # Alice shares with Bob file 'file1.txt' with permission P
         await granter(
             bob.name,
-            [{"uri": f"storage://{alice.name}/{self.file1}", "action": permission}],
+            [
+                {
+                    "uri": f"storage://{cluster_name}/{alice.name}/{self.file1}",
+                    "action": permission,
+                }
+            ],
             alice,
         )
 
@@ -716,6 +722,7 @@ class TestGetFileStatus:
         alice: User,
         bob: User,
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
         permission: str,
     ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
@@ -723,7 +730,12 @@ class TestGetFileStatus:
         # Alice shares with Bob file 'dir3' with permission P
         await granter(
             bob.name,
-            [{"uri": f"storage://{alice.name}/{self.dir3}", "action": permission}],
+            [
+                {
+                    "uri": f"storage://{cluster_name}/{alice.name}/{self.dir3}",
+                    "action": permission,
+                }
+            ],
             alice,
         )
 
@@ -771,6 +783,7 @@ class TestGetFileStatus:
         alice: User,
         bob: User,
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
         perm_file: str,
         perm_parent_dir: str,
     ) -> None:
@@ -780,7 +793,12 @@ class TestGetFileStatus:
 
         await granter(
             bob.name,
-            [{"uri": f"storage://{alice.name}/{self.dir3_file3}", "action": perm_file}],
+            [
+                {
+                    "uri": f"storage://{cluster_name}/{alice.name}/{self.dir3_file3}",
+                    "action": perm_file,
+                }
+            ],
             alice,
         )
 
@@ -813,6 +831,7 @@ class TestGetFileStatus:
         alice: User,
         bob: User,
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
         perm_dir: str,
         perm_parent_dir: str,
     ) -> None:
@@ -821,7 +840,12 @@ class TestGetFileStatus:
         # Alice shares with Bob file 'dir3/dir4' with permission P
         await granter(
             bob.name,
-            [{"uri": f"storage://{alice.name}/{self.dir3_dir4}", "action": perm_dir}],
+            [
+                {
+                    "uri": f"storage://{cluster_name}/{alice.name}/{self.dir3_dir4}",
+                    "action": perm_dir,
+                }
+            ],
             alice,
         )
 
@@ -870,6 +894,7 @@ class TestGetFileStatus:
         alice: User,
         bob: User,
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
         perm_dir: str,
         perm_child_dir: str,
     ) -> None:
@@ -878,7 +903,12 @@ class TestGetFileStatus:
         # Alice shares with Bob file 'dir3' with permission P
         await granter(
             bob.name,
-            [{"uri": f"storage://{alice.name}/{self.dir3}", "action": perm_dir}],
+            [
+                {
+                    "uri": f"storage://{cluster_name}/{alice.name}/{self.dir3}",
+                    "action": perm_dir,
+                }
+            ],
             alice,
         )
 
@@ -1130,6 +1160,7 @@ class TestRename:
         server_url: str,
         api: ApiConfig,
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
         client: aiohttp.ClientSession,
         alice: User,
         bob: User,
@@ -1137,7 +1168,9 @@ class TestRename:
     ) -> None:
         await self.put_file(server_url, client, bob, self.file1, self.payload2)
         await granter(
-            alice.name, [{"uri": f"storage://{bob.name}", "action": permission}], bob
+            alice.name,
+            [{"uri": f"storage://{cluster_name}/{bob.name}", "action": permission}],
+            bob,
         )
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         status = await self.get_filestatus(server_url, client, alice, alice, self.file1)
@@ -1166,6 +1199,7 @@ class TestRename:
         server_url: str,
         api: ApiConfig,
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
         client: aiohttp.ClientSession,
         alice: User,
         bob: User,
@@ -1173,7 +1207,9 @@ class TestRename:
     ) -> None:
         await self.put_file(server_url, client, bob, self.file2, self.payload2)
         await granter(
-            alice.name, [{"uri": f"storage://{bob.name}", "action": permission}], bob
+            alice.name,
+            [{"uri": f"storage://{cluster_name}/{bob.name}", "action": permission}],
+            bob,
         )
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         status = await self.get_filestatus(server_url, client, alice, bob, self.file2)
