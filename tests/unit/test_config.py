@@ -39,7 +39,6 @@ class TestConfig:
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
             "NP_STORAGE_ZIPKIN_URL": "https://zipkin.io:9411/",
             "NP_STORAGE_ZIPKIN_SAMPLE_RATE": "0.3",
-            "NP_CLUSTER_NAME": "test-cluster",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
@@ -49,7 +48,7 @@ class TestConfig:
         assert config.auth.service_token == "hello-token"
         assert config.zipkin.url == URL("https://zipkin.io:9411/")
         assert config.zipkin.sample_rate == 0.3
-        assert config.cluster_name == "test-cluster"
+        assert config.cluster_name == ""
 
     def test_from_environ_custom(self) -> None:
         environ = {
