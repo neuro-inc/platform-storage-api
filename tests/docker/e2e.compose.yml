@@ -24,6 +24,7 @@ services:
     - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
     - NP_STORAGE_ZIPKIN_URL=http://zipkin:9411
     - NP_STORAGE_ZIPKIN_SAMPLE_RATE=1.0
+    - NP_CLUSTER_NAME=test-cluster
     links:
     - auth_server
     - zipkin
@@ -37,6 +38,7 @@ services:
     - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
     - NP_STORAGE_ZIPKIN_URL=http://zipkin:9411
     - NP_STORAGE_ZIPKIN_SAMPLE_RATE=1.0
+    - NP_CLUSTER_NAME=test-cluster
     links:
     - auth_server
     - storage
