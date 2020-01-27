@@ -1,6 +1,7 @@
 import contextlib
 import os
-from pathlib import PurePath
+import tempfile
+from pathlib import Path, PurePath
 from typing import Any, List, Union
 
 import aiohttp
@@ -11,9 +12,16 @@ from .trace import trace
 
 
 class Storage:
-    def __init__(self, fs: FileSystem, base_path: Union[PurePath, str]) -> None:
+    def __init__(
+        self,
+        fs: FileSystem,
+        base_path: Union[PurePath, str],
+        *,
+        upload_to_temp: bool = False
+    ) -> None:
         self._fs = fs
         self._base_path = PurePath(base_path)
+        self._upload_to_temp = upload_to_temp
 
         # TODO (A Danshyn 04/23/18): implement StoragePathResolver
 
@@ -37,8 +45,22 @@ class Storage:
     ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
-        async with self._fs.open(real_path, "wb") as f:
-            await copy_streams(outstream, f)
+        if self._upload_to_temp:
+            # Check that the destination is a file
+            async with self._fs.open(real_path, "wb+"):
+                pass
+            with tempfile.NamedTemporaryFile(delete=False) as tmpf:
+                tmp_path = Path(tmpf.name)
+                try:
+                    async with self._fs.open(tmp_path, "wb") as f:
+                        await copy_streams(outstream, f)
+                    tmp_path.replace(real_path)
+                except:  # noqa
+                    tmp_path.unlink()
+                    raise
+        else:
+            async with self._fs.open(real_path, "wb") as f:
+                await copy_streams(outstream, f)
 
     @trace
     async def retrieve(

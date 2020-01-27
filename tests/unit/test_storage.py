@@ -40,9 +40,14 @@ class TestStorage:
         assert PurePath("/") == storage.sanitize_path("/super/../path/../..")
 
     @pytest.mark.asyncio
-    async def test_store(self, local_fs: FileSystem, local_tmp_dir_path: Path) -> None:
+    @pytest.mark.parametrize("upload_to_temp", [False, True])
+    async def test_store(
+        self, local_fs: FileSystem, local_tmp_dir_path: Path, upload_to_temp: bool
+    ) -> None:
         base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
+        storage = Storage(
+            fs=local_fs, base_path=base_path, upload_to_temp=upload_to_temp
+        )
 
         expected_payload = b"test"
         outstream = AsyncBytesIO(expected_payload)

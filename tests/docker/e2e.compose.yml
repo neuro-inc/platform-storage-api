@@ -22,6 +22,7 @@ services:
     - NP_STORAGE_AUTH_URL=http://auth_server:5003
     - NP_STORAGE_AUTH_TOKEN=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6ImFkbWluIn0.ZWS9jwSdIbCxWfihvJfKwMkO27-R1Q5X7fQUwYbuO_E
     - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
+    - NP_STORAGE_UPLOAD_TO_TEMP=1
     - NP_STORAGE_ZIPKIN_URL=http://zipkin:9411
     - NP_STORAGE_ZIPKIN_SAMPLE_RATE=1.0
     - NP_CLUSTER_NAME=test-cluster
@@ -36,6 +37,7 @@ services:
     - NP_STORAGE_AUTH_URL=http://auth_server:5003
     - NP_STORAGE_AUTH_TOKEN=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6ImFkbWluIn0.ZWS9jwSdIbCxWfihvJfKwMkO27-R1Q5X7fQUwYbuO_E
     - NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage
+    - NP_STORAGE_UPLOAD_TO_TEMP=1
     - NP_STORAGE_ZIPKIN_URL=http://zipkin:9411
     - NP_STORAGE_ZIPKIN_SAMPLE_RATE=1.0
     - NP_CLUSTER_NAME=test-cluster

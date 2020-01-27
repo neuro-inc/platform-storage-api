@@ -44,6 +44,7 @@ class TestConfig:
         assert config.server.port == 8080
         assert config.storage.fs_local_base_path == PurePath("/path/to/dir")
         assert config.storage.fs_local_thread_pool_size == 100
+        assert not config.storage.upload_to_temp
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
         assert config.auth.service_token == "hello-token"
         assert config.zipkin.url == URL("https://zipkin.io:9411/")
@@ -54,6 +55,7 @@ class TestConfig:
         environ = {
             "NP_STORAGE_LOCAL_BASE_PATH": "/path/to/dir",
             "NP_STORAGE_LOCAL_THREAD_POOL_SIZE": "123",
+            "NP_STORAGE_UPLOAD_TO_TEMP": "1",
             "NP_STORAGE_AUTH_URL": "http://127.0.0.1/",
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
             "NP_STORAGE_ZIPKIN_URL": "https://zipkin.io:9411/",
@@ -64,6 +66,7 @@ class TestConfig:
         assert config.server.port == 8080
         assert config.storage.fs_local_base_path == PurePath("/path/to/dir")
         assert config.storage.fs_local_thread_pool_size == 123
+        assert config.storage.upload_to_temp
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
         assert config.auth.service_token == "hello-token"
         assert config.zipkin.url == URL("https://zipkin.io:9411/")

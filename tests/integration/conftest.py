@@ -92,7 +92,7 @@ def config(in_docker: bool, admin_token: str, cluster_name: str) -> Config:
 
     server_config = ServerConfig()
     path = PurePath("/tmp/np_storage")
-    storage_config = StorageConfig(fs_local_base_path=path)
+    storage_config = StorageConfig(fs_local_base_path=path, upload_to_temp=True)
     auth = AuthConfig(
         server_endpoint_url=URL("http://localhost:5003"), service_token=admin_token
     )
@@ -146,7 +146,11 @@ async def regular_user_factory(
 
 @pytest.fixture
 async def storage(local_fs: FileSystem, config: Config) -> Storage:
-    return Storage(fs=local_fs, base_path=config.storage.fs_local_base_path)
+    return Storage(
+        fs=local_fs,
+        base_path=config.storage.fs_local_base_path,
+        upload_to_temp=config.storage.upload_to_temp,
+    )
 
 
 @pytest.fixture

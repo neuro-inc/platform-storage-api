@@ -33,6 +33,7 @@ class AuthConfig:
 class StorageConfig:
     fs_local_base_path: PurePath
     fs_local_thread_pool_size: int = 100
+    upload_to_temp: bool = False
 
     @classmethod
     def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "StorageConfig":
@@ -66,9 +67,15 @@ class EnvironConfigFactory:
                 StorageConfig.fs_local_thread_pool_size,
             )
         )
+        upload_to_temp = _parsebool(
+            self._environ.get(
+                "NP_STORAGE_UPLOAD_TO_TEMP", str(StorageConfig.upload_to_temp)
+            )
+        )
         return StorageConfig(
             fs_local_base_path=PurePath(fs_local_base_path),
             fs_local_thread_pool_size=fs_local_thread_pool_size,
+            upload_to_temp=upload_to_temp,
         )
 
     def create_server(self) -> ServerConfig:
@@ -112,3 +119,12 @@ class EnvironConfigFactory:
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
+
+
+def _parsebool(s: str) -> bool:
+    s = s.lower()
+    if s in {"0", "false", "no"}:
+        return False
+    if s in {"1", "true", "yes"}:
+        return True
+    raise ValueError("Required boolean")
