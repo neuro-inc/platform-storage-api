@@ -1,7 +1,7 @@
 import contextlib
 import os
 import tempfile
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from typing import Any, List, Union
 
 import aiohttp
@@ -47,17 +47,12 @@ class Storage:
         await self._fs.mkdir(real_path.parent)
         if self._upload_to_temp:
             # Check that the destination is a file
-            async with self._fs.open(real_path, "wb+"):
-                pass
-            with tempfile.NamedTemporaryFile(delete=False) as tmpf:
-                tmp_path = Path(tmpf.name)
-                try:
-                    async with self._fs.open(tmp_path, "wb") as f:
+            async with self._fs.open(real_path, "wb") as outf:
+                with tempfile.NamedTemporaryFile() as tmpf:
+                    async with self._fs.open(PurePath(tmpf.name), "wb+") as f:
                         await copy_streams(outstream, f)
-                    tmp_path.replace(real_path)
-                except:  # noqa
-                    tmp_path.unlink()
-                    raise
+                        await f.seek(0)
+                        await copy_streams(f, outf)
         else:
             async with self._fs.open(real_path, "wb") as f:
                 await copy_streams(outstream, f)
