@@ -50,16 +50,15 @@ class Storage:
     ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
-        if self._upload_tempdir and (size is None or size > self._chunk_size):
-            # Check that the destination is a file
-            async with self._fs.open(real_path, "wb") as outf:
-                with tempfile.NamedTemporaryFile(dir=self._upload_tempdir) as tmpf:
-                    async with self._fs.open(PurePath(tmpf.name), "wb+") as f:
-                        await copy_streams(outstream, f, self._chunk_size)
-                        await f.seek(0)
-                        await copy_streams(f, outf, self._chunk_size)
-        else:
-            async with self._fs.open(real_path, "wb") as f:
+        # Check that the destination is a file
+        async with self._fs.open(real_path, "wb") as f:
+            if self._upload_tempdir and (size is None or size > self._chunk_size):
+                with tempfile.NamedTemporaryFile(dir=self._upload_tempdir) as tf1:
+                    async with self._fs.open(PurePath(tf1.name), "wb+") as tf2:
+                        await copy_streams(outstream, tf2, self._chunk_size)
+                        await tf2.seek(0)
+                        await copy_streams(tf2, f, self._chunk_size)
+            else:
                 await copy_streams(outstream, f, self._chunk_size)
 
     @trace
