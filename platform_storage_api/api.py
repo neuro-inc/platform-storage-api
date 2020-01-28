@@ -681,7 +681,7 @@ def main() -> None:
     storage = Storage(
         fs,
         config.storage.fs_local_base_path,
-        upload_to_temp=config.storage.upload_to_temp,
+        upload_tempdir=config.storage.upload_tempdir,
     )
 
     async def _init_storage(app: web.Application) -> AsyncIterator[None]:

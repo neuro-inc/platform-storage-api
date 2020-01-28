@@ -27,3 +27,9 @@ async def local_fs() -> AsyncIterator[FileSystem]:
 def local_tmp_dir_path() -> Iterator[Path]:
     with tempfile.TemporaryDirectory() as d:
         yield Path(d)
+
+
+@pytest.fixture
+def upload_tmp_dir_path() -> Iterator[Path]:
+    with tempfile.TemporaryDirectory() as d:
+        yield Path(d)

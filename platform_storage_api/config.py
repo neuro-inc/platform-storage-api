@@ -33,7 +33,7 @@ class AuthConfig:
 class StorageConfig:
     fs_local_base_path: PurePath
     fs_local_thread_pool_size: int = 100
-    upload_to_temp: bool = False
+    upload_tempdir: Optional[PurePath] = None
 
     @classmethod
     def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "StorageConfig":
@@ -61,21 +61,17 @@ class EnvironConfigFactory:
 
     def create_storage(self) -> StorageConfig:
         fs_local_base_path = self._environ["NP_STORAGE_LOCAL_BASE_PATH"]
+        upload_tempdir = self._environ.get("NP_STORAGE_UPLOAD_TEMPDIR")
         fs_local_thread_pool_size = int(
             self._environ.get(
                 "NP_STORAGE_LOCAL_THREAD_POOL_SIZE",
                 StorageConfig.fs_local_thread_pool_size,
             )
         )
-        upload_to_temp = _parsebool(
-            self._environ.get(
-                "NP_STORAGE_UPLOAD_TO_TEMP", str(StorageConfig.upload_to_temp)
-            )
-        )
         return StorageConfig(
             fs_local_base_path=PurePath(fs_local_base_path),
             fs_local_thread_pool_size=fs_local_thread_pool_size,
-            upload_to_temp=upload_to_temp,
+            upload_tempdir=PurePath(upload_tempdir) if upload_tempdir else None,
         )
 
     def create_server(self) -> ServerConfig:
@@ -119,12 +115,3 @@ class EnvironConfigFactory:
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
-
-
-def _parsebool(s: str) -> bool:
-    s = s.lower()
-    if s in {"0", "false", "no"}:
-        return False
-    if s in {"1", "true", "yes"}:
-        return True
-    raise ValueError("Required boolean")

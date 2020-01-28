@@ -31,8 +31,8 @@ spec:
         env:
         - name: NP_STORAGE_LOCAL_BASE_PATH
           value: /var/storage
-        - name: NP_STORAGE_UPLOAD_TO_TEMP
-          value: 1
+        - name: NP_STORAGE_UPLOAD_TEMPDIR
+          value: /tmp/upload
         - name: NP_STORAGE_AUTH_URL
           value: {{ .Values.NP_STORAGE_AUTH_URL }}
         - name: NP_STORAGE_AUTH_TOKEN

@@ -86,13 +86,18 @@ def server_url(in_docker: bool, api: ApiConfig) -> str:
 
 
 @pytest.fixture
-def config(in_docker: bool, admin_token: str, cluster_name: str) -> Config:
+def config(
+    in_docker: bool, admin_token: str, cluster_name: str, upload_tmp_dir_path: str
+) -> Config:
     if in_docker:
         return EnvironConfigFactory().create()
 
     server_config = ServerConfig()
     path = PurePath("/tmp/np_storage")
-    storage_config = StorageConfig(fs_local_base_path=path, upload_to_temp=True)
+    upload_tempdir = PurePath(upload_tmp_dir_path)
+    storage_config = StorageConfig(
+        fs_local_base_path=path, upload_tempdir=upload_tempdir
+    )
     auth = AuthConfig(
         server_endpoint_url=URL("http://localhost:5003"), service_token=admin_token
     )
@@ -149,7 +154,7 @@ async def storage(local_fs: FileSystem, config: Config) -> Storage:
     return Storage(
         fs=local_fs,
         base_path=config.storage.fs_local_base_path,
-        upload_to_temp=config.storage.upload_to_temp,
+        upload_tempdir=config.storage.upload_tempdir,
     )
 
 

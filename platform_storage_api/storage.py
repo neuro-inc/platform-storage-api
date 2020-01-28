@@ -2,7 +2,7 @@ import contextlib
 import os
 import tempfile
 from pathlib import PurePath
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 import aiohttp
 from aiohttp.abc import AbstractStreamWriter
@@ -17,11 +17,11 @@ class Storage:
         fs: FileSystem,
         base_path: Union[PurePath, str],
         *,
-        upload_to_temp: bool = False
+        upload_tempdir: Optional[Union[PurePath, str]] = None
     ) -> None:
         self._fs = fs
         self._base_path = PurePath(base_path)
-        self._upload_to_temp = upload_to_temp
+        self._upload_tempdir = upload_tempdir
 
         # TODO (A Danshyn 04/23/18): implement StoragePathResolver
 
@@ -45,10 +45,10 @@ class Storage:
     ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
-        if self._upload_to_temp:
+        if self._upload_tempdir:
             # Check that the destination is a file
             async with self._fs.open(real_path, "wb") as outf:
-                with tempfile.NamedTemporaryFile() as tmpf:
+                with tempfile.NamedTemporaryFile(dir=self._upload_tempdir) as tmpf:
                     async with self._fs.open(PurePath(tmpf.name), "wb+") as f:
                         await copy_streams(outstream, f)
                         await f.seek(0)
