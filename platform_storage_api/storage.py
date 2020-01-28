@@ -7,7 +7,7 @@ from typing import Any, List, Optional, Union
 import aiohttp
 from aiohttp.abc import AbstractStreamWriter
 
-from .fs.local import FileStatus, FileSystem, copy_streams
+from .fs.local import DEFAULT_CHUNK_SIZE, FileStatus, FileSystem, copy_streams
 from .trace import trace
 
 
@@ -17,11 +17,13 @@ class Storage:
         fs: FileSystem,
         base_path: Union[PurePath, str],
         *,
-        upload_tempdir: Optional[Union[PurePath, str]] = None
+        upload_tempdir: Optional[Union[PurePath, str]] = None,
+        chunk_size: int = DEFAULT_CHUNK_SIZE
     ) -> None:
         self._fs = fs
         self._base_path = PurePath(base_path)
         self._upload_tempdir = upload_tempdir
+        self._chunk_size = chunk_size
 
         # TODO (A Danshyn 04/23/18): implement StoragePathResolver
 
@@ -41,21 +43,24 @@ class Storage:
 
     @trace
     async def store(
-        self, outstream: AbstractStreamWriter, path: Union[PurePath, str]
+        self,
+        outstream: AbstractStreamWriter,
+        path: Union[PurePath, str],
+        size: Optional[int] = None,
     ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path.parent)
-        if self._upload_tempdir:
+        if self._upload_tempdir and (size is None or size > self._chunk_size):
             # Check that the destination is a file
             async with self._fs.open(real_path, "wb") as outf:
                 with tempfile.NamedTemporaryFile(dir=self._upload_tempdir) as tmpf:
                     async with self._fs.open(PurePath(tmpf.name), "wb+") as f:
-                        await copy_streams(outstream, f)
+                        await copy_streams(outstream, f, self._chunk_size)
                         await f.seek(0)
-                        await copy_streams(f, outf)
+                        await copy_streams(f, outf, self._chunk_size)
         else:
             async with self._fs.open(real_path, "wb") as f:
-                await copy_streams(outstream, f)
+                await copy_streams(outstream, f, self._chunk_size)
 
     @trace
     async def retrieve(
@@ -63,7 +68,7 @@ class Storage:
     ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         async with self._fs.open(real_path, "rb") as f:
-            await copy_streams(f, instream)
+            await copy_streams(f, instream, self._chunk_size)
 
     @contextlib.asynccontextmanager
     async def _open(self, path: Union[PurePath, str]) -> Any:

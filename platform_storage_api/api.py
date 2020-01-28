@@ -229,7 +229,9 @@ class StorageHandler:
     ) -> web.Response:
         # TODO (A Danshyn 04/23/18): check aiohttp default limits
         try:
-            await self._storage.store(request.content, storage_path)
+            await self._storage.store(
+                request.content, storage_path, request.content_length
+            )
         except IsADirectoryError as e:
             raise _http_bad_request("Destination is a directory", errno=e.errno)
 
