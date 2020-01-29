@@ -1,7 +1,7 @@
 import contextlib
 import os
 import tempfile
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from typing import Any, List, Optional, Union
 
 import aiohttp
@@ -22,8 +22,13 @@ class Storage:
     ) -> None:
         self._fs = fs
         self._base_path = PurePath(base_path)
-        self._upload_tempdir = upload_tempdir
         self._chunk_size = chunk_size
+
+        if upload_tempdir:
+            self._upload_tempdir: Optional[Path] = Path(upload_tempdir)
+            self._upload_tempdir.mkdir(exist_ok=True)
+        else:
+            self._upload_tempdir = None
 
         # TODO (A Danshyn 04/23/18): implement StoragePathResolver
 

@@ -51,7 +51,10 @@ class TestStorage:
         base_path = local_tmp_dir_path
         upload_tempdir = upload_tmp_dir_path if upload_to_temp else None
         storage = Storage(
-            fs=local_fs, base_path=base_path, upload_tempdir=upload_tempdir
+            fs=local_fs,
+            base_path=base_path,
+            upload_tempdir=upload_tempdir,
+            chunk_size=1,
         )
 
         expected_payload = b"test"

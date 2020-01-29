@@ -45,17 +45,19 @@ class TestApi:
 
 class TestStorage:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("large", [False, True])
     async def test_put_head_get(
         self,
         server_url: str,
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
         api: ApiConfig,
+        large: bool,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
-        payload = b"test"
+        payload = b"large" * 10 ** 6 if large else b"small"
         mtime_min = int(current_time())
 
         async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
