@@ -132,6 +132,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
     async def rename(self, old: PurePath, new: PurePath) -> None:
         pass
 
+    @abc.abstractmethod
+    async def copyfile(self, src_fd: int, dst_fd: int) -> None:
+        pass
+
 
 class LocalFileSystem(FileSystem):
     def __init__(
@@ -274,6 +278,14 @@ class LocalFileSystem(FileSystem):
     @trace
     async def rename(self, old: PurePath, new: PurePath) -> None:  # type: ignore
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
+
+    def _copyfile(self, src_fd: int, dst_fd: int) -> None:
+        size = os.stat(src_fd).st_size
+        os.sendfile(dst_fd, src_fd, 0, size)
+
+    @trace
+    async def copyfile(self, src_fd: int, dst_fd: int) -> None:  # type: ignore
+        await self._loop.run_in_executor(self._executor, self._copyfile, src_fd, dst_fd)
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB

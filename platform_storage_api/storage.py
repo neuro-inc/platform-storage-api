@@ -59,10 +59,10 @@ class Storage:
         async with self._fs.open(real_path, "wb") as f:
             if self._upload_tempdir and (size is None or size > self._chunk_size):
                 with tempfile.NamedTemporaryFile(dir=self._upload_tempdir) as tf1:
-                    async with self._fs.open(PurePath(tf1.name), "wb+") as tf2:
+                    async with self._fs.open(PurePath(tf1.name), "w+b") as tf2:
                         await copy_streams(outstream, tf2, self._chunk_size)
-                        await tf2.seek(0)
-                        await copy_streams(tf2, f, self._chunk_size)
+                        await tf2.flush()
+                        await self._fs.copyfile(tf2.fileno(), f.fileno())
             else:
                 await copy_streams(outstream, f, self._chunk_size)
 
