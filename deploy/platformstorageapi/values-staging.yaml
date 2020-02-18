@@ -1,5 +1,5 @@
-NP_STORAGE_NFS_SERVER: '10.69.59.50'
-NP_STORAGE_NFS_PATH: '/devpremium'
+NP_STORAGE_NFS_SERVER: 'nfs-server.default.svc.cluster.local'
+NP_STORAGE_NFS_PATH: '/'
 IMAGE: ''
 NP_STORAGE_AUTH_URL: http://platformauthapi:8080
 NP_STORAGE_REQUESTS_CPU: "0.1"
