@@ -48,10 +48,8 @@ class PermissionChecker(AbstractPermissionChecker):
 
     def _path_to_uri(self, target_path: PurePath) -> str:
         assert str(target_path)[0] == "/"
-        if self._config.cluster_name:
-            return f"storage://{self._config.cluster_name}{target_path!s}"
-        else:
-            return f"storage:/{target_path!s}"
+        assert self._config.cluster_name
+        return f"storage://{self._config.cluster_name}{target_path!s}"
 
     async def get_user_permissions_tree(
         self, request: web.Request, target_path: PurePath
