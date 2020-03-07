@@ -123,7 +123,7 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
-    async def exists(self, path: PurePath) -> List[FileStatus]:
+    async def exists(self, path: PurePath) -> bool:
         pass
 
     @abc.abstractmethod
