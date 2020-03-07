@@ -230,9 +230,7 @@ class LocalFileSystem(FileSystem):
 
     @trace
     async def exists(self, path: PurePath) -> List[FileStatus]:  # type: ignore
-        return await self._loop.run_in_executor(
-            self._executor, Path(path).exists
-        )
+        return await self._loop.run_in_executor(self._executor, Path(path).exists)
 
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)

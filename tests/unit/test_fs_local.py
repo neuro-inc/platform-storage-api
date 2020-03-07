@@ -371,9 +371,7 @@ class TestLocalFileSystem:
         await fs.remove(expected_file_path)
 
     @pytest.mark.asyncio
-    async def test_exists_file(
-        self, fs: FileSystem, tmp_dir_path: Path
-    ) -> None:
+    async def test_exists_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
 
