@@ -15,8 +15,6 @@ from typing import Any, List, Optional, Type, cast
 
 import aiofiles
 
-from platform_storage_api.trace import trace, tracing_cm
-
 
 logger = logging.getLogger()
 
@@ -168,22 +166,19 @@ class LocalFileSystem(FileSystem):
         path = Path(path)
         return list(path.iterdir())
 
-    @trace
     async def listdir(self, path: PurePath) -> List[PurePath]:  # type: ignore
         return await self._loop.run_in_executor(self._executor, self._listdir, path)
 
     # Actual return type is an async version of io.FileIO
     @contextlib.asynccontextmanager
     async def open(self, path: PurePath, mode: str = "r") -> Any:
-        async with tracing_cm("open"):
-            async with aiofiles.open(path, mode=mode, executor=self._executor) as f:
-                yield f
+        async with aiofiles.open(path, mode=mode, executor=self._executor) as f:
+            yield f
 
     def _mkdir(self, path: PurePath) -> None:
         # TODO (A Danshyn 04/23/18): consider setting mode
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    @trace
     async def mkdir(self, path: PurePath) -> None:  # type: ignore
         await self._loop.run_in_executor(self._executor, self._mkdir, path)
 
@@ -213,7 +208,6 @@ class LocalFileSystem(FileSystem):
                 statuses.append(status)
         return statuses
 
-    @trace
     async def liststatus(self, path: PurePath) -> List[FileStatus]:  # type: ignore
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
         return await self._loop.run_in_executor(self._executor, self._scandir, path)
@@ -222,13 +216,11 @@ class LocalFileSystem(FileSystem):
     def _get_file_or_dir_status(cls, path: PurePath) -> FileStatus:
         return cls._create_filestatus(path, basename_only=False)
 
-    @trace
     async def get_filestatus(self, path: PurePath) -> FileStatus:  # type: ignore
         return await self._loop.run_in_executor(
             self._executor, self._get_file_or_dir_status, path
         )
 
-    @trace
     async def exists(self, path: PurePath) -> bool:
         return await self._loop.run_in_executor(self._executor, Path(path).exists)
 
@@ -270,7 +262,6 @@ class LocalFileSystem(FileSystem):
         else:
             concrete_path.unlink()
 
-    @trace
     async def remove(self, path: PurePath) -> None:  # type: ignore
         await self._loop.run_in_executor(self._executor, self._remove, path)
 
@@ -279,7 +270,6 @@ class LocalFileSystem(FileSystem):
         concrete_new_path = Path(new)
         concrete_old_path.rename(concrete_new_path)
 
-    @trace
     async def rename(self, old: PurePath, new: PurePath) -> None:  # type: ignore
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
 

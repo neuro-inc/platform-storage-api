@@ -89,6 +89,11 @@ class Storage:
         return await self._fs.get_filestatus(real_path)
 
     @trace
+    async def exists(self, path: Union[PurePath, str]) -> FileStatus:
+        real_path = self._resolve_real_path(PurePath(path))
+        return await self._fs.exists(real_path)
+
+    @trace
     async def mkdir(self, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.mkdir(real_path)
