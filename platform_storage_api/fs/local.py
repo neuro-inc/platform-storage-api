@@ -166,7 +166,7 @@ class LocalFileSystem(FileSystem):
         path = Path(path)
         return list(path.iterdir())
 
-    async def listdir(self, path: PurePath) -> List[PurePath]:  # type: ignore
+    async def listdir(self, path: PurePath) -> List[PurePath]:
         return await self._loop.run_in_executor(self._executor, self._listdir, path)
 
     # Actual return type is an async version of io.FileIO
@@ -179,7 +179,7 @@ class LocalFileSystem(FileSystem):
         # TODO (A Danshyn 04/23/18): consider setting mode
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    async def mkdir(self, path: PurePath) -> None:  # type: ignore
+    async def mkdir(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._mkdir, path)
 
     @classmethod
@@ -208,7 +208,7 @@ class LocalFileSystem(FileSystem):
                 statuses.append(status)
         return statuses
 
-    async def liststatus(self, path: PurePath) -> List[FileStatus]:  # type: ignore
+    async def liststatus(self, path: PurePath) -> List[FileStatus]:
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
         return await self._loop.run_in_executor(self._executor, self._scandir, path)
 
@@ -216,7 +216,7 @@ class LocalFileSystem(FileSystem):
     def _get_file_or_dir_status(cls, path: PurePath) -> FileStatus:
         return cls._create_filestatus(path, basename_only=False)
 
-    async def get_filestatus(self, path: PurePath) -> FileStatus:  # type: ignore
+    async def get_filestatus(self, path: PurePath) -> FileStatus:
         return await self._loop.run_in_executor(
             self._executor, self._get_file_or_dir_status, path
         )
@@ -262,7 +262,7 @@ class LocalFileSystem(FileSystem):
         else:
             concrete_path.unlink()
 
-    async def remove(self, path: PurePath) -> None:  # type: ignore
+    async def remove(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path)
 
     def _rename(self, old: PurePath, new: PurePath) -> None:
@@ -270,7 +270,7 @@ class LocalFileSystem(FileSystem):
         concrete_new_path = Path(new)
         concrete_old_path.rename(concrete_new_path)
 
-    async def rename(self, old: PurePath, new: PurePath) -> None:  # type: ignore
+    async def rename(self, old: PurePath, new: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
 
 
