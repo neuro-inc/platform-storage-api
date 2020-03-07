@@ -211,7 +211,7 @@ class StorageHandler:
             # Microoptimization: non-existing items return 404 regardless of
             # object permissions,
             # no need to wait for user permission checks.
-            if not await self._storage.exits(storage_path):
+            if not await self._storage.exists(storage_path):
                 raise web.HTTPNotFound
             await self._check_user_permissions(request, storage_path)
             await self._handle_delete(storage_path)
