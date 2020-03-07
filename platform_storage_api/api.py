@@ -208,6 +208,11 @@ class StorageHandler:
         operation = self._parse_delete_operation(request)
         if operation == StorageOperation.DELETE:
             storage_path: PurePath = self._get_fs_path_from_request(request)
+            # Microoptimization: non-existing items return 404 regardless of
+            # object permissions,
+            # no need to wait for user permission checks.
+            if not await self._storage.exists(storage_path):
+                raise web.HTTPNotFound
             await self._check_user_permissions(request, storage_path)
             await self._handle_delete(storage_path)
         raise ValueError(f"Illegal operation: {operation}")

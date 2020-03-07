@@ -9,6 +9,7 @@ from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.client import ClientAccessSubTreeView
 
 from .config import Config
+from .trace import trace
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,8 @@ class PermissionChecker(AbstractPermissionChecker):
         else:
             return f"storage:/{target_path!s}"
 
-    async def get_user_permissions_tree(
+    @trace
+    async def get_user_permissions_tree(  # type: ignore
         self, request: web.Request, target_path: PurePath
     ) -> ClientAccessSubTreeView:
         username = await self._get_user_from_request(request)
@@ -64,7 +66,8 @@ class PermissionChecker(AbstractPermissionChecker):
             raise web.HTTPNotFound
         return tree.sub_tree
 
-    async def check_user_permissions(
+    @trace
+    async def check_user_permissions(  # type: ignore
         self, request: web.Request, target_path: PurePath, action: str
     ) -> None:
         uri = self._path_to_uri(target_path)
