@@ -125,6 +125,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
+    async def exists(self, path: PurePath) -> List[FileStatus]:
+        pass
+
+    @abc.abstractmethod
     async def remove(self, path: PurePath) -> None:
         pass
 
@@ -222,6 +226,12 @@ class LocalFileSystem(FileSystem):
     async def get_filestatus(self, path: PurePath) -> FileStatus:  # type: ignore
         return await self._loop.run_in_executor(
             self._executor, self._get_file_or_dir_status, path
+        )
+
+    @trace
+    async def exists(self, path: PurePath) -> List[FileStatus]:  # type: ignore
+        return await self._loop.run_in_executor(
+            self._executor, Path(path).exists
         )
 
     def _remove(self, path: PurePath) -> None:

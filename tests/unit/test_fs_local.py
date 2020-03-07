@@ -370,6 +370,38 @@ class TestLocalFileSystem:
 
         await fs.remove(expected_file_path)
 
+    @pytest.mark.asyncio
+    async def test_exists_file(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        file_relative = Path("nested")
+        expected_file_path = tmp_dir_path / file_relative
+
+        payload = b"test"
+        async with fs.open(expected_file_path, mode="wb") as f:
+            await f.write(payload)
+            await f.flush()
+
+        assert await fs.exists(expected_file_path)
+        await fs.remove(expected_file_path)
+
+    @pytest.mark.asyncio
+    async def test_exists_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+        file_relative = Path("nested")
+        expected_file_path = tmp_dir_path / file_relative
+
+        payload = b"test"
+        async with fs.open(expected_file_path, mode="wb") as f:
+            await f.write(payload)
+            await f.flush()
+
+        assert await fs.exists(tmp_dir_path)
+        await fs.remove(expected_file_path)
+
+    @pytest.mark.asyncio
+    async def test_exists_unknown(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+        assert not await fs.exists(Path("unknown-name"))
+
     # helper methods for working with sets of statuses
     @classmethod
     def statuses_get(cls, statuses: Iterable[FileStatus], path: PurePath) -> FileStatus:
