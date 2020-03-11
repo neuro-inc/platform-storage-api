@@ -11,6 +11,7 @@ class ServerConfig:
     host: str = "0.0.0.0"
     port: int = 8080
     name: str = "Storage API"
+    keep_alive_timeout_s: float = 75
 
     @classmethod
     def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "ServerConfig":
@@ -73,7 +74,12 @@ class EnvironConfigFactory:
 
     def create_server(self) -> ServerConfig:
         port = int(self._environ.get("NP_STORAGE_API_PORT", ServerConfig.port))
-        return ServerConfig(port=port)
+        keep_alive_timeout_s = int(
+            self._environ.get(
+                "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT", ServerConfig.keep_alive_timeout_s
+            )
+        )
+        return ServerConfig(port=port, keep_alive_timeout_s=keep_alive_timeout_s)
 
     def create_auth(self) -> AuthConfig:
         url = URL(self._environ["NP_STORAGE_AUTH_URL"])

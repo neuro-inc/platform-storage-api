@@ -48,6 +48,8 @@ spec:
           value: "{{ .Values.NP_STORAGE_ZIPKIN_SAMPLE_RATE }}"
         - name: NP_CLUSTER_NAME
           value: "{{ .Values.NP_CLUSTER_NAME }}"
+        - name: NP_STORAGE_API_KEEP_ALIVE_TIMEOUT
+          value: "{{ .Values.NP_STORAGE_API_KEEP_ALIVE_TIMEOUT | quote }}"
         volumeMounts:
         - name: storage
           mountPath: /var/storage
