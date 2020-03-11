@@ -76,8 +76,7 @@ class EnvironConfigFactory:
         port = int(self._environ.get("NP_STORAGE_API_PORT", ServerConfig.port))
         keep_alive_timeout_s = int(
             self._environ.get(
-                "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT",
-                ServerConfig.keep_alive_timeout_s
+                "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT", ServerConfig.keep_alive_timeout_s
             )
         )
         return ServerConfig(port=port, keep_alive_timeout_s=keep_alive_timeout_s)
