@@ -42,6 +42,7 @@ class TestConfig:
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
+        assert config.server.keep_alive_timeout_s == 75
         assert config.storage.fs_local_base_path == PurePath("/path/to/dir")
         assert config.storage.fs_local_thread_pool_size == 100
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
@@ -59,6 +60,7 @@ class TestConfig:
             "NP_STORAGE_ZIPKIN_URL": "https://zipkin.io:9411/",
             "NP_STORAGE_ZIPKIN_SAMPLE_RATE": "0.3",
             "NP_CLUSTER_NAME": "test-cluster",
+            "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT": "900",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080

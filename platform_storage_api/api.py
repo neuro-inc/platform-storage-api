@@ -614,7 +614,10 @@ async def create_tracer(config: Config) -> aiozipkin.Tracer:
 
 
 async def create_app(config: Config, storage: Storage) -> web.Application:
-    app = web.Application(middlewares=[handle_exceptions])
+    app = web.Application(
+        middlewares=[handle_exceptions],
+        handler_args=dict(keepalive_timeout=config.server.keep_alive_timeout_s)
+    )
     app["config"] = config
 
     tracer = await create_tracer(config)
