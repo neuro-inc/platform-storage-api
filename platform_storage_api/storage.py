@@ -1,13 +1,13 @@
-import contextlib
 import os
+from contextlib import asynccontextmanager
 from pathlib import PurePath
-from typing import Any, AsyncContextManager, AsyncIterator, List, Union
+from typing import Any, AsyncIterator, List, Union
 
 import aiohttp
 from aiohttp.abc import AbstractStreamWriter
 
 from .fs.local import FileStatus, FileSystem, copy_streams
-from .trace import trace
+from .trace import trace, tracing_cm
 
 
 class Storage:
@@ -48,7 +48,7 @@ class Storage:
         async with self._fs.open(real_path, "rb") as f:
             await copy_streams(f, instream)
 
-    @contextlib.asynccontextmanager
+    @asynccontextmanager
     async def _open(self, path: Union[PurePath, str]) -> Any:
         real_path = self._resolve_real_path(PurePath(path))
         try:
@@ -78,12 +78,14 @@ class Storage:
             await f.seek(offset)
             return await f.read(size)
 
-    @trace
+    @asynccontextmanager
     async def iterstatus(
         self, path: Union[PurePath, str]
-    ) -> AsyncContextManager[AsyncIterator[FileStatus]]:
-        real_path = self._resolve_real_path(PurePath(path))
-        return self._fs.iterstatus(real_path)
+    ) -> AsyncIterator[AsyncIterator[FileStatus]]:
+        async with tracing_cm("iterstatus"):
+            real_path = self._resolve_real_path(PurePath(path))
+            async with self._fs.iterstatus(real_path) as it:
+                yield it
 
     @trace
     async def liststatus(self, path: Union[PurePath, str]) -> List[FileStatus]:

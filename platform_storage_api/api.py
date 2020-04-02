@@ -458,7 +458,7 @@ class StorageHandler:
         self, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.Response:
         try:
-            async with await self._storage.iterstatus(storage_path) as statuses:
+            async with self._storage.iterstatus(storage_path) as statuses:
                 filtered_statuses = [
                     fstat async for fstat in self._liststatus_filter(statuses, tree)
                 ]
@@ -483,7 +483,7 @@ class StorageHandler:
             raise web.HTTPNotFound
 
         try:
-            async with await self._storage.iterstatus(storage_path) as statuses:
+            async with self._storage.iterstatus(storage_path) as statuses:
                 response = web.StreamResponse()
                 await response.prepare(request)
                 async for fstat in self._liststatus_filter(statuses, tree):
