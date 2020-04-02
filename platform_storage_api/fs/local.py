@@ -9,6 +9,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
+from itertools import islice
 from pathlib import Path, PurePath
 from types import TracebackType
 from typing import (
@@ -24,6 +25,8 @@ from typing import (
 
 import aiofiles
 
+
+SCANDIR_CHUNK_SIZE = 100
 
 logger = logging.getLogger()
 
@@ -214,16 +217,31 @@ class LocalFileSystem(FileSystem):
                     path, size, modification_time=mod_time
                 )
 
-    @classmethod
-    async def _scandir_iter(cls, dir_iter: Iterator[Any]) -> AsyncIterator[FileStatus]:
-        for entry in dir_iter:
-            yield cls._create_filestatus(PurePath(entry), basename_only=True)
+    async def _iterate_in_chunks(
+        self, it: Iterator[Any], chunk_size: int
+    ) -> AsyncIterator[List[Any]]:
+        done = False
+        while not done:
+            chunk = await self._loop.run_in_executor(
+                self._executor, list, islice(it, 0, chunk_size)
+            )
+            if not chunk:
+                break
+            done = len(chunk) < chunk_size
+            yield chunk
+
+    async def _scandir_iter(self, dir_iter: Iterator[Any]) -> AsyncIterator[FileStatus]:
+        async for chunk in self._iterate_in_chunks(dir_iter, SCANDIR_CHUNK_SIZE):
+            for entry in chunk:
+                yield self._create_filestatus(PurePath(entry), basename_only=True)
 
     @asynccontextmanager
     async def iterstatus(
         self, path: PurePath
     ) -> AsyncIterator[AsyncIterator[FileStatus]]:
-        with os.scandir(path) as dir_iter:
+        with await self._loop.run_in_executor(
+            self._executor, os.scandir, path
+        ) as dir_iter:
             yield self._scandir_iter(dir_iter)
 
     @classmethod

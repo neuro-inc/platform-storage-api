@@ -188,6 +188,35 @@ class TestLocalFileSystem:
         ]
 
     @pytest.mark.asyncio
+    async def test_liststatus_many_files(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        expected = []
+        for i in range(5000):
+            name = f"file-{i}"
+            expected.append(PurePath(name))
+            async with fs.open(tmp_dir_path / name, "wb"):
+                pass
+        statuses = await fs.liststatus(tmp_dir_path)
+        actual = [status.path for status in statuses]
+        assert sorted(actual) == sorted(expected)
+
+    @pytest.mark.asyncio
+    async def test_iterstatus_many_files(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        expected = []
+        for i in range(5000):
+            name = f"file-{i}"
+            expected.append(PurePath(name))
+            async with fs.open(tmp_dir_path / name, "wb"):
+                pass
+        async with fs.iterstatus(tmp_dir_path) as it:
+            statuses = [status async for status in it]
+        actual = [status.path for status in statuses]
+        assert sorted(actual) == sorted(expected)
+
+    @pytest.mark.asyncio
     async def test_liststatus_non_existent_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
