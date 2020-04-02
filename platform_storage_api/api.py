@@ -20,6 +20,7 @@ from typing import (
 )
 
 import aiohttp
+import aiozipkin
 import cbor
 import uvloop
 from aiohttp import web
@@ -27,12 +28,14 @@ from aiohttp.web_request import Request
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
+from platform_logging import init_logging
 
 from .cache import PermissionsCache
 from .config import Config
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
+from .trace import store_span_middleware
 
 
 uvloop.install()
@@ -214,6 +217,11 @@ class StorageHandler:
         operation = self._parse_delete_operation(request)
         if operation == StorageOperation.DELETE:
             storage_path: PurePath = self._get_fs_path_from_request(request)
+            # Microoptimization: non-existing items return 404 regardless of
+            # object permissions,
+            # no need to wait for user permission checks.
+            if not await self._storage.exists(storage_path):
+                raise web.HTTPNotFound
             await self._check_user_permissions(request, storage_path)
             await self._handle_delete(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
@@ -288,12 +296,9 @@ class StorageHandler:
         storage_path: PurePath,
         tree: ClientAccessSubTreeView,
     ) -> web.WebSocketResponse:
-        if tree.action == AuthAction.READ:
-            write = False
-        elif tree.action == AuthAction.WRITE or tree.action == "manage":
-            write = True
-        else:
+        if not tree.can_read():
             raise web.HTTPForbidden
+        write = tree.can_write()
 
         ws = web.WebSocketResponse(max_msg_size=MAX_WS_MESSAGE_SIZE)
         await ws.prepare(request)
@@ -304,7 +309,7 @@ class StorageHandler:
                     await ws.close(code=aiohttp.WSCloseCode.UNSUPPORTED_DATA)
                     break
                 try:
-                    hsize, = struct.unpack("!I", msg.data[:4])
+                    (hsize,) = struct.unpack("!I", msg.data[:4])
                     payload = cbor.loads(msg.data[4:hsize])
                     op = payload["op"]
                     reqid = payload["id"]
@@ -444,7 +449,7 @@ class StorageHandler:
 
         response = self._create_response(fstat)
         await response.prepare(request)
-        await self._storage.retrieve(response, storage_path)  # type: ignore
+        await self._storage.retrieve(response, storage_path)
         await response.write_eof()
 
         return response
@@ -474,7 +479,7 @@ class StorageHandler:
     async def _handle_iterstatus(
         self, request: Request, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.StreamResponse:
-        if tree.action == AuthAction.DENY.value:
+        if not tree.can_list():
             raise web.HTTPNotFound
 
         try:
@@ -499,15 +504,15 @@ class StorageHandler:
     async def _liststatus_filter(
         self, statuses: AsyncIterable[FileStatus], tree: ClientAccessSubTreeView
     ) -> AsyncIterator[FileStatus]:
-        is_list_action = tree.action == AuthAction.LIST.value
+        can_read = tree.can_read()
         async for status in statuses:
             sub_tree = tree.children.get(str(status.path))
             if sub_tree:
                 action = sub_tree.action
-            else:
-                if is_list_action:
-                    continue
+            elif can_read:
                 action = tree.action
+            else:
+                continue
             yield status.with_permission(self._convert_action_to_permission(action))
 
     def _convert_action_to_permission(self, action: str) -> FileStatusPermission:
@@ -630,17 +635,40 @@ async def handle_exceptions(
         raise _http_exception(web.HTTPInternalServerError, msg_str)
 
 
+async def create_tracer(config: Config) -> aiozipkin.Tracer:
+    endpoint = aiozipkin.create_endpoint(
+        "platformstorageapi",  # the same name as pod prefix on a cluster
+        ipv4=config.server.host,
+        port=config.server.port,
+    )
+
+    zipkin_address = config.zipkin.url / "api/v2/spans"
+    tracer = await aiozipkin.create(
+        str(zipkin_address), endpoint, sample_rate=config.zipkin.sample_rate
+    )
+    return tracer
+
+
 async def create_app(config: Config, storage: Storage) -> web.Application:
-    app = web.Application(middlewares=[handle_exceptions])
+    app = web.Application(
+        middlewares=[handle_exceptions],
+        handler_args=dict(keepalive_timeout=config.server.keep_alive_timeout_s),
+    )
     app["config"] = config
+
+    tracer = await create_tracer(config)
 
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
             logger.info("Initializing Auth Client For Storage API")
 
+            trace_config = aiozipkin.make_trace_config(tracer)
+
             auth_client = await exit_stack.enter_async_context(
                 AuthClient(
-                    url=config.auth.server_endpoint_url, token=config.auth.service_token
+                    url=config.auth.server_endpoint_url,
+                    token=config.auth.service_token,
+                    trace_config=trace_config,
                 )
             )
 
@@ -678,16 +706,12 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)
 
+    aiozipkin.setup(app, tracer)
+    app.middlewares.append(store_span_middleware)
+
     logger.info("Storage API has been initialized, ready to serve.")
 
     return app
-
-
-def init_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
 
 
 def main() -> None:

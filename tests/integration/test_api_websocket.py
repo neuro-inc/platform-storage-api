@@ -31,12 +31,12 @@ def ws_request(
 
 
 def parse_ws_response(resp: bytes) -> Dict[str, Any]:
-    hsize, = struct.unpack("!I", resp[:4])
+    (hsize,) = struct.unpack("!I", resp[:4])
     return cbor.loads(resp[4:hsize])
 
 
 def get_ws_response_data(resp: bytes) -> bytes:
-    hsize, = struct.unpack("!I", resp[:4])
+    (hsize,) = struct.unpack("!I", resp[:4])
     return resp[hsize:]
 
 
@@ -473,6 +473,7 @@ class TestStorageWebSocket:
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()
         user2 = await regular_user_factory()
@@ -481,7 +482,9 @@ class TestStorageWebSocket:
         dir_name = f"dir-{uuid.uuid4()}"
 
         await granter(
-            user2.name, [{"uri": f"storage://{user1.name}/", "action": "read"}], user1
+            user2.name,
+            [{"uri": f"storage://{cluster_name}/{user1.name}/", "action": "read"}],
+            user1,
         )
 
         async with client.ws_connect(
@@ -512,7 +515,9 @@ class TestStorageWebSocket:
             )
 
         await granter(
-            user2.name, [{"uri": f"storage://{user1.name}/", "action": "write"}], user1
+            user2.name,
+            [{"uri": f"storage://{cluster_name}/{user1.name}/", "action": "write"}],
+            user1,
         )
 
         async with client.ws_connect(

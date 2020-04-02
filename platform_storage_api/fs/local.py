@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import contextlib
 import enum
 import errno
 import logging
@@ -11,7 +12,6 @@ from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
 from types import TracebackType
 from typing import (
-    TYPE_CHECKING,
     Any,
     AsyncContextManager,
     AsyncIterator,
@@ -24,11 +24,6 @@ from typing import (
 
 import aiofiles
 
-
-if TYPE_CHECKING:
-    _FSBase = AbstractAsyncContextManager["FileSystem"]
-else:
-    _FSBase = AbstractAsyncContextManager
 
 logger = logging.getLogger()
 
@@ -87,7 +82,7 @@ class FileStatus:
         return replace(self, permission=permission)
 
 
-class FileSystem(_FSBase):
+class FileSystem(AbstractAsyncContextManager):  # type: ignore
     @classmethod
     def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
         if type_ == StorageType.LOCAL:
@@ -144,6 +139,10 @@ class FileSystem(_FSBase):
         pass
 
     @abc.abstractmethod
+    async def exists(self, path: PurePath) -> bool:
+        pass
+
+    @abc.abstractmethod
     async def remove(self, path: PurePath) -> None:
         pass
 
@@ -187,8 +186,10 @@ class LocalFileSystem(FileSystem):
         return await self._loop.run_in_executor(self._executor, self._listdir, path)
 
     # Actual return type is an async version of io.FileIO
-    def open(self, path: PurePath, mode: str = "r") -> Any:
-        return aiofiles.open(path, mode=mode, executor=self._executor)
+    @contextlib.asynccontextmanager
+    async def open(self, path: PurePath, mode: str = "r") -> Any:
+        async with aiofiles.open(path, mode=mode, executor=self._executor) as f:
+            yield f
 
     def _mkdir(self, path: PurePath) -> None:
         # TODO (A Danshyn 04/23/18): consider setting mode
@@ -233,6 +234,9 @@ class LocalFileSystem(FileSystem):
         return await self._loop.run_in_executor(
             self._executor, self._get_file_or_dir_status, path
         )
+
+    async def exists(self, path: PurePath) -> bool:
+        return await self._loop.run_in_executor(self._executor, Path(path).exists)
 
     def _remove(self, path: PurePath) -> None:
         concrete_path = Path(path)

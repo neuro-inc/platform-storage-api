@@ -4,11 +4,13 @@ from setuptools import find_packages, setup
 install_requires = (
     "aiodns==2.0.0",
     "aiofiles==0.4.0",
-    "aiohttp==3.6.1",
+    "aiohttp==3.6.2",
+    "aiozipkin==0.6.0",
     "cbor==1.0.0",
-    "cchardet==2.1.4",
-    "neuro_auth_client==1.0.7",
-    "uvloop==0.13.0",
+    "cchardet==2.1.6",
+    "neuro_auth_client==19.10.5",
+    "uvloop==0.14.0",
+    "platform-logging==0.3",
 )
 
 setup(
@@ -17,6 +19,7 @@ setup(
     url="https://github.com/neuromation/platform-storage-api",
     packages=find_packages(),
     install_requires=install_requires,
+    python_requires=">=3.7",
     entry_points={
         "console_scripts": "platform-storage-api=platform_storage_api.api:main"
     },

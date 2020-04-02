@@ -85,6 +85,7 @@ class TestStorageListAndResourceSharing:
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()
         headers1 = {"Authorization": "Bearer " + user1.token}
@@ -113,7 +114,7 @@ class TestStorageListAndResourceSharing:
 
         await granter(
             user2.name,
-            [{"uri": f"storage://{user1.name}/path/", "action": "read"}],
+            [{"uri": f"storage://{cluster_name}/{user1.name}/path/", "action": "read"}],
             user1,
         )
         async with client.get(dir_url, headers=headers2, params=params) as response:
@@ -147,6 +148,7 @@ class TestStorageListAndResourceSharing:
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()
         headers1 = {"Authorization": "Bearer " + user1.token}
@@ -173,10 +175,9 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 404
 
+        root_uri = f"storage://{cluster_name}/{user1.name}"
         await granter(
-            user2.name,
-            [{"uri": f"storage://{user1.name}/path/to/first", "action": "read"}],
-            user1,
+            user2.name, [{"uri": root_uri + "/path/to/first", "action": "read"}], user1,
         )
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
@@ -203,6 +204,7 @@ class TestStorageListAndResourceSharing:
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()
         headers1 = {"Authorization": "Bearer " + user1.token}
@@ -240,14 +242,15 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 404
 
+        root_uri = f"storage://{cluster_name}/{user1.name}"
         await granter(
             user2.name,
-            [{"uri": f"storage://{user1.name}/path/to/first/second", "action": "read"}],
+            [{"uri": root_uri + "/path/to/first/second", "action": "read"}],
             user1,
         )
         await granter(
             user2.name,
-            [{"uri": f"storage://{user1.name}/path/to/first/third", "action": "read"}],
+            [{"uri": root_uri + "/path/to/first/third", "action": "read"}],
             user1,
         )
         async with client.get(
@@ -283,6 +286,7 @@ class TestStorageListAndResourceSharing:
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
         granter: Callable[[str, Any, User], Awaitable[None]],
+        cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()
         headers1 = {"Authorization": "Bearer " + user1.token}
@@ -325,29 +329,18 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 404
 
+        root_uri = f"storage://{cluster_name}/{user1.name}"
+        await granter(
+            user2.name, [{"uri": root_uri + "/path/to/file", "action": "read"}], user1,
+        )
         await granter(
             user2.name,
-            [{"uri": f"storage://{user1.name}/path/to/file", "action": "read"}],
+            [{"uri": root_uri + "/path/to/first/second", "action": "write"}],
             user1,
         )
         await granter(
             user2.name,
-            [
-                {
-                    "uri": f"storage://{user1.name}/path/to/first/second",
-                    "action": "write",
-                }
-            ],
-            user1,
-        )
-        await granter(
-            user2.name,
-            [
-                {
-                    "uri": f"storage://{user1.name}/path/to/first/second/third",
-                    "action": "manage",
-                }
-            ],
+            [{"uri": root_uri + "/path/to/first/second/third", "action": "manage"}],
             user1,
         )
 

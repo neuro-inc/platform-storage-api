@@ -11,10 +11,17 @@ class ServerConfig:
     host: str = "0.0.0.0"
     port: int = 8080
     name: str = "Storage API"
+    keep_alive_timeout_s: float = 75
 
     @classmethod
     def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "ServerConfig":
         return EnvironConfigFactory(environ).create_server()
+
+
+@dataclass(frozen=True)
+class ZipkinConfig:
+    url: URL
+    sample_rate: float
 
 
 @dataclass(frozen=True)
@@ -38,6 +45,8 @@ class Config:
     server: ServerConfig
     storage: StorageConfig
     auth: AuthConfig
+    zipkin: ZipkinConfig
+    cluster_name: str
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -65,17 +74,29 @@ class EnvironConfigFactory:
 
     def create_server(self) -> ServerConfig:
         port = int(self._environ.get("NP_STORAGE_API_PORT", ServerConfig.port))
-        return ServerConfig(port=port)
+        keep_alive_timeout_s = int(
+            self._environ.get(
+                "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT", ServerConfig.keep_alive_timeout_s
+            )
+        )
+        return ServerConfig(port=port, keep_alive_timeout_s=keep_alive_timeout_s)
 
     def create_auth(self) -> AuthConfig:
         url = URL(self._environ["NP_STORAGE_AUTH_URL"])
         token = self._environ["NP_STORAGE_AUTH_TOKEN"]
         return AuthConfig(server_endpoint_url=url, service_token=token)
 
+    def create_zipkin(self) -> ZipkinConfig:
+        url = URL(self._environ["NP_STORAGE_ZIPKIN_URL"])
+        sample_rate = float(self._environ["NP_STORAGE_ZIPKIN_SAMPLE_RATE"])
+        return ZipkinConfig(url=url, sample_rate=sample_rate)
+
     def create(self) -> Config:
         server_config = self.create_server()
         storage_config = self.create_storage()
         auth_config = self.create_auth()
+        zipkin_config = self.create_zipkin()
+        cluster_name = self._environ.get("NP_CLUSTER_NAME", "")
         permission_expiration_interval_s: float = float(
             self._environ.get(
                 "NP_PERMISSION_EXPIRATION_INTERVAL",
@@ -92,6 +113,8 @@ class EnvironConfigFactory:
             server=server_config,
             storage=storage_config,
             auth=auth_config,
+            zipkin=zipkin_config,
+            cluster_name=cluster_name,
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )

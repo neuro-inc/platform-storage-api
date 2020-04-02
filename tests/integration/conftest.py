@@ -7,6 +7,7 @@ from typing import (
     Any,
     AsyncIterable,
     AsyncIterator,
+    Awaitable,
     Callable,
     Dict,
     List,
@@ -27,6 +28,7 @@ from platform_storage_api.config import (
     EnvironConfigFactory,
     ServerConfig,
     StorageConfig,
+    ZipkinConfig,
 )
 from platform_storage_api.fs.local import FileSystem
 from platform_storage_api.storage import Storage
@@ -86,7 +88,7 @@ def server_url(in_docker: bool, api: ApiConfig) -> str:
 
 
 @pytest.fixture
-def config(in_docker: bool, admin_token: str) -> Config:
+def config(in_docker: bool, admin_token: str, cluster_name: str) -> Config:
     if in_docker:
         return EnvironConfigFactory().create()
 
@@ -96,7 +98,14 @@ def config(in_docker: bool, admin_token: str) -> Config:
     auth = AuthConfig(
         server_endpoint_url=URL("http://localhost:5003"), service_token=admin_token
     )
-    return Config(server=server_config, storage=storage_config, auth=auth)
+    zipkin = ZipkinConfig(URL("http://localhost:9441"), 0)
+    return Config(
+        server=server_config,
+        storage=storage_config,
+        auth=auth,
+        zipkin=zipkin,
+        cluster_name=cluster_name,
+    )
 
 
 @pytest.fixture
@@ -112,13 +121,26 @@ _UserFactory = Callable[..., User]
 
 @pytest.fixture
 async def regular_user_factory(
-    auth_client: AuthClient, token_factory: _TokenFactory
+    auth_client: AuthClient,
+    token_factory: _TokenFactory,
+    admin_token: str,
+    granter: Callable[[str, Any, User], Awaitable[None]],
+    cluster_name: str,
 ) -> _UserFactory:
     async def _factory(name: Optional[str] = None) -> User:
         if not name:
             name = str(uuid.uuid4())
-        user = User(name=name)
+        user = User(name=name, cluster_name=cluster_name)
         await auth_client.add_user(user)
+        # Grant permissions to the user home directory
+        headers = auth_client._generate_headers(admin_token)
+        payload = [
+            {"uri": f"storage://{cluster_name}/{name}", "action": "manage"},
+        ]
+        async with auth_client._request(
+            "POST", f"/api/v1/users/{name}/permissions", headers=headers, json=payload
+        ) as p:
+            assert p.status == 201
         return _User(name=user.name, token=token_factory(user.name))
 
     return _factory
@@ -161,8 +183,13 @@ async def granter(auth_client: AuthClient, admin_token: str) -> Any:
     return f
 
 
+@pytest.fixture
+def cluster_name() -> str:
+    return "test-cluster"
+
+
 async def get_iterstatus_list(
-    response_lines: AsyncIterable[bytes]
+    response_lines: AsyncIterable[bytes],
 ) -> List[Dict[str, Any]]:
     return [json.loads(line)["FileStatus"] async for line in response_lines]
 

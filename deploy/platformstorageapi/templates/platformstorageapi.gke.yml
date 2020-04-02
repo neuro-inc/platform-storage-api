@@ -42,6 +42,14 @@ spec:
           value: "{{ .Values.NP_PERMISSION_EXPIRATION_INTERVAL }}"
         - name: NP_PERMISSION_FORGETTING_INTERVAL
           value: "{{ .Values.NP_PERMISSION_FORGETTING_INTERVAL }}"
+        - name: NP_STORAGE_ZIPKIN_URL
+          value: {{ .Values.NP_STORAGE_ZIPKIN_URL }}
+        - name: NP_STORAGE_ZIPKIN_SAMPLE_RATE
+          value: "{{ .Values.NP_STORAGE_ZIPKIN_SAMPLE_RATE }}"
+        - name: NP_CLUSTER_NAME
+          value: "{{ .Values.NP_CLUSTER_NAME }}"
+        - name: NP_STORAGE_API_KEEP_ALIVE_TIMEOUT
+          value: "{{ .Values.NP_STORAGE_API_KEEP_ALIVE_TIMEOUT }}"
         volumeMounts:
         - name: storage
           mountPath: /var/storage
@@ -51,9 +59,14 @@ spec:
       {{- end }}
       volumes:
         - name: storage
+          {{- if .Values.NP_STORAGE_PVC_CLAIM_NAME }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.NP_STORAGE_PVC_CLAIM_NAME }}
+          {{- else }}
           nfs:
             server: {{ .Values.NP_STORAGE_NFS_SERVER }}
             path: {{ .Values.NP_STORAGE_NFS_PATH }}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service
