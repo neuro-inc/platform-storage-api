@@ -478,9 +478,6 @@ class StorageHandler:
     async def _handle_iterstatus(
         self, request: Request, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.StreamResponse:
-        if not tree.can_list():
-            raise web.HTTPNotFound
-
         try:
             async with self._storage.iterstatus(storage_path) as statuses:
                 response = web.StreamResponse()
