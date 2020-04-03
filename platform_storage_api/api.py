@@ -63,7 +63,6 @@ class StorageOperation(str, Enum):
     The CREATE operation handles opening files for writing.
     The OPEN operation handles opening files for reading.
     The LISTSTATUS operation handles non-recursive listing of directories.
-    The ITERSTATUS operation handles streamed non-recursive listing of directories.
     The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     The RENAME operation handles moving of files and directories.
@@ -77,7 +76,6 @@ class StorageOperation(str, Enum):
     CREATE = "CREATE"
     OPEN = "OPEN"
     LISTSTATUS = "LISTSTATUS"
-    ITERSTATUS = "ITERSTATUS"
     GETFILESTATUS = "GETFILESTATUS"
     MKDIRS = "MKDIRS"
     DELETE = "DELETE"
@@ -161,6 +159,10 @@ class StorageHandler:
 
         return self._create_response(fstat)
 
+    def _accepts_ndjson(self, request: web.Request) -> bool:
+        accept = request.headers.get("Accept", "")
+        return "application/x-ndjson" in accept
+
     async def handle_get(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
@@ -172,13 +174,10 @@ class StorageHandler:
             tree = await self._permission_checker.get_user_permissions_tree(
                 request, storage_path
             )
-            return await self._handle_liststatus(storage_path, tree)
-        elif operation == StorageOperation.ITERSTATUS:
-            storage_path = self._get_fs_path_from_request(request)
-            tree = await self._permission_checker.get_user_permissions_tree(
-                request, storage_path
-            )
-            return await self._handle_iterstatus(request, storage_path, tree)
+            if self._accepts_ndjson(request):
+                return await self._handle_iterstatus(request, storage_path, tree)
+            else:
+                return await self._handle_liststatus(storage_path, tree)
         elif operation == StorageOperation.GETFILESTATUS:
             storage_path = self._get_fs_path_from_request(request)
             action = await self._permission_checker.get_user_permissions(
@@ -485,6 +484,7 @@ class StorageHandler:
         try:
             async with self._storage.iterstatus(storage_path) as statuses:
                 response = web.StreamResponse()
+                response.headers["Content-Type"] = "application/x-ndjson"
                 await response.prepare(request)
                 async for fstat in self._liststatus_filter(statuses, tree):
                     stat_dict = {

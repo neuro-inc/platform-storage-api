@@ -171,9 +171,11 @@ class TestStorage:
         async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
             assert response.status == 201
 
-        params = {"op": "ITERSTATUS"}
+        params = {"op": "LISTSTATUS"}
+        headers["Accept"] = "application/x-ndjson"
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 200
+            assert response.headers["Content-Type"] == "application/x-ndjson"
             statuses = await get_iterstatus_list(response.content)
             file_status = statuses[0]
 
@@ -207,7 +209,10 @@ class TestStorage:
         async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
             assert response.status == 201
 
-        async with client.get(dir_url + "?iterstatus", headers=headers) as response:
+        headers["Accept"] = "application/x-ndjson"
+        async with client.get(dir_url + "?liststatus", headers=headers) as response:
+            assert response.status == 200
+            assert response.headers["Content-Type"] == "application/x-ndjson"
             statuses = await get_iterstatus_list(response.content)
             file_status = statuses[0]
 
@@ -230,10 +235,13 @@ class TestStorage:
         regular_user_factory: Callable[[], User],
     ) -> None:
         user = await regular_user_factory()
-        headers = {"Authorization": "Bearer " + user.token}
+        headers = {
+            "Authorization": "Bearer " + user.token,
+            "Accept": "application/x-ndjson",
+        }
         dir_url = f"{server_url}/{user.name}/non-existent"
 
-        params = {"op": "ITERSTATUS"}
+        params = {"op": "LISTSTATUS"}
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 404
 
@@ -252,7 +260,8 @@ class TestStorage:
         async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
             assert response.status == 201
 
-        params = {"op": "ITERSTATUS"}
+        params = {"op": "LISTSTATUS"}
+        headers["Accept"] = "application/x-ndjson"
         async with client.get(url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
