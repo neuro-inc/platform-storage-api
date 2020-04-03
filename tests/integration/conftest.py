@@ -1,9 +1,11 @@
+import json
 import os
 import uuid
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import (
     Any,
+    AsyncIterable,
     AsyncIterator,
     Awaitable,
     Callable,
@@ -184,6 +186,12 @@ async def granter(auth_client: AuthClient, admin_token: str) -> Any:
 @pytest.fixture
 def cluster_name() -> str:
     return "test-cluster"
+
+
+async def get_iterstatus_list(
+    response_lines: AsyncIterable[bytes],
+) -> List[Dict[str, Any]]:
+    return [json.loads(line)["FileStatus"] async for line in response_lines]
 
 
 def get_liststatus_dict(response_json: Dict[str, Any]) -> List[Any]:

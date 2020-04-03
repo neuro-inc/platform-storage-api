@@ -7,14 +7,26 @@ import logging
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
+from itertools import islice
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import Any, List, Optional, Type, cast
+from typing import (
+    Any,
+    AsyncContextManager,
+    AsyncIterator,
+    Iterator,
+    List,
+    Optional,
+    Type,
+    cast,
+)
 
 import aiofiles
 
+
+SCANDIR_CHUNK_SIZE = 100
 
 logger = logging.getLogger()
 
@@ -115,8 +127,15 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
-    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+    def iterstatus(
+        self, path: PurePath
+    ) -> AsyncContextManager[AsyncIterator[FileStatus]]:
         pass
+
+    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+        # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
+        async with self.iterstatus(path) as dir_iter:
+            return [status async for status in dir_iter]
 
     @abc.abstractmethod
     async def get_filestatus(self, path: PurePath) -> FileStatus:
@@ -198,19 +217,32 @@ class LocalFileSystem(FileSystem):
                     path, size, modification_time=mod_time
                 )
 
-    @classmethod
-    def _scandir(cls, path: PurePath) -> List[FileStatus]:
-        statuses = []
-        with os.scandir(path) as dir_iter:
-            for entry in dir_iter:
-                entry_path = PurePath(entry)
-                status = cls._create_filestatus(entry_path, basename_only=True)
-                statuses.append(status)
-        return statuses
+    async def _iterate_in_chunks(
+        self, it: Iterator[Any], chunk_size: int
+    ) -> AsyncIterator[List[Any]]:
+        done = False
+        while not done:
+            chunk = await self._loop.run_in_executor(
+                self._executor, list, islice(it, 0, chunk_size)
+            )
+            if not chunk:
+                break
+            done = len(chunk) < chunk_size
+            yield chunk
 
-    async def liststatus(self, path: PurePath) -> List[FileStatus]:
-        # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
-        return await self._loop.run_in_executor(self._executor, self._scandir, path)
+    async def _scandir_iter(self, dir_iter: Iterator[Any]) -> AsyncIterator[FileStatus]:
+        async for chunk in self._iterate_in_chunks(dir_iter, SCANDIR_CHUNK_SIZE):
+            for entry in chunk:
+                yield self._create_filestatus(PurePath(entry), basename_only=True)
+
+    @asynccontextmanager
+    async def iterstatus(
+        self, path: PurePath
+    ) -> AsyncIterator[AsyncIterator[FileStatus]]:
+        with await self._loop.run_in_executor(
+            self._executor, os.scandir, path
+        ) as dir_iter:
+            yield self._scandir_iter(dir_iter)
 
     @classmethod
     def _get_file_or_dir_status(cls, path: PurePath) -> FileStatus:

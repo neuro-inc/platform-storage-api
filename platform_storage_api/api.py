@@ -9,11 +9,11 @@ from errno import errorcode
 from pathlib import PurePath
 from typing import (
     Any,
+    AsyncIterable,
     AsyncIterator,
     Awaitable,
     Callable,
     Dict,
-    Iterator,
     List,
     Optional,
     Type,
@@ -24,6 +24,7 @@ import aiozipkin
 import cbor
 import uvloop
 from aiohttp import web
+from aiohttp.web_request import Request
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
@@ -158,6 +159,10 @@ class StorageHandler:
 
         return self._create_response(fstat)
 
+    def _accepts_ndjson(self, request: web.Request) -> bool:
+        accept = request.headers.get("Accept", "")
+        return "application/x-ndjson" in accept
+
     async def handle_get(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
@@ -169,7 +174,10 @@ class StorageHandler:
             tree = await self._permission_checker.get_user_permissions_tree(
                 request, storage_path
             )
-            return await self._handle_liststatus(storage_path, tree)
+            if self._accepts_ndjson(request):
+                return await self._handle_iterstatus(request, storage_path, tree)
+            else:
+                return await self._handle_liststatus(storage_path, tree)
         elif operation == StorageOperation.GETFILESTATUS:
             storage_path = self._get_fs_path_from_request(request)
             action = await self._permission_checker.get_user_permissions(
@@ -449,12 +457,14 @@ class StorageHandler:
         self, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.Response:
         try:
-            statuses = await self._storage.liststatus(storage_path)
+            async with self._storage.iterstatus(storage_path) as statuses:
+                filtered_statuses = [
+                    fstat async for fstat in self._liststatus_filter(statuses, tree)
+                ]
         except FileNotFoundError:
             raise web.HTTPNotFound
         except NotADirectoryError as e:
             raise _http_bad_request("Not a directory", errno=e.errno)
-        filtered_statuses = self._liststatus_filter(statuses, tree)
         primitive_statuses = {
             "FileStatuses": {
                 "FileStatus": [
@@ -465,11 +475,34 @@ class StorageHandler:
 
         return web.json_response(primitive_statuses)
 
-    def _liststatus_filter(
-        self, statuses: List[FileStatus], tree: ClientAccessSubTreeView
-    ) -> Iterator[FileStatus]:
+    async def _handle_iterstatus(
+        self, request: Request, storage_path: PurePath, tree: ClientAccessSubTreeView
+    ) -> web.StreamResponse:
+        try:
+            async with self._storage.iterstatus(storage_path) as statuses:
+                response = web.StreamResponse()
+                response.headers["Content-Type"] = "application/x-ndjson"
+                await response.prepare(request)
+                async for fstat in self._liststatus_filter(statuses, tree):
+                    stat_dict = {
+                        "FileStatus": self._convert_filestatus_to_primitive(fstat)
+                    }
+                    await response.write(json.dumps(stat_dict).encode() + b"\r\n")
+                await response.write_eof()
+
+                return response
+        except FileNotFoundError:
+            raise web.HTTPNotFound
+        except NotADirectoryError:
+            return web.json_response(
+                {"error": "Not a directory"}, status=web.HTTPBadRequest.status_code
+            )
+
+    async def _liststatus_filter(
+        self, statuses: AsyncIterable[FileStatus], tree: ClientAccessSubTreeView
+    ) -> AsyncIterator[FileStatus]:
         can_read = tree.can_read()
-        for status in statuses:
+        async for status in statuses:
             sub_tree = tree.children.get(str(status.path))
             if sub_tree:
                 action = sub_tree.action

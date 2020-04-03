@@ -10,7 +10,7 @@ import yarl
 from neuro_auth_client import User
 
 from platform_storage_api.fs.local import FileStatusType
-from tests.integration.conftest import ApiConfig, get_liststatus_dict
+from tests.integration.conftest import ApiConfig, get_iterstatus_list
 
 
 class TestStorageListAndResourceSharing:
@@ -34,7 +34,10 @@ class TestStorageListAndResourceSharing:
             assert response.status == 201
 
         user2 = await regular_user_factory()
-        headers = {"Authorization": "Bearer " + user2.token}
+        headers = {
+            "Authorization": "Bearer " + user2.token,
+            "Accept": "application/x-ndjson",
+        }
         params = {"op": "LISTSTATUS"}
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 404
@@ -66,13 +69,17 @@ class TestStorageListAndResourceSharing:
             assert response.status == 201
 
         # user2 lists users
-        headers = {"Authorization": "Bearer " + user2.token}
+        headers = {
+            "Authorization": "Bearer " + user2.token,
+            "Accept": "application/x-ndjson",
+        }
         dir_url = f"{server_url}/{user2.name}/../"
         params = {"op": "LISTSTATUS"}
         async with client.get(
             yarl.URL(dir_url, encoded=True), headers=headers, params=params
         ) as response:
             assert response.status == 200
+            assert response.headers["Content-Type"] == "application/x-ndjson"
             resp_text = await response.text()
             assert user1.name not in resp_text
             assert user2.name in resp_text
@@ -91,7 +98,10 @@ class TestStorageListAndResourceSharing:
         headers1 = {"Authorization": "Bearer " + user1.token}
 
         user2 = await regular_user_factory()
-        headers2 = {"Authorization": "Bearer " + user2.token}
+        headers2 = {
+            "Authorization": "Bearer " + user2.token,
+            "Accept": "application/x-ndjson",
+        }
 
         # create file /path/to/file by user1
         dir_url = f"{server_url}/{user1.name}/path/to"
@@ -119,7 +129,8 @@ class TestStorageListAndResourceSharing:
         )
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -154,7 +165,10 @@ class TestStorageListAndResourceSharing:
         headers1 = {"Authorization": "Bearer " + user1.token}
 
         user2 = await regular_user_factory()
-        headers2 = {"Authorization": "Bearer " + user2.token}
+        headers2 = {
+            "Authorization": "Bearer " + user2.token,
+            "Accept": "application/x-ndjson",
+        }
 
         # create file /path/to/file by user1
         dir_url = f"{server_url}/{user1.name}/path/to/"
@@ -181,8 +195,8 @@ class TestStorageListAndResourceSharing:
         )
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
-
-            statuses = get_liststatus_dict(await response.json())
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -210,7 +224,10 @@ class TestStorageListAndResourceSharing:
         headers1 = {"Authorization": "Bearer " + user1.token}
 
         user2 = await regular_user_factory()
-        headers2 = {"Authorization": "Bearer " + user2.token}
+        headers2 = {
+            "Authorization": "Bearer " + user2.token,
+            "Accept": "application/x-ndjson",
+        }
 
         # create file /path/to/file by user1
         dir_url = f"{server_url}/{user1.name}/path/to"
@@ -257,7 +274,8 @@ class TestStorageListAndResourceSharing:
             dir_url + "/first", headers=headers2, params=params
         ) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -292,7 +310,10 @@ class TestStorageListAndResourceSharing:
         headers1 = {"Authorization": "Bearer " + user1.token}
 
         user2 = await regular_user_factory()
-        headers2 = {"Authorization": "Bearer " + user2.token}
+        headers2 = {
+            "Authorization": "Bearer " + user2.token,
+            "Accept": "application/x-ndjson",
+        }
 
         # create file /path/to/file by user1
         dir_url = f"{server_url}/{user1.name}/path/to"
@@ -346,7 +367,8 @@ class TestStorageListAndResourceSharing:
 
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -371,7 +393,8 @@ class TestStorageListAndResourceSharing:
             dir_url + "/first", headers=headers2, params=params
         ) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -388,7 +411,8 @@ class TestStorageListAndResourceSharing:
             dir_url + "/first/second", headers=headers2, params=params
         ) as response:
             assert response.status == 200
-            statuses = get_liststatus_dict(await response.json())
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await get_iterstatus_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {

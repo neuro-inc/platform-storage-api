@@ -188,6 +188,35 @@ class TestLocalFileSystem:
         ]
 
     @pytest.mark.asyncio
+    async def test_liststatus_many_files(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        expected = []
+        for i in range(5000):
+            name = f"file-{i}"
+            expected.append(PurePath(name))
+            async with fs.open(tmp_dir_path / name, "wb"):
+                pass
+        statuses = await fs.liststatus(tmp_dir_path)
+        actual = [status.path for status in statuses]
+        assert sorted(actual) == sorted(expected)
+
+    @pytest.mark.asyncio
+    async def test_iterstatus_many_files(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        expected = []
+        for i in range(5000):
+            name = f"file-{i}"
+            expected.append(PurePath(name))
+            async with fs.open(tmp_dir_path / name, "wb"):
+                pass
+        async with fs.iterstatus(tmp_dir_path) as it:
+            statuses = [status async for status in it]
+        actual = [status.path for status in statuses]
+        assert sorted(actual) == sorted(expected)
+
+    @pytest.mark.asyncio
     async def test_liststatus_non_existent_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -202,6 +231,40 @@ class TestLocalFileSystem:
     ) -> None:
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
+
+    @pytest.mark.asyncio
+    async def test_iterstatus_non_existent_dir(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        path = tmp_dir_path / "nested"
+
+        cm = fs.iterstatus(path)
+        with pytest.raises(FileNotFoundError):
+            async with cm:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_iterstatus_broken_directory_link(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        path = tmp_dir_path / "nested"
+        os.symlink("nonexisting", path, target_is_directory=True)
+
+        cm = fs.iterstatus(path)
+        with pytest.raises(FileNotFoundError):
+            async with cm:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_iterstatus_broken_entry_link(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        path = tmp_dir_path / "nested"
+        os.symlink("nonexisting", path)
+
+        async with fs.iterstatus(tmp_dir_path) as it:
+            with pytest.raises(FileNotFoundError):
+                await it.__anext__()
 
     @pytest.mark.asyncio
     async def test_rm_non_existent(self, fs: FileSystem, tmp_dir_path: Path) -> None:
