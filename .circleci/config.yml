@@ -57,6 +57,21 @@ jobs:
           command: |
             make gke_k8s_deploy
 
+  aws_deploy:
+    <<: *defaults
+
+    steps:
+      - checkout
+
+      - run:
+          name: AWS Auth
+          command: |
+            make aws_login
+
+      - run:
+          name: AWS S3 ls
+          command: |
+            make aws_s3_ls
 
 
   artifactory_deploy:
@@ -159,3 +174,20 @@ workflows:
             tags:
               only:
                 - /artifactory.*/
+
+  aws-dev:
+    jobs:
+      - test:
+          context: aws-main-dev
+          filters:
+            branches:
+              only:
+                - master
+      - aws_deploy:
+          context: aws-main-dev
+          requires:
+            - test
+          filters:
+            branches:
+              only:
+                - deploy-to-aws

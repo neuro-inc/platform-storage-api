@@ -79,6 +79,13 @@ gke_login:
 	gcloud config set $(SET_CLUSTER_ZONE_REGION)
 	gcloud auth configure-docker
 
+aws_login:
+	aws --version
+	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
+
+aws_s3_ls:
+	aws s3 ls
+
 _helm:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.11.0
 
