@@ -177,16 +177,8 @@ workflows:
 
   aws-dev:
     jobs:
-      - test:
-          context: aws-main-dev
-          filters:
-            branches:
-              only:
-                - master
       - aws_deploy:
           context: aws-main-dev
-          requires:
-            - test
           filters:
             branches:
               only:
