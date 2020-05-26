@@ -100,8 +100,10 @@ gke_k8s_deploy: _helm
 	sudo chown -R circleci: $(HOME)/.kube
 	helm -f deploy/platformstorageapi/values-$(HELM_ENV).yaml --set "IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
 
-aws_docker_push: build
+aws_docker_login:
 	docker_login=$(aws ecr get-login --no-include-email --region us-east-1) && $docker_login 2>&1
+
+aws_docker_push: aws_docker_login build
 	docker tag $(IMAGE) $(IMAGE_K8S_AWS):latest
 	docker tag $(IMAGE_K8S_AWS):latest $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
 	docker push  $(IMAGE_K8S_AWS):latest
