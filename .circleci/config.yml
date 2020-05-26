@@ -69,9 +69,9 @@ jobs:
             make aws_login
 
       - run:
-          name: AWS S3 ls
+          name: AWS Docker Push
           command: |
-            make aws_s3_ls
+            make aws_docker_push
 
 
   artifactory_deploy:
@@ -178,7 +178,7 @@ workflows:
   aws-dev:
     jobs:
       - aws_deploy:
-          context: aws-main-dev
+          context: org-dev
           filters:
             branches:
               only:

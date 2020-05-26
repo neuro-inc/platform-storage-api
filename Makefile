@@ -3,6 +3,7 @@ IMAGE_TAG ?= latest
 ARTIFACTORY_TAG ?=$(shell echo "$(CIRCLE_TAG)" | awk -F/ '{print $$2}')
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_K8S ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
+IMAGE_K8S_AWS ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
 
 ifdef CIRCLECI
     PIP_INDEX_URL ?= "https://$(DEVPI_USER):$(DEVPI_PASS)@$(DEVPI_HOST)/$(DEVPI_USER)/$(DEVPI_INDEX)"
@@ -85,9 +86,6 @@ aws_login:
 	aws --version
 	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
 
-aws_s3_ls:
-	aws s3 ls
-
 _helm:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.11.0
 
@@ -102,6 +100,12 @@ gke_k8s_deploy: _helm
 	sudo chown -R circleci: $(HOME)/.kube
 	helm -f deploy/platformstorageapi/values-$(HELM_ENV).yaml --set "IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
 
+aws_docker_push: build
+	docker_login=$(aws ecr get-login --no-include-email --region us-east-1) && $docker_login 2>&1
+	docker tag $(IMAGE) $(IMAGE_K8S_AWS):latest
+	docker tag $(IMAGE_K8S_AWS):latest $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
+	docker push  $(IMAGE_K8S_AWS):latest
+	docker push  $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
 
 artifactory_docker_push: build
 	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
