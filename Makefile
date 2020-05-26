@@ -81,6 +81,8 @@ gke_login:
 
 aws_login:
 	aws --version
+	pip install --upgrade awscli
+	aws --version
 	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
 
 aws_s3_ls:
