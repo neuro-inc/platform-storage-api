@@ -96,7 +96,8 @@ class EnvironConfigFactory:
         storage_config = self.create_storage()
         auth_config = self.create_auth()
         zipkin_config = self.create_zipkin()
-        cluster_name = self._environ.get("NP_CLUSTER_NAME", "")
+        cluster_name = self._environ["NP_CLUSTER_NAME"]
+        assert cluster_name
         permission_expiration_interval_s: float = float(
             self._environ.get(
                 "NP_PERMISSION_EXPIRATION_INTERVAL",
