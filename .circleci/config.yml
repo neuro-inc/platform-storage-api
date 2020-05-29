@@ -73,6 +73,10 @@ jobs:
           command: |
             make aws_docker_push
 
+      - run:
+          name: AWS K8s Deploy
+          command: |
+            make aws_k8s_deploy
 
   artifactory_deploy:
     <<: *defaults
