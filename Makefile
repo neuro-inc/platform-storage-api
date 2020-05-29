@@ -81,10 +81,14 @@ gke_login:
 	gcloud auth configure-docker
 
 aws_login:
-	aws --version
 	pip install --upgrade awscli
-	aws --version
 	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
+
+aws_docker_login_old:
+	docker_login=$(aws ecr get-login --no-include-email --region us-east-1) && $docker_login 2>&1
+
+aws_docker_login:
+	$$(aws ecr get-login --no-include-email --region $(AWS_REGION) )
 
 _helm:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.11.0
@@ -98,19 +102,17 @@ gke_docker_push: build
 gke_k8s_deploy: _helm
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME) $(CLUSTER_ZONE_REGION)
 	sudo chown -R circleci: $(HOME)/.kube
-	helm -f deploy/platformstorageapi/values-$(HELM_ENV).yaml --set "IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
+	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
 
-aws_docker_login_old:
-	docker_login=$(aws ecr get-login --no-include-email --region us-east-1) && $docker_login 2>&1
-
-aws_docker_login:
+aws_docker_push: build
 	$$(aws ecr get-login --no-include-email --region $(AWS_REGION) )
-
-aws_docker_push: aws_docker_login build
 	docker tag $(IMAGE) $(IMAGE_K8S_AWS):latest
 	docker tag $(IMAGE_K8S_AWS):latest $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
 	docker push  $(IMAGE_K8S_AWS):latest
 	docker push  $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
+
+aws_k8s_deploy: _helm
+	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
 
 artifactory_docker_push: build
 	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
