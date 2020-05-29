@@ -84,15 +84,8 @@ aws_login:
 	pip install --upgrade awscli
 	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
 
-aws_docker_login_old:
-	docker_login=$(aws ecr get-login --no-include-email --region us-east-1) && $docker_login 2>&1
-
-aws_docker_login:
-	$$(aws ecr get-login --no-include-email --region $(AWS_REGION) )
-
 _helm:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.11.0
-
 
 gke_docker_push: build
 	docker tag $(IMAGE) $(IMAGE_K8S):latest
