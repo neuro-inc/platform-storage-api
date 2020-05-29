@@ -112,7 +112,7 @@ aws_docker_push: build
 	docker push  $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
 
 aws_k8s_deploy: _helm
-	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
+	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
 
 artifactory_docker_push: build
 	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
