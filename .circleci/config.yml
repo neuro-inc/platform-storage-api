@@ -216,7 +216,7 @@ workflows:
           filters:
             branches:
               only:
-                - deploy-to-aws
+                - master
       - aws_deploy:
           context: org-dev
           requires:
@@ -224,4 +224,4 @@ workflows:
           filters:
             branches:
               only:
-                - deploy-to-aws
+                - master
