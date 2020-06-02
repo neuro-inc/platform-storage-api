@@ -35,6 +35,36 @@ jobs:
            command: |
              make test_integration
 
+  aws_test:
+    <<: *defaults
+
+    environment:
+      AWS_CLUSTER: present
+
+    steps:
+      - checkout
+
+      # NOTE: these are temporary steps until moved to docker
+      - run:
+          name: Configuring Docker Client
+          command: |
+            make -s ecr_login
+
+      - run:
+          name: Running Static Code Analysis
+          command: |
+            make lint
+
+      - run:
+           name: Running Unit Test Suite
+           command: |
+             make test_unit
+
+      - run:
+           name: Running Integration Test Suite
+           command: |
+             make test_integration
+
 
   gke_deploy:
     <<: *defaults
@@ -179,10 +209,18 @@ workflows:
               only:
                 - /artifactory.*/
 
-  aws-dev:
+  dev-aws:
     jobs:
+      - aws_test:
+          context: org-dev
+          filters:
+            branches:
+              only:
+                - deploy-to-aws
       - aws_deploy:
           context: org-dev
+          requires:
+            - aws_test
           filters:
             branches:
               only:

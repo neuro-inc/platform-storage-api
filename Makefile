@@ -11,6 +11,13 @@ else
     PIP_INDEX_URL ?= "$(shell python pip_extra_index_url.py)"
 endif
 
+ifdef AWS_CLUSTER
+    IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+else
+    IMAGE_REPO ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)
+endif
+export IMAGE_REPO
+
 build:
 	@docker build --build-arg PIP_INDEX_URL="$(PIP_INDEX_URL)" -t $(IMAGE) .
 
@@ -97,8 +104,10 @@ gke_k8s_deploy: _helm
 	sudo chown -R circleci: $(HOME)/.kube
 	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
 
-aws_docker_push: build
+ecr_login: build
 	$$(aws ecr get-login --no-include-email --region $(AWS_REGION) )
+
+aws_docker_push: build ecr_login
 	docker tag $(IMAGE) $(IMAGE_K8S_AWS):latest
 	docker tag $(IMAGE_K8S_AWS):latest $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
 	docker push  $(IMAGE_K8S_AWS):latest
