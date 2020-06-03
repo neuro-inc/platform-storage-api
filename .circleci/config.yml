@@ -35,6 +35,36 @@ jobs:
            command: |
              make test_integration
 
+  aws_test:
+    <<: *defaults
+
+    environment:
+      AWS_CLUSTER: present
+
+    steps:
+      - checkout
+
+      # NOTE: these are temporary steps until moved to docker
+      - run:
+          name: Configuring Docker Client
+          command: |
+            make -s ecr_login
+
+      - run:
+          name: Running Static Code Analysis
+          command: |
+            make lint
+
+      - run:
+           name: Running Unit Test Suite
+           command: |
+             make test_unit
+
+      - run:
+           name: Running Integration Test Suite
+           command: |
+             make test_integration
+
 
   gke_deploy:
     <<: *defaults
@@ -57,7 +87,26 @@ jobs:
           command: |
             make gke_k8s_deploy
 
+  aws_deploy:
+    <<: *defaults
 
+    steps:
+      - checkout
+
+      - run:
+          name: AWS Auth
+          command: |
+            make aws_login
+
+      - run:
+          name: AWS Docker Push
+          command: |
+            make aws_docker_push
+
+      - run:
+          name: AWS K8s Deploy
+          command: |
+            make aws_k8s_deploy
 
   artifactory_deploy:
     <<: *defaults
@@ -159,3 +208,20 @@ workflows:
             tags:
               only:
                 - /artifactory.*/
+
+  dev-aws:
+    jobs:
+      - aws_test:
+          context: org-dev
+          filters:
+            branches:
+              only:
+                - master
+      - aws_deploy:
+          context: org-dev
+          requires:
+            - aws_test
+          filters:
+            branches:
+              only:
+                - master
