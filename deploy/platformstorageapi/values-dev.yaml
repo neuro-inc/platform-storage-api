@@ -1,4 +1,4 @@
-NP_STORAGE_NFS_SERVER: 'nfs-server.default.svc.cluster.local'
+NP_STORAGE_NFS_SERVER: 'fs-b90a823a.efs.us-east-1.amazonaws.com'
 NP_STORAGE_NFS_PATH: '/'
 IMAGE: ''
 NP_STORAGE_AUTH_URL: http://platformauthapi:8080
