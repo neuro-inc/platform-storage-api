@@ -73,7 +73,7 @@ kind: Service
 metadata:
   annotations:
     traefik.ingress.kubernetes.io/affinity: "true"
-    traefik.ingress.kubernetes.io/session-cookie-name: NEURO_SESSION
+    traefik.ingress.kubernetes.io/session-cookie-name: NEURO_STORAGE_SESSION
   name: platformstorageapi
 spec:
   type: ClusterIP
