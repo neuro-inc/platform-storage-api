@@ -91,7 +91,7 @@ docker_push: build
 	docker push  $(IMAGE_K8S_AWS):latest
 	docker push  $(IMAGE_K8S_AWS):$(IMAGE_TAG)
 
-k8s_deploy:
+helm_deploy:
 	#helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
 	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --debug --dry-run
 
