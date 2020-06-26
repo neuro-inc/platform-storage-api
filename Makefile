@@ -10,7 +10,7 @@ export IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
 build:
 	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
-	docker tag $(IMAGE) $(IMAGE):latest
+	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
 pull:
 	-docker-compose --project-directory=`pwd` -p platformregistryapi \
