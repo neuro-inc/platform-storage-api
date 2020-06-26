@@ -124,87 +124,87 @@ jobs:
           command: |
             make artifactory_helm_push
 
-
-workflows:
-  version: 2
-
-  main:
-    jobs:
-      - test:
-          context: org-global
-
-  staging:
-    jobs:
-      - test:
-          context: org-staging
-          filters:
-            branches:
-              only:
-                - /release.*/
-      - gke_deploy:
-          context: org-staging
-          requires:
-            - test
-          filters:
-            branches:
-              only:
-                - /release.*/
-
-  prod:
-    jobs:
-      - test:
-          context: org-prod
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only:
-                - /release.*/
-      - gke_deploy:
-          context: org-prod
-          requires:
-            - test
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only:
-                - /release.*/
-
-  artifactory:
-    jobs:
-      - test:
-          context: org-global
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only:
-                - /artifactory.*/
-      - artifactory_deploy:
-          context: org-global
-          requires:
-            - test
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only:
-                - /artifactory.*/
-
-  dev-aws:
-    jobs:
-      - aws_test:
-          context: org-dev
-          filters:
-            branches:
-              only:
-                - master
-      - aws_deploy:
-          context: org-dev
-          requires:
-            - aws_test
-          filters:
-            branches:
-              only:
-                - master
+#
+#workflows:
+#  version: 2
+#
+#  main:
+#    jobs:
+#      - test:
+#          context: org-global
+#
+#  staging:
+#    jobs:
+#      - test:
+#          context: org-staging
+#          filters:
+#            branches:
+#              only:
+#                - /release.*/
+#      - gke_deploy:
+#          context: org-staging
+#          requires:
+#            - test
+#          filters:
+#            branches:
+#              only:
+#                - /release.*/
+#
+#  prod:
+#    jobs:
+#      - test:
+#          context: org-prod
+#          filters:
+#            branches:
+#              ignore: /.*/
+#            tags:
+#              only:
+#                - /release.*/
+#      - gke_deploy:
+#          context: org-prod
+#          requires:
+#            - test
+#          filters:
+#            branches:
+#              ignore: /.*/
+#            tags:
+#              only:
+#                - /release.*/
+#
+#  artifactory:
+#    jobs:
+#      - test:
+#          context: org-global
+#          filters:
+#            branches:
+#              ignore: /.*/
+#            tags:
+#              only:
+#                - /artifactory.*/
+#      - artifactory_deploy:
+#          context: org-global
+#          requires:
+#            - test
+#          filters:
+#            branches:
+#              ignore: /.*/
+#            tags:
+#              only:
+#                - /artifactory.*/
+#
+#  dev-aws:
+#    jobs:
+#      - aws_test:
+#          context: org-dev
+#          filters:
+#            branches:
+#              only:
+#                - master
+#      - aws_deploy:
+#          context: org-dev
+#          requires:
+#            - aws_test
+#          filters:
+#            branches:
+#              only:
+#                - master
