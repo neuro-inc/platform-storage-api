@@ -10,6 +10,7 @@ export IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
 build:
 	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
+	docker tag $(IMAGE) $(IMAGE):latest
 
 pull:
 	-docker-compose --project-directory=`pwd` -p platformregistryapi \
@@ -91,7 +92,9 @@ docker_push: build
 	docker push  $(IMAGE_K8S_AWS):$(IMAGE_TAG)
 
 k8s_deploy:
-	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
+	#helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
+	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --debug --dry-run
+
 
 artifactory_docker_push: build
 	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
