@@ -6,7 +6,7 @@ IMAGE_K8S_GKE ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
 IMAGE_K8S_AWS ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
 
 export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
-export IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+#export IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
 build:
 	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
