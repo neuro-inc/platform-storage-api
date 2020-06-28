@@ -1,6 +1,6 @@
 IMAGE_NAME ?= platformstorageapi
 IMAGE_TAG ?= $(GITHUB_SHA)
-ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_SHA)" | awk -F/ '{print $$2}')
+ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_REF)" | awk -F/ '{print $NF}')
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_K8S_GKE ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
 IMAGE_K8S_AWS ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
@@ -92,9 +92,7 @@ docker_push: build
 	docker push  $(IMAGE_K8S_AWS):$(IMAGE_TAG)
 
 helm_deploy:
-	#helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
-	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --debug --dry-run
-
+	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
 
 artifactory_docker_push: build
 	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
