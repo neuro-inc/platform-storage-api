@@ -7,7 +7,7 @@ on:
 jobs:
 
   test:
-    name: Run tests RELEASE
+    name: Run  Release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'GITHUB_REF=refs/tags/test_release')
     env:
