@@ -13,10 +13,10 @@ from platform_storage_api.trace import CURRENT_TRACER
 
 class AsyncBytesIO(BytesIO):
     async def read(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore
-        return super().read(*args, **kwargs)
+        return super().read(*args, **kwargs)  # type: ignore
 
     async def write(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore
-        return super().write(*args, **kwargs)
+        return super().write(*args, **kwargs)  # type: ignore
 
 
 class TestStorage:
