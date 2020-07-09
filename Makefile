@@ -26,7 +26,7 @@ pull:
 	    -f tests/docker/e2e.compose.yml pull
 
 format:
-	isort -rc platform_storage_api tests setup.py
+	isort platform_storage_api tests setup.py
 	black platform_storage_api tests setup.py pip_extra_index_url.py
 
 lint: build_test lint_built
@@ -61,11 +61,7 @@ _test_integration:
 
 _lint:
 	black --check platform_storage_api tests setup.py
-	@if ! isort -c -rc platform_storage_api tests setup.py; then \
-            echo "Import sort errors, run 'make format' to fix them!!!"; \
-            isort --diff -rc platform_storage_api tests setup.py; \
-            false; \
-        fi
+	isort --check --diff platform_storage_api tests setup.py
 	flake8 platform_storage_api tests setup.py
 	mypy platform_storage_api tests
 
