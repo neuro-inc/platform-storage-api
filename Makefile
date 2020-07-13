@@ -1,25 +1,16 @@
 IMAGE_NAME ?= platformstorageapi
-IMAGE_TAG ?= latest
-ARTIFACTORY_TAG ?=$(shell echo "$(CIRCLE_TAG)" | awk -F/ '{print $$2}')
+IMAGE_TAG ?= $(GITHUB_SHA)
+ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_REF)" | awk -F/ '{print $NF}')
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
-IMAGE_K8S ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
+IMAGE_K8S_GKE ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
 IMAGE_K8S_AWS ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
 
-ifdef CIRCLECI
-    PIP_INDEX_URL ?= "https://$(DEVPI_USER):$(DEVPI_PASS)@$(DEVPI_HOST)/$(DEVPI_USER)/$(DEVPI_INDEX)"
-else
-    PIP_INDEX_URL ?= "$(shell python pip_extra_index_url.py)"
-endif
-
-ifdef AWS_CLUSTER
-    IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-else
-    IMAGE_REPO ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)
-endif
-export IMAGE_REPO
+export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
+#export IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
 build:
-	@docker build --build-arg PIP_INDEX_URL="$(PIP_INDEX_URL)" -t $(IMAGE) .
+	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
+	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
 pull:
 	-docker-compose --project-directory=`pwd` -p platformregistryapi \
@@ -83,34 +74,21 @@ gke_login:
 	gcloud config set $(SET_CLUSTER_ZONE_REGION)
 	gcloud auth configure-docker
 
-aws_login:
+eks_login:
 	pip install --upgrade awscli
 	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
 
 _helm:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.11.0
 
-gke_docker_push: build
-	docker tag $(IMAGE) $(IMAGE_K8S):latest
-	docker tag $(IMAGE_K8S):latest $(IMAGE_K8S):$(CIRCLE_SHA1)
-	sudo /opt/google-cloud-sdk/bin/gcloud docker -- push $(IMAGE_K8S)
-
-gke_k8s_deploy: _helm
-	sudo /opt/google-cloud-sdk/bin/gcloud --quiet container clusters get-credentials $(GKE_CLUSTER_NAME) $(CLUSTER_ZONE_REGION)
-	sudo chown -R circleci: $(HOME)/.kube
-	helm -f deploy/platformstorageapi/values-$(HELM_ENV).yaml --set "IMAGE=$(IMAGE_K8S):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --wait --timeout 600
-
-ecr_login: build
-	$$(aws ecr get-login --no-include-email --region $(AWS_REGION) )
-
-aws_docker_push: build ecr_login
+docker_push: build
 	docker tag $(IMAGE) $(IMAGE_K8S_AWS):latest
-	docker tag $(IMAGE_K8S_AWS):latest $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
+	docker tag $(IMAGE_K8S_AWS):latest $(IMAGE_K8S_AWS):$(IMAGE_TAG)
 	docker push  $(IMAGE_K8S_AWS):latest
-	docker push  $(IMAGE_K8S_AWS):$(CIRCLE_SHA1)
+	docker push  $(IMAGE_K8S_AWS):$(IMAGE_TAG)
 
-aws_k8s_deploy: _helm
-	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(CIRCLE_SHA1)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
+helm_deploy:
+	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
 
 artifactory_docker_push: build
 	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
