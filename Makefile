@@ -1,6 +1,6 @@
 IMAGE_NAME ?= platformstorageapi
 IMAGE_TAG ?= $(GITHUB_SHA)
-ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_REF)" | awk -F/ '{print $NF}')
+ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_REF)" | awk -F/ '{print $$NF}')
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_K8S_GKE ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
 IMAGE_K8S_AWS ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
