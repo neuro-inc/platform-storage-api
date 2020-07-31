@@ -79,7 +79,8 @@ eks_login:
 	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
 
 _helm:
-	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.11.0
+	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v $(HELM_VERSION)
+	helm init --client-only
 
 docker_push: build
 	docker tag $(IMAGE) $(IMAGE_K8S_AWS):latest
@@ -101,7 +102,6 @@ artifactory_helm_push: _helm
 	cp temp_deploy/platformstorageapi/values-template.yaml temp_deploy/platformstorageapi/values.yaml
 	sed -i "s/IMAGE_TAG/$(ARTIFACTORY_TAG)/g" temp_deploy/platformstorageapi/values.yaml
 	find temp_deploy/platformstorageapi -type f -name 'values-*' -delete
-	helm init --client-only
 	helm package --app-version=$(ARTIFACTORY_TAG) --version=$(ARTIFACTORY_TAG) temp_deploy/platformstorageapi/
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
 	helm push-artifactory $(IMAGE_NAME)-$(ARTIFACTORY_TAG).tgz $(ARTIFACTORY_HELM_REPO) --username $(ARTIFACTORY_USERNAME) --password $(ARTIFACTORY_PASSWORD)
