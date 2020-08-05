@@ -20,11 +20,11 @@ from typing import (
     List,
     Optional,
     Type,
-    cast,
+    cast, Union, Callable, Tuple, AnyStr,
 )
 
 import aiofiles
-
+from aiohttp.typedefs import PathLike
 
 SCANDIR_CHUNK_SIZE = 100
 
@@ -321,3 +321,29 @@ async def copy_streams(
         if not chunk:
             break
         await instream.write(chunk)
+
+
+async def _async_walk(
+        loop: asyncio.AbstractEventLoop,
+        executor: Optional[ThreadPoolExecutor],
+        # os.walk arguments:
+        top: Union[AnyStr, PurePath], topdown: bool = True,
+        onerror: Optional[Callable[[OSError], Any]] = None,
+        followlinks: bool = False,
+) -> AsyncIterator[Tuple[AnyStr, List[AnyStr], List[AnyStr]]]:
+    queue: asyncio.Queue = asyncio.Queue(500)
+    end_mark = object()
+
+    def sync_walker():
+        for entry in os.walk(top, topdown, onerror, followlinks):
+            future = asyncio.run_coroutine_threadsafe(queue.put(entry), loop)
+            future.result()
+        asyncio.run_coroutine_threadsafe(queue.put(end_mark), loop)
+
+    loop.run_in_executor(executor, sync_walker)
+
+    while True:
+        item = await queue.get()
+        if item == end_mark:
+            return
+        yield item
