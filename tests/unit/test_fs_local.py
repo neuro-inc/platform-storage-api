@@ -14,7 +14,8 @@ from platform_storage_api.fs.local import (
     FileSystem,
     LocalFileSystem,
     StorageType,
-    copy_streams, _async_walk,
+    _async_walk,
+    copy_streams,
 )
 from platform_storage_api.trace import CURRENT_TRACER
 
@@ -387,6 +388,34 @@ class TestLocalFileSystem:
                 modification_time=expected_mtime,
             )
         ]
+
+    @pytest.mark.asyncio
+    async def test_iterremove_many_files(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        expected = []
+
+        async def make_files(path: PurePath, count: int) -> None:
+            for i in range(count):
+                name = f"file-{i}"
+                filepath = path / name
+                expected.append(filepath)
+                async with fs.open(filepath, "wb"):
+                    pass
+
+        to_remove_dir = tmp_dir_path / "to_remove"
+        to_remove_dir.mkdir()
+        expected.append(to_remove_dir)
+
+        for subdir_segments in (("foo",), ("bar",), ("foo", "baz")):
+            subdir = to_remove_dir.joinpath(*subdir_segments)
+            subdir.mkdir()
+            expected.append(subdir)
+            await make_files(subdir, 100)
+
+        statuses = [status async for status in fs.iterremove(to_remove_dir)]
+        actual = [status.path for status in statuses]
+        assert sorted(actual) == sorted(expected)
 
     @pytest.mark.asyncio
     async def test_get_filestatus_file(
@@ -1063,15 +1092,15 @@ class TestLocalFileSystem:
     @pytest.mark.asyncio
     async def test_async_walk(self, fs: FileSystem, tmp_dir_path: Path) -> None:
 
-        foo_dir = tmp_dir_path / 'foo'
-        bar_dir = tmp_dir_path / 'boo' / 'bar'
+        foo_dir = tmp_dir_path / "foo"
+        bar_dir = tmp_dir_path / "boo" / "bar"
 
         foo_dir.mkdir(parents=True)
         bar_dir.mkdir(parents=True)
 
-        (tmp_dir_path / 'test1').touch()
-        (foo_dir / 'test2').touch()
-        (bar_dir / 'test3').touch()
+        (tmp_dir_path / "test1").touch()
+        (foo_dir / "test2").touch()
+        (bar_dir / "test3").touch()
 
         os_walk_result = list(os.walk(tmp_dir_path))  # In test its OK to block loop
         async_walk_result = list()

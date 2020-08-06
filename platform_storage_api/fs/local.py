@@ -5,7 +5,6 @@ import enum
 import errno
 import logging
 import os
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
@@ -14,17 +13,22 @@ from pathlib import Path, PurePath
 from types import TracebackType
 from typing import (
     Any,
+    AnyStr,
     AsyncContextManager,
     AsyncIterator,
+    Callable,
     Iterator,
     List,
     Optional,
+    Tuple,
     Type,
-    cast, Union, Callable, Tuple, AnyStr,
+    Union,
+    cast,
 )
 
 import aiofiles
 from aiohttp.typedefs import PathLike
+
 
 SCANDIR_CHUNK_SIZE = 100
 
@@ -150,6 +154,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
+    def iterremove(self, path: PurePath) -> AsyncIterator[FileStatus]:
+        pass
+
+    @abc.abstractmethod
     async def rename(self, old: PurePath, new: PurePath) -> None:
         pass
 
@@ -256,46 +264,76 @@ class LocalFileSystem(FileSystem):
     async def exists(self, path: PurePath) -> bool:
         return await self._loop.run_in_executor(self._executor, Path(path).exists)
 
-    def _remove(self, path: PurePath) -> None:
-        concrete_path = Path(path)
-        if not concrete_path.is_symlink() and concrete_path.is_dir():
+    def _remove_as_dir(self, path: PurePath) -> bool:
+        with Path(path) as real_path:
+            return not real_path.is_symlink() and real_path.is_dir()
+
+    def _remove_single(self, path: PurePath) -> FileStatus:
+        with Path(path) as real_path:
+            file_status = self._create_filestatus(real_path)
+            if self._remove_as_dir(path):
+                real_path.rmdir()
+            else:
+                real_path.unlink()
+        return file_status
+
+    async def iterremove(self, path: PurePath) -> AsyncIterator[FileStatus]:
+
+        # Debug logging (sync code)
+        def log_error(e: OSError, failed_path: PurePath) -> None:
+            if e.filename:
+                failed_path = e.filename
+            path_access_ok = os.access(failed_path, os.W_OK)
             try:
-                shutil.rmtree(concrete_path)
+                path_mode = f"{os.stat(failed_path).st_mode:03o}"
+            except OSError:
+                path_mode = "?"
+
+            parent_path = os.path.dirname(failed_path)
+            parent_path_access_ok = os.access(parent_path, os.W_OK)
+            try:
+                parent_path_mode = f"{os.stat(parent_path).st_mode:03o}"
+            except OSError:
+                parent_path_mode = "?"
+
+            logger.warning(
+                "OSError for path = %s, path_mode = %s, access = %s, "
+                "parent_path_mode = %s, parent_access = %s, "
+                "error_message = %s, errno = %s",
+                failed_path,
+                path_mode,
+                path_access_ok,
+                parent_path_mode,
+                parent_path_access_ok,
+                str(e),
+                errno.errorcode.get(e.errno, e.errno),
+            )
+
+        if self._remove_as_dir(path):
+            try:
+                async for (dirpath, __, filenames) in _async_walk(
+                    self._loop, self._executor, path, topdown=False
+                ):
+                    dir = PurePath(dirpath)
+                    for file in filenames:
+                        filepath = dir / file
+                        yield await self._loop.run_in_executor(
+                            self._executor, self._remove_single, filepath
+                        )
+                    yield await self._loop.run_in_executor(
+                        self._executor, self._remove_single, dir
+                    )
             except OSError as e:
-                # Debug logging
-                if e.filename:
-                    path = e.filename
-                path_access_ok = os.access(path, os.W_OK)
-                try:
-                    path_mode = f"{os.stat(path).st_mode:03o}"
-                except OSError:
-                    path_mode = "?"
-
-                parent_path = os.path.dirname(path)
-                parent_path_access_ok = os.access(parent_path, os.W_OK)
-                try:
-                    parent_path_mode = f"{os.stat(parent_path).st_mode:03o}"
-                except OSError:
-                    parent_path_mode = "?"
-
-                logger.warning(
-                    "OSError for path = %s, path_mode = %s, access = %s, "
-                    "parent_path_mode = %s, parent_access = %s, "
-                    "error_message = %s, errno = %s",
-                    path,
-                    path_mode,
-                    path_access_ok,
-                    parent_path_mode,
-                    parent_path_access_ok,
-                    str(e),
-                    errno.errorcode.get(e.errno, e.errno),
-                )
+                await self._loop.run_in_executor(self._executor, log_error, e, path)
                 raise e
         else:
-            concrete_path.unlink()
+            yield await self._loop.run_in_executor(
+                self._executor, self._remove_single, path
+            )
 
     async def remove(self, path: PurePath) -> None:
-        await self._loop.run_in_executor(self._executor, self._remove, path)
+        async for __ in self.iterremove(path):
+            pass
 
     def _rename(self, old: PurePath, new: PurePath) -> None:
         concrete_old_path = Path(old)
@@ -324,26 +362,33 @@ async def copy_streams(
 
 
 async def _async_walk(
-        loop: asyncio.AbstractEventLoop,
-        executor: Optional[ThreadPoolExecutor],
-        # os.walk arguments:
-        top: Union[AnyStr, PurePath], topdown: bool = True,
-        onerror: Optional[Callable[[OSError], Any]] = None,
-        followlinks: bool = False,
-) -> AsyncIterator[Tuple[AnyStr, List[AnyStr], List[AnyStr]]]:
-    queue: asyncio.Queue = asyncio.Queue(500)
-    end_mark = object()
+    loop: asyncio.AbstractEventLoop,
+    executor: Optional[ThreadPoolExecutor],
+    # os.walk arguments:
+    top: Union[AnyStr, PurePath],
+    topdown: bool = True,
+    onerror: Optional[Callable[[OSError], Any]] = None,
+    followlinks: bool = False,
+) -> AsyncIterator[Tuple[str, List[str], List[str]]]:
+    class _EndMark:
+        pass
 
-    def sync_walker():
-        for entry in os.walk(top, topdown, onerror, followlinks):
+    queue: asyncio.Queue[
+        Union[Tuple[str, List[str], List[str]], Type[_EndMark]]
+    ] = asyncio.Queue(500)
+
+    casted_top = cast(PathLike, top)
+
+    def sync_walker() -> None:
+        for entry in os.walk(casted_top, topdown, onerror, followlinks):
             future = asyncio.run_coroutine_threadsafe(queue.put(entry), loop)
             future.result()
-        asyncio.run_coroutine_threadsafe(queue.put(end_mark), loop)
+        asyncio.run_coroutine_threadsafe(queue.put(_EndMark), loop)
 
     loop.run_in_executor(executor, sync_walker)
 
     while True:
         item = await queue.get()
-        if item == end_mark:
-            return
-        yield item
+        if isinstance(item, tuple):
+            yield item
+        return
