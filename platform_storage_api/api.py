@@ -222,7 +222,10 @@ class StorageHandler:
             if not await self._storage.exists(storage_path):
                 raise web.HTTPNotFound
             await self._check_user_permissions(request, storage_path)
-            await self._handle_delete(storage_path)
+            if self._accepts_ndjson(request):
+                return await self._handle_iterdelete(request, storage_path)
+            else:
+                await self._handle_delete(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_post(self, request: web.Request) -> web.StreamResponse:
@@ -544,6 +547,19 @@ class StorageHandler:
         except FileNotFoundError:
             raise web.HTTPNotFound
         raise web.HTTPNoContent
+
+    async def _handle_iterdelete(
+        self, request: Request, storage_path: PurePath
+    ) -> web.StreamResponse:
+        response = web.StreamResponse()
+        response.headers["Content-Type"] = "application/x-ndjson"
+        await response.prepare(request)
+        async for fstat in await self._storage.iterremove(storage_path):
+            stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
+            await response.write(json.dumps(stat_dict).encode() + b"\r\n")
+        await response.write_eof()
+
+        return response
 
     async def _handle_rename(
         self, old: PurePath, request: web.Request

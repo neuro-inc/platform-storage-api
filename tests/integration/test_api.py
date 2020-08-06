@@ -15,8 +15,8 @@ from platform_storage_api.fs.local import FileStatusType
 from tests.integration.conftest import (
     ApiConfig,
     get_filestatus_dict,
-    get_iterstatus_list,
     get_liststatus_dict,
+    status_iter_response_to_list,
 )
 
 
@@ -176,7 +176,7 @@ class TestStorage:
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await get_iterstatus_list(response.content)
+            statuses = await status_iter_response_to_list(response.content)
             file_status = statuses[0]
 
             assert file_status == {
@@ -213,7 +213,7 @@ class TestStorage:
         async with client.get(dir_url + "?liststatus", headers=headers) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await get_iterstatus_list(response.content)
+            statuses = await status_iter_response_to_list(response.content)
             file_status = statuses[0]
 
             assert file_status == {
@@ -616,6 +616,81 @@ class TestStorage:
 
         async with client.delete(url, headers=headers) as response:
             assert response.status == aiohttp.web.HTTPNoContent.status_code
+
+    @pytest.mark.asyncio
+    async def test_iterdelete_file(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
+        url = f"{server_url}{path_str}"
+        payload = b"test"
+
+        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        headers["Accept"] = "application/x-ndjson"
+        async with client.delete(url, headers=headers) as response:
+            assert response.status == 200
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await status_iter_response_to_list(response.content)
+            file_status = statuses[0]
+
+            assert file_status == {
+                "path": path_str,
+                "type": str(FileStatusType.FILE),
+                "length": mock.ANY,
+                "modificationTime": mock.ANY,
+                "permission": mock.ANY,
+            }
+
+    @pytest.mark.asyncio
+    async def test_iterdelete_dir_with_file(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path_str = f"/{user.name}/new/nested/to_delete"
+        file_path_str = f"{dir_path_str}/{uuid.uuid4()}"
+        payload = b"test"
+
+        async with client.put(
+            f"{server_url}{file_path_str}", headers=headers, data=BytesIO(payload)
+        ) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        headers["Accept"] = "application/x-ndjson"
+        async with client.delete(
+            f"{server_url}{dir_path_str}", headers=headers
+        ) as response:
+            assert response.status == 200
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await status_iter_response_to_list(response.content)
+
+            assert statuses[0] == {
+                "path": file_path_str,
+                "type": str(FileStatusType.FILE),
+                "length": mock.ANY,
+                "modificationTime": mock.ANY,
+                "permission": mock.ANY,
+            }
+
+            assert statuses[1] == {
+                "path": dir_path_str,
+                "type": str(FileStatusType.DIRECTORY),
+                "length": mock.ANY,
+                "modificationTime": mock.ANY,
+                "permission": mock.ANY,
+            }
 
 
 class TestGetFileStatus:

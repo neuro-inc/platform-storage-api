@@ -391,4 +391,5 @@ async def _async_walk(
         item = await queue.get()
         if isinstance(item, tuple):
             yield item
-        return
+        else:
+            return

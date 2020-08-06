@@ -188,7 +188,7 @@ def cluster_name() -> str:
     return "test-cluster"
 
 
-async def get_iterstatus_list(
+async def status_iter_response_to_list(
     response_lines: AsyncIterable[bytes],
 ) -> List[Dict[str, Any]]:
     return [json.loads(line)["FileStatus"] async for line in response_lines]

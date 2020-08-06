@@ -1111,5 +1111,5 @@ class TestLocalFileSystem:
         for item in os_walk_result:
             assert item in async_walk_result
 
-        for item in os_walk_result:
-            assert item in async_walk_result
+        for item in async_walk_result:
+            assert item in os_walk_result

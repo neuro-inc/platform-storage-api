@@ -1,3 +1,4 @@
+import dataclasses
 import os
 from contextlib import asynccontextmanager
 from pathlib import PurePath
@@ -111,6 +112,17 @@ class Storage:
     async def remove(self, path: Union[PurePath, str]) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.remove(real_path)
+
+    @trace
+    async def iterremove(self, path: Union[PurePath, str]) -> AsyncIterator[FileStatus]:
+        real_path = self._resolve_real_path(PurePath(path))
+        return (
+            dataclasses.replace(
+                filestatus,
+                path=self.sanitize_path(filestatus.path.relative_to(self._base_path)),
+            )
+            async for filestatus in self._fs.iterremove(real_path)
+        )
 
     @trace
     async def rename(
