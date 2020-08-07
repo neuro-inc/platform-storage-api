@@ -146,7 +146,7 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
-    async def remove(self, path: PurePath, recursive: bool = False) -> None:
+    async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
         pass
 
     @abc.abstractmethod
@@ -298,7 +298,7 @@ class LocalFileSystem(FileSystem):
         else:
             concrete_path.unlink()
 
-    async def remove(self, path: PurePath, recursive: bool = False) -> None:
+    async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path, recursive)
 
     def _rename(self, old: PurePath, new: PurePath) -> None:

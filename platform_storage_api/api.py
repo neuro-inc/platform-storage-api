@@ -543,7 +543,7 @@ class StorageHandler:
     ) -> web.StreamResponse:
         recursive = request.query.get("recursive", "true") == "true"
         try:
-            await self._storage.remove(storage_path, recursive)
+            await self._storage.remove(storage_path, recursive=recursive)
         except FileNotFoundError:
             raise web.HTTPNotFound
         except IsADirectoryError as e:
