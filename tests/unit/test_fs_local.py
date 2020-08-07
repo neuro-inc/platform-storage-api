@@ -290,7 +290,7 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(path)
+        await fs.remove(path, recursive=True)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
@@ -318,10 +318,21 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(dir_path)
+        await fs.remove(dir_path, recursive=True)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
+
+    @pytest.mark.asyncio
+    async def test_rm_dir_non_recursive_fails(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        expected_path = Path("nested")
+        dir_path = tmp_dir_path / expected_path
+        await fs.mkdir(dir_path)
+
+        with pytest.raises(IsADirectoryError):
+            await fs.remove(dir_path, recursive=False)
 
     @pytest.mark.asyncio
     async def test_rm_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:

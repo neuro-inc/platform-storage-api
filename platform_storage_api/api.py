@@ -222,7 +222,7 @@ class StorageHandler:
             if not await self._storage.exists(storage_path):
                 raise web.HTTPNotFound
             await self._check_user_permissions(request, storage_path)
-            await self._handle_delete(storage_path)
+            await self._handle_delete(storage_path, request)
         raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_post(self, request: web.Request) -> web.StreamResponse:
@@ -538,11 +538,16 @@ class StorageHandler:
             raise _http_bad_request("Predecessor is not a directory", errno=e.errno)
         raise web.HTTPCreated
 
-    async def _handle_delete(self, storage_path: PurePath) -> web.StreamResponse:
+    async def _handle_delete(
+        self, storage_path: PurePath, request: web.Request
+    ) -> web.StreamResponse:
+        recursive = request.query.get("recursive", "true") == "true"
         try:
-            await self._storage.remove(storage_path)
+            await self._storage.remove(storage_path, recursive)
         except FileNotFoundError:
             raise web.HTTPNotFound
+        except IsADirectoryError as e:
+            raise _http_bad_request("Target is a directory", errno=e.errno)
         raise web.HTTPNoContent
 
     async def _handle_rename(
