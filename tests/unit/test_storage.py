@@ -132,8 +132,9 @@ class TestStorage:
         real_dir_path = local_tmp_dir_path / dir_name
         await local_fs.mkdir(real_dir_path)
 
-        status = [status async for status in await storage.iterremove(f"/{dir_name}")][
-            0
-        ]
+        remove_listing = [
+            remove_listing
+            async for remove_listing in await storage.iterremove(f"/{dir_name}")
+        ][0]
 
-        assert status.path == PurePath(f"/{dir_name}")
+        assert remove_listing.path == PurePath(f"/{dir_name}")

@@ -7,7 +7,7 @@ from typing import Any, AsyncIterator, List, Union
 import aiohttp
 from aiohttp.abc import AbstractStreamWriter
 
-from .fs.local import FileStatus, FileSystem, copy_streams
+from .fs.local import FileStatus, FileSystem, RemoveListing, copy_streams
 from .trace import trace, tracing_cm
 
 
@@ -114,14 +114,18 @@ class Storage:
         await self._fs.remove(real_path)
 
     @trace
-    async def iterremove(self, path: Union[PurePath, str]) -> AsyncIterator[FileStatus]:
+    async def iterremove(
+        self, path: Union[PurePath, str]
+    ) -> AsyncIterator[RemoveListing]:
         real_path = self._resolve_real_path(PurePath(path))
         return (
             dataclasses.replace(
-                filestatus,
-                path=self.sanitize_path(filestatus.path.relative_to(self._base_path)),
+                remove_listing,
+                path=self.sanitize_path(
+                    remove_listing.path.relative_to(self._base_path)
+                ),
             )
-            async for filestatus in self._fs.iterremove(real_path)
+            async for remove_listing in self._fs.iterremove(real_path)
         )
 
     @trace

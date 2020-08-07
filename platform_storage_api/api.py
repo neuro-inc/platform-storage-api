@@ -554,9 +554,12 @@ class StorageHandler:
         response = web.StreamResponse()
         response.headers["Content-Type"] = "application/x-ndjson"
         await response.prepare(request)
-        async for fstat in await self._storage.iterremove(storage_path):
-            stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
-            await response.write(json.dumps(stat_dict).encode() + b"\r\n")
+        async for remove_listing in await self._storage.iterremove(storage_path):
+            listing_dict = {
+                "path": str(remove_listing.path),
+                "is_dir": remove_listing.is_dir,
+            }
+            await response.write(json.dumps(listing_dict).encode() + b"\r\n")
         await response.write_eof()
 
         return response

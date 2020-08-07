@@ -1,3 +1,4 @@
+import json
 import time
 import uuid
 from io import BytesIO
@@ -638,15 +639,12 @@ class TestStorage:
         async with client.delete(url, headers=headers) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await status_iter_response_to_list(response.content)
+            statuses = [json.loads(line) async for line in response.content]
             file_status = statuses[0]
 
             assert file_status == {
                 "path": path_str,
-                "type": str(FileStatusType.FILE),
-                "length": mock.ANY,
-                "modificationTime": mock.ANY,
-                "permission": mock.ANY,
+                "is_dir": False,
             }
 
     @pytest.mark.asyncio
@@ -674,22 +672,16 @@ class TestStorage:
         ) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await status_iter_response_to_list(response.content)
+            statuses = [json.loads(line) async for line in response.content]
 
             assert statuses[0] == {
                 "path": file_path_str,
-                "type": str(FileStatusType.FILE),
-                "length": mock.ANY,
-                "modificationTime": mock.ANY,
-                "permission": mock.ANY,
+                "is_dir": False,
             }
 
             assert statuses[1] == {
                 "path": dir_path_str,
-                "type": str(FileStatusType.DIRECTORY),
-                "length": mock.ANY,
-                "modificationTime": mock.ANY,
-                "permission": mock.ANY,
+                "is_dir": True,
             }
 
 

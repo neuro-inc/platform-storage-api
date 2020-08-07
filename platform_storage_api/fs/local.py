@@ -89,6 +89,12 @@ class FileStatus:
         return replace(self, permission=permission)
 
 
+@dataclass(frozen=True)
+class RemoveListing:
+    path: PurePath
+    is_dir: bool
+
+
 class FileSystem(AbstractAsyncContextManager):  # type: ignore
     @classmethod
     def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
@@ -154,7 +160,7 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
-    def iterremove(self, path: PurePath) -> AsyncIterator[FileStatus]:
+    def iterremove(self, path: PurePath) -> AsyncIterator[RemoveListing]:
         pass
 
     @abc.abstractmethod
@@ -268,16 +274,16 @@ class LocalFileSystem(FileSystem):
         with Path(path) as real_path:
             return not real_path.is_symlink() and real_path.is_dir()
 
-    def _remove_single(self, path: PurePath) -> FileStatus:
+    def _remove_single(self, path: PurePath) -> RemoveListing:
         with Path(path) as real_path:
-            file_status = self._create_filestatus(real_path)
             if self._remove_as_dir(path):
                 real_path.rmdir()
+                return RemoveListing(path=path, is_dir=True)
             else:
                 real_path.unlink()
-        return file_status
+                return RemoveListing(path=path, is_dir=False)
 
-    async def iterremove(self, path: PurePath) -> AsyncIterator[FileStatus]:
+    async def iterremove(self, path: PurePath) -> AsyncIterator[RemoveListing]:
 
         # Debug logging (sync code)
         def log_error(e: OSError, failed_path: PurePath) -> None:

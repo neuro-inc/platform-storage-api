@@ -399,22 +399,24 @@ class TestLocalFileSystem:
             for i in range(count):
                 name = f"file-{i}"
                 filepath = path / name
-                expected.append(filepath)
+                expected.append((filepath, False))
                 async with fs.open(filepath, "wb"):
                     pass
 
         to_remove_dir = tmp_dir_path / "to_remove"
         to_remove_dir.mkdir()
-        expected.append(to_remove_dir)
+        expected.append((to_remove_dir, True))
 
         for subdir_segments in (("foo",), ("bar",), ("foo", "baz")):
             subdir = to_remove_dir.joinpath(*subdir_segments)
             subdir.mkdir()
-            expected.append(subdir)
+            expected.append((subdir, True))
             await make_files(subdir, 100)
 
-        statuses = [status async for status in fs.iterremove(to_remove_dir)]
-        actual = [status.path for status in statuses]
+        actual = [
+            (remove_listing.path, remove_listing.is_dir)
+            async for remove_listing in fs.iterremove(to_remove_dir)
+        ]
         assert sorted(actual) == sorted(expected)
 
     @pytest.mark.asyncio
