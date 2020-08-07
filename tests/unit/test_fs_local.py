@@ -3,7 +3,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path, PurePath
-from typing import AsyncIterator, Iterable, Iterator, Set
+from typing import Any, AsyncIterator, Callable, Coroutine, Iterable, Iterator, Set
 from unittest import mock
 
 import pytest
@@ -32,6 +32,15 @@ class TestFileSystem:
     def test_create_s3(self) -> None:
         with pytest.raises(ValueError, match="Unsupported storage type: s3"):
             FileSystem.create(StorageType.S3)
+
+
+async def remove_normal(fs: FileSystem, path: PurePath) -> None:
+    await fs.remove(path)
+
+
+async def remove_iter(fs: FileSystem, path: PurePath) -> None:
+    async for _ in fs.iterremove(path):
+        pass
 
 
 class TestLocalFileSystem:
@@ -268,14 +277,26 @@ class TestLocalFileSystem:
             with pytest.raises(FileNotFoundError):
                 await it.__anext__()
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
-    async def test_rm_non_existent(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_non_existent(
+        self,
+        fs: FileSystem,
+        tmp_dir_path: Path,
+        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+    ) -> None:
         path = tmp_dir_path / "nested"
         with pytest.raises(FileNotFoundError):
-            await fs.remove(path)
+            await remove_method(fs, path)
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
-    async def test_rm_empty_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_empty_dir(
+        self,
+        fs: FileSystem,
+        tmp_dir_path: Path,
+        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+    ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
         await fs.mkdir(path)
@@ -292,13 +313,19 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(path)
+        await remove_method(fs, path)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
-    async def test_rm_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_dir(
+        self,
+        fs: FileSystem,
+        tmp_dir_path: Path,
+        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+    ) -> None:
         expected_path = Path("nested")
         dir_path = tmp_dir_path / expected_path
         file_path = dir_path / "file"
@@ -320,13 +347,19 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(dir_path)
+        await remove_method(fs, dir_path)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
-    async def test_rm_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_file(
+        self,
+        fs: FileSystem,
+        tmp_dir_path: Path,
+        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+    ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
 
@@ -346,13 +379,19 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(path)
+        await remove_method(fs, path)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
-    async def test_rm_symlink_to_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_symlink_to_dir(
+        self,
+        fs: FileSystem,
+        tmp_dir_path: Path,
+        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+    ) -> None:
         dir_path = tmp_dir_path / "dir"
         await fs.mkdir(dir_path)
         link_path = tmp_dir_path / "link"
@@ -377,7 +416,7 @@ class TestLocalFileSystem:
             ),
         ]
 
-        await fs.remove(link_path)
+        await remove_method(fs, link_path)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
