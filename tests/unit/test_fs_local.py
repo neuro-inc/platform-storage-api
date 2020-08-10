@@ -325,24 +325,18 @@ class TestLocalFileSystem:
     ) -> None:
         expected_path = Path("nested")
         dir_path = tmp_dir_path / expected_path
-        file_path = dir_path / "file"
         await fs.mkdir(dir_path)
+
+        subdir_path = dir_path / "subdir"
+        subdir_path.mkdir()
+
+        file_path = dir_path / "file"
         async with fs.open(file_path, mode="wb") as f:
             await f.write(b"test")
             await f.flush()
 
-        stat = os.stat(file_path)
-        expected_mtime = int(stat.st_mtime)
-
         statuses = await fs.liststatus(dir_path)
-        assert statuses == [
-            FileStatus(
-                Path("file"),
-                size=4,
-                type=FileStatusType.FILE,
-                modification_time=expected_mtime,
-            )
-        ]
+        assert len(statuses) == 2
 
         await remove_method(fs, dir_path, True)
 
