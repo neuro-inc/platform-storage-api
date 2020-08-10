@@ -32,13 +32,16 @@ class TestFileSystem:
             FileSystem.create(StorageType.S3)
 
 
-async def remove_normal(fs: FileSystem, path: PurePath) -> None:
-    await fs.remove(path)
+async def remove_normal(fs: FileSystem, path: PurePath, recursive: bool) -> None:
+    await fs.remove(path, recursive=recursive)
 
 
-async def remove_iter(fs: FileSystem, path: PurePath) -> None:
-    async for _ in fs.iterremove(path):
+async def remove_iter(fs: FileSystem, path: PurePath, recursive: bool) -> None:
+    async for _ in fs.iterremove(path, recursive=recursive):
         pass
+
+
+RemoveMethod = Callable[[FileSystem, PurePath, bool], Coroutine[Any, Any, None]]
 
 
 class TestLocalFileSystem:
@@ -275,25 +278,24 @@ class TestLocalFileSystem:
             with pytest.raises(FileNotFoundError):
                 await it.__anext__()
 
+    @pytest.mark.parametrize("recursive", [True, False])
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
     async def test_rm_non_existent(
         self,
         fs: FileSystem,
         tmp_dir_path: Path,
-        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+        remove_method: RemoveMethod,
+        recursive: bool,
     ) -> None:
         path = tmp_dir_path / "nested"
         with pytest.raises(FileNotFoundError):
-            await remove_method(fs, path)
+            await remove_method(fs, path, recursive)
 
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
     async def test_rm_empty_dir(
-        self,
-        fs: FileSystem,
-        tmp_dir_path: Path,
-        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod,
     ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
@@ -311,7 +313,7 @@ class TestLocalFileSystem:
             )
         ]
 
-        await remove_method(fs, path)
+        await remove_method(fs, path, True)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
@@ -319,10 +321,7 @@ class TestLocalFileSystem:
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
     async def test_rm_dir(
-        self,
-        fs: FileSystem,
-        tmp_dir_path: Path,
-        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod,
     ) -> None:
         expected_path = Path("nested")
         dir_path = tmp_dir_path / expected_path
@@ -345,18 +344,31 @@ class TestLocalFileSystem:
             )
         ]
 
-        await remove_method(fs, dir_path)
+        await remove_method(fs, dir_path, True)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
+    async def test_rm_dir_non_recursive_fails(
+        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod
+    ) -> None:
+        dir_path = tmp_dir_path / "nested"
+        await fs.mkdir(dir_path)
+
+        with pytest.raises(IsADirectoryError):
+            await remove_method(fs, dir_path, False)
+
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
+    @pytest.mark.parametrize("recursive", [True, False])
+    @pytest.mark.asyncio
     async def test_rm_file(
         self,
         fs: FileSystem,
         tmp_dir_path: Path,
-        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+        recursive: bool,
+        remove_method: RemoveMethod,
     ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
@@ -377,18 +389,20 @@ class TestLocalFileSystem:
             )
         ]
 
-        await remove_method(fs, path)
+        await remove_method(fs, path, recursive)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
+    @pytest.mark.parametrize("recursive", [True, False])
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
     async def test_rm_symlink_to_dir(
         self,
         fs: FileSystem,
         tmp_dir_path: Path,
-        remove_method: Callable[[FileSystem, PurePath], Coroutine[Any, Any, None]],
+        remove_method: RemoveMethod,
+        recursive: bool,
     ) -> None:
         dir_path = tmp_dir_path / "dir"
         await fs.mkdir(dir_path)
@@ -414,7 +428,7 @@ class TestLocalFileSystem:
             ),
         ]
 
-        await remove_method(fs, link_path)
+        await remove_method(fs, link_path, recursive)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
@@ -452,7 +466,7 @@ class TestLocalFileSystem:
 
         actual = [
             (remove_listing.path, remove_listing.is_dir)
-            async for remove_listing in fs.iterremove(to_remove_dir)
+            async for remove_listing in fs.iterremove(to_remove_dir, recursive=True)
         ]
         assert sorted(actual) == sorted(expected)
 

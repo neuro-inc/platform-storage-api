@@ -155,11 +155,13 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
-    async def remove(self, path: PurePath) -> None:
+    async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
         pass
 
     @abc.abstractmethod
-    def iterremove(self, path: PurePath) -> AsyncIterator[RemoveListing]:
+    def iterremove(
+        self, path: PurePath, *, recursive: bool = False
+    ) -> AsyncIterator[RemoveListing]:
         pass
 
     @abc.abstractmethod
@@ -316,8 +318,14 @@ class LocalFileSystem(FileSystem):
         os.rmdir(path)
         yield RemoveListing(path, is_dir=True)
 
-    async def iterremove(self, path: PurePath) -> AsyncIterator[RemoveListing]:
+    async def iterremove(
+        self, path: PurePath, *, recursive: bool = False
+    ) -> AsyncIterator[RemoveListing]:
         if self._remove_as_dir(path):
+            if not recursive:
+                raise IsADirectoryError(
+                    errno.EISDIR, "Is a directory, use recursive remove", str(path)
+                )
             try:
                 async for remove_entry in sync_iterator_to_async(
                     self._loop, self._executor, self._iterremove(path)
@@ -332,8 +340,12 @@ class LocalFileSystem(FileSystem):
             await self._loop.run_in_executor(self._executor, os.unlink, path)
             yield RemoveListing(path, is_dir=False)
 
-    def _remove(self, path: PurePath) -> None:
+    def _remove(self, path: PurePath, recursive: bool) -> None:
         if self._remove_as_dir(path):
+            if not recursive:
+                raise IsADirectoryError(
+                    errno.EISDIR, "Is a directory, use recursive remove", str(path)
+                )
             try:
                 shutil.rmtree(path)
             except OSError as e:
@@ -342,9 +354,8 @@ class LocalFileSystem(FileSystem):
         else:
             os.unlink(path)
 
-    async def remove(self, path: PurePath) -> None:
-        async for _ in self.iterremove(path):
-            pass
+    async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
+        await self._loop.run_in_executor(self._executor, self._remove, path, recursive)
 
     def _rename(self, old: PurePath, new: PurePath) -> None:
         concrete_old_path = Path(old)

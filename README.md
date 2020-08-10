@@ -12,8 +12,31 @@ source venv/bin/activate
 pip install -e .
 ```
 
-### Running tests locally
+### Running unit tests locally
 ```
 pip install -r requirements-test.txt
 pytest -vv tests
+```
+
+### Running integration tests locally
+Make sure you have docker installed.
+To build docker image where test run, you should set the following ENV variables:
+
+```
+export IMAGE_TAG=latest
+export IMAGE_REPO=%link-to-docker-repo%
+```
+
+The `%link-to-docker-repo%` links to repo with other services docker images. 
+It depends on current setup. Please refer to onboarding guide to get it.
+
+Then you can run tests with next command:
+
+```
+make test_integration
+```
+
+### Reformatting code
+```
+make format
 ```

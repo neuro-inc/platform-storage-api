@@ -134,7 +134,9 @@ class TestStorage:
 
         remove_listing = [
             remove_listing
-            async for remove_listing in await storage.iterremove(f"/{dir_name}")
+            async for remove_listing in await storage.iterremove(
+                f"/{dir_name}", recursive=True
+            )
         ][0]
 
         assert remove_listing.path == PurePath(f"/{dir_name}")

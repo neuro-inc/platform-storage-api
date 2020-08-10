@@ -109,13 +109,15 @@ class Storage:
         await self._fs.mkdir(real_path)
 
     @trace
-    async def remove(self, path: Union[PurePath, str]) -> None:
+    async def remove(
+        self, path: Union[PurePath, str], *, recursive: bool = False
+    ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
-        await self._fs.remove(real_path)
+        await self._fs.remove(real_path, recursive=recursive)
 
     @trace
     async def iterremove(
-        self, path: Union[PurePath, str]
+        self, path: Union[PurePath, str], *, recursive: bool = False
     ) -> AsyncIterator[RemoveListing]:
         real_path = self._resolve_real_path(PurePath(path))
         return (
@@ -125,7 +127,9 @@ class Storage:
                     remove_listing.path.relative_to(self._base_path)
                 ),
             )
-            async for remove_listing in self._fs.iterremove(real_path)
+            async for remove_listing in self._fs.iterremove(
+                real_path, recursive=recursive
+            )
         )
 
     @trace
