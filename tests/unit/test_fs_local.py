@@ -1,4 +1,3 @@
-import asyncio
 import os
 import tempfile
 import uuid
@@ -14,7 +13,6 @@ from platform_storage_api.fs.local import (
     FileSystem,
     LocalFileSystem,
     StorageType,
-    _async_walk,
     copy_streams,
 )
 from platform_storage_api.trace import CURRENT_TRACER
@@ -1129,28 +1127,3 @@ class TestLocalFileSystem:
         async with fs.open(old_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
-
-    @pytest.mark.asyncio
-    async def test_async_walk(self, fs: FileSystem, tmp_dir_path: Path) -> None:
-
-        foo_dir = tmp_dir_path / "foo"
-        bar_dir = tmp_dir_path / "boo" / "bar"
-
-        foo_dir.mkdir(parents=True)
-        bar_dir.mkdir(parents=True)
-
-        (tmp_dir_path / "test1").touch()
-        (foo_dir / "test2").touch()
-        (bar_dir / "test3").touch()
-
-        os_walk_result = list(os.walk(tmp_dir_path))  # In test its OK to block loop
-        async_walk_result = list()
-        async for item in _async_walk(asyncio.get_running_loop(), None, tmp_dir_path):
-            async_walk_result.append(item)
-
-        # Set equivalence check for to list
-        for item in os_walk_result:
-            assert item in async_walk_result
-
-        for item in async_walk_result:
-            assert item in os_walk_result

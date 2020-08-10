@@ -16,12 +16,12 @@ from typing import (
     Any,
     AsyncContextManager,
     AsyncIterator,
-    Callable,
+    Iterable,
     Iterator,
     List,
     Optional,
-    Tuple,
     Type,
+    TypeVar,
     Union,
     cast,
 )
@@ -273,15 +273,6 @@ class LocalFileSystem(FileSystem):
         real_path = Path(path)
         return not real_path.is_symlink() and real_path.is_dir()
 
-    def _remove_single(self, path: PurePath, dir: bool) -> RemoveListing:
-        real_path = Path(path)
-        if dir:
-            real_path.rmdir()
-            return RemoveListing(path=path, is_dir=True)
-        else:
-            real_path.unlink()
-            return RemoveListing(path=path, is_dir=False)
-
     def _log_remove_error(self, e: OSError, failed_path: PurePath) -> None:
         if e.filename:
             failed_path = e.filename
@@ -311,30 +302,35 @@ class LocalFileSystem(FileSystem):
             errno.errorcode.get(e.errno, e.errno),
         )
 
+    def _iterremove(self, path: PurePath) -> Iterator[RemoveListing]:
+        with os.scandir(path) as scandir_it:
+            entries = list(scandir_it)
+
+        for entry in entries:
+            entry_path = PurePath(entry.path)
+            if entry.is_dir():
+                yield from self._iterremove(entry_path)
+            else:
+                os.unlink(entry_path)
+                yield RemoveListing(entry_path, is_dir=False)
+        os.rmdir(path)
+        yield RemoveListing(path, is_dir=True)
+
     async def iterremove(self, path: PurePath) -> AsyncIterator[RemoveListing]:
         if self._remove_as_dir(path):
             try:
-                async for (dirpath, _, filenames) in _async_walk(
-                    self._loop, self._executor, path, topdown=False
+                async for remove_entry in sync_iterator_to_async(
+                    self._loop, self._executor, self._iterremove(path)
                 ):
-                    dir = PurePath(dirpath)
-                    for file in filenames:
-                        filepath = dir / file
-                        yield await self._loop.run_in_executor(
-                            self._executor, self._remove_single, filepath, False
-                        )
-                    yield await self._loop.run_in_executor(
-                        self._executor, self._remove_single, dir, True
-                    )
+                    yield remove_entry
             except OSError as e:
                 await self._loop.run_in_executor(
                     self._executor, self._log_remove_error, e, path
                 )
                 raise e
         else:
-            yield await self._loop.run_in_executor(
-                self._executor, self._remove_single, path, False
-            )
+            await self._loop.run_in_executor(self._executor, os.unlink, path)
+            yield RemoveListing(path, is_dir=False)
 
     def _remove(self, path: PurePath) -> None:
         if self._remove_as_dir(path):
@@ -344,7 +340,7 @@ class LocalFileSystem(FileSystem):
                 self._log_remove_error(e, path)
                 raise e
         else:
-            self._remove_single(path, False)
+            os.unlink(path)
 
     async def remove(self, path: PurePath) -> None:
         async for _ in self.iterremove(path):
@@ -376,31 +372,40 @@ async def copy_streams(
         await instream.write(chunk)
 
 
-async def _async_walk(
+_T = TypeVar("_T")
+
+
+async def sync_iterator_to_async(
     loop: asyncio.AbstractEventLoop,
     executor: Optional[ThreadPoolExecutor],
-    # os.walk arguments:
-    top: Union[str, PurePath],
-    topdown: bool = True,
-    onerror: Optional[Callable[[OSError], Any]] = None,
-    followlinks: bool = False,
-) -> AsyncIterator[Tuple[str, List[str], List[str]]]:
+    iter: Iterable[_T],
+    queue_size: int = 5000,
+) -> AsyncIterator[_T]:
+    class EndMark:
+        pass
 
-    queue: asyncio.Queue[Optional[Tuple[str, List[str], List[str]]]] = asyncio.Queue(
-        500
-    )
+    chunk_size = max(queue_size / 20, 50)
 
-    def sync_walker() -> None:
-        for entry in os.walk(top, topdown, onerror, followlinks):
-            future = asyncio.run_coroutine_threadsafe(queue.put(entry), loop)
-            future.result()
-        asyncio.run_coroutine_threadsafe(queue.put(None), loop)
+    queue: asyncio.Queue[Union[_T, EndMark]] = asyncio.Queue(queue_size)
 
-    loop.run_in_executor(executor, sync_walker)
+    async def put_to_queue(chunk: List[Union[_T, EndMark]]) -> None:
+        for item in chunk:
+            await queue.put(item)
+
+    def sync_runner() -> None:
+        chunk: List[Union[_T, EndMark]] = []
+        for item in iter:
+            chunk.append(item)
+            if len(chunk) == chunk_size:
+                asyncio.run_coroutine_threadsafe(put_to_queue(chunk), loop).done()
+                chunk = []
+        chunk.append(EndMark())
+        asyncio.run_coroutine_threadsafe(put_to_queue(chunk), loop).done()
+
+    loop.run_in_executor(executor, sync_runner)
 
     while True:
         item = await queue.get()
-        if item:
-            yield item
-        else:
+        if isinstance(item, EndMark):
             return
+        yield item
