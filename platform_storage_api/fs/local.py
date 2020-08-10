@@ -146,7 +146,7 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
-    async def remove(self, path: PurePath) -> None:
+    async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
         pass
 
     @abc.abstractmethod
@@ -256,9 +256,13 @@ class LocalFileSystem(FileSystem):
     async def exists(self, path: PurePath) -> bool:
         return await self._loop.run_in_executor(self._executor, Path(path).exists)
 
-    def _remove(self, path: PurePath) -> None:
+    def _remove(self, path: PurePath, recursive: bool) -> None:
         concrete_path = Path(path)
         if not concrete_path.is_symlink() and concrete_path.is_dir():
+            if not recursive:
+                raise IsADirectoryError(
+                    errno.EISDIR, "Is a directory, use recursive remove", str(path)
+                )
             try:
                 shutil.rmtree(concrete_path)
             except OSError as e:
@@ -294,8 +298,8 @@ class LocalFileSystem(FileSystem):
         else:
             concrete_path.unlink()
 
-    async def remove(self, path: PurePath) -> None:
-        await self._loop.run_in_executor(self._executor, self._remove, path)
+    async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
+        await self._loop.run_in_executor(self._executor, self._remove, path, recursive)
 
     def _rename(self, old: PurePath, new: PurePath) -> None:
         concrete_old_path = Path(old)

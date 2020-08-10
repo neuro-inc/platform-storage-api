@@ -290,7 +290,7 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(path)
+        await fs.remove(path, recursive=True)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
@@ -318,13 +318,26 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(dir_path)
+        await fs.remove(dir_path, recursive=True)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
     @pytest.mark.asyncio
-    async def test_rm_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_dir_non_recursive_fails(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        dir_path = tmp_dir_path / "nested"
+        await fs.mkdir(dir_path)
+
+        with pytest.raises(IsADirectoryError):
+            await fs.remove(dir_path, recursive=False)
+
+    @pytest.mark.parametrize("recursive", [True, False])
+    @pytest.mark.asyncio
+    async def test_rm_file(
+        self, fs: FileSystem, tmp_dir_path: Path, recursive: bool
+    ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
 
@@ -344,13 +357,16 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(path)
+        await fs.remove(path, recursive=recursive)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
+    @pytest.mark.parametrize("recursive", [True, False])
     @pytest.mark.asyncio
-    async def test_rm_symlink_to_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_symlink_to_dir(
+        self, fs: FileSystem, tmp_dir_path: Path, recursive: bool
+    ) -> None:
         dir_path = tmp_dir_path / "dir"
         await fs.mkdir(dir_path)
         link_path = tmp_dir_path / "link"
@@ -375,7 +391,7 @@ class TestLocalFileSystem:
             ),
         ]
 
-        await fs.remove(link_path)
+        await fs.remove(link_path, recursive=recursive)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [

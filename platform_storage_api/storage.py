@@ -108,9 +108,11 @@ class Storage:
         await self._fs.mkdir(real_path)
 
     @trace
-    async def remove(self, path: Union[PurePath, str]) -> None:
+    async def remove(
+        self, path: Union[PurePath, str], *, recursive: bool = False
+    ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
-        await self._fs.remove(real_path)
+        await self._fs.remove(real_path, recursive=recursive)
 
     @trace
     async def rename(

@@ -617,6 +617,55 @@ class TestStorage:
         async with client.delete(url, headers=headers) as response:
             assert response.status == aiohttp.web.HTTPNoContent.status_code
 
+    @pytest.mark.asyncio
+    async def test_cant_delete_folder_without_non_recursive(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        params_mkdir = {"op": "MKDIRS"}
+        params_delete = {"recursive": "false"}
+        path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
+        url = f"{server_url}{path_str}"
+
+        async with client.put(url, headers=headers, params=params_mkdir) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        async with client.delete(
+            url, headers=headers, params=params_delete
+        ) as response:
+            assert response.status == aiohttp.web.HTTPBadRequest.status_code
+            payload = await response.json()
+            assert payload["error"] == "Target is a directory"
+            assert payload["errno"] == "EISDIR"
+
+    @pytest.mark.asyncio
+    async def test_can_delete_folder_with_recursive_set(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        params_mkdir = {"op": "MKDIRS"}
+        params_delete = {"recursive": "true"}
+        path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
+        url = f"{server_url}{path_str}"
+
+        async with client.put(url, headers=headers, params=params_mkdir) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        async with client.delete(
+            url, headers=headers, params=params_delete
+        ) as response:
+            assert response.status == aiohttp.web.HTTPNoContent.status_code
+
 
 class TestGetFileStatus:
 
