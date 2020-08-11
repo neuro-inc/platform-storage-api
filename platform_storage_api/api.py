@@ -222,7 +222,10 @@ class StorageHandler:
             if not await self._storage.exists(storage_path):
                 raise web.HTTPNotFound
             await self._check_user_permissions(request, storage_path)
-            await self._handle_delete(storage_path, request)
+            if self._accepts_ndjson(request):
+                return await self._handle_iterdelete(request, storage_path)
+            else:
+                await self._handle_delete(storage_path, request)
         raise ValueError(f"Illegal operation: {operation}")
 
     async def handle_post(self, request: web.Request) -> web.StreamResponse:
@@ -544,11 +547,31 @@ class StorageHandler:
         recursive = request.query.get("recursive", "true") == "true"
         try:
             await self._storage.remove(storage_path, recursive=recursive)
-        except FileNotFoundError:
-            raise web.HTTPNotFound
         except IsADirectoryError as e:
             raise _http_bad_request("Target is a directory", errno=e.errno)
         raise web.HTTPNoContent
+
+    async def _handle_iterdelete(
+        self, request: Request, storage_path: PurePath
+    ) -> web.StreamResponse:
+        recursive = request.query.get("recursive", "true") == "true"
+        response = web.StreamResponse()
+        response.headers["Content-Type"] = "application/x-ndjson"
+        await response.prepare(request)
+        try:
+            async for remove_listing in await self._storage.iterremove(
+                storage_path, recursive=recursive
+            ):
+                listing_dict = {
+                    "path": str(remove_listing.path),
+                    "is_dir": remove_listing.is_dir,
+                }
+                await response.write(json.dumps(listing_dict).encode() + b"\r\n")
+        except IsADirectoryError as e:
+            raise _http_bad_request("Target is a directory", errno=e.errno)
+        else:
+            await response.write_eof()
+            return response
 
     async def _handle_rename(
         self, old: PurePath, request: web.Request

@@ -16,10 +16,13 @@ from typing import (
     Any,
     AsyncContextManager,
     AsyncIterator,
+    Iterable,
     Iterator,
     List,
     Optional,
     Type,
+    TypeVar,
+    Union,
     cast,
 )
 
@@ -85,6 +88,12 @@ class FileStatus:
         return replace(self, permission=permission)
 
 
+@dataclass(frozen=True)
+class RemoveListing:
+    path: PurePath
+    is_dir: bool
+
+
 class FileSystem(AbstractAsyncContextManager):  # type: ignore
     @classmethod
     def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
@@ -147,6 +156,12 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
 
     @abc.abstractmethod
     async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
+        pass
+
+    @abc.abstractmethod
+    def iterremove(
+        self, path: PurePath, *, recursive: bool = False
+    ) -> AsyncIterator[RemoveListing]:
         pass
 
     @abc.abstractmethod
@@ -256,47 +271,88 @@ class LocalFileSystem(FileSystem):
     async def exists(self, path: PurePath) -> bool:
         return await self._loop.run_in_executor(self._executor, Path(path).exists)
 
-    def _remove(self, path: PurePath, recursive: bool) -> None:
-        concrete_path = Path(path)
-        if not concrete_path.is_symlink() and concrete_path.is_dir():
+    def _remove_as_dir(self, path: PurePath) -> bool:
+        real_path = Path(path)
+        return not real_path.is_symlink() and real_path.is_dir()
+
+    def _log_remove_error(self, e: OSError, failed_path: PurePath) -> None:
+        if e.filename:
+            failed_path = e.filename
+        path_access_ok = os.access(failed_path, os.W_OK)
+        try:
+            path_mode = f"{os.stat(failed_path).st_mode:03o}"
+        except OSError:
+            path_mode = "?"
+
+        parent_path = os.path.dirname(failed_path)
+        parent_path_access_ok = os.access(parent_path, os.W_OK)
+        try:
+            parent_path_mode = f"{os.stat(parent_path).st_mode:03o}"
+        except OSError:
+            parent_path_mode = "?"
+
+        logger.warning(
+            "OSError for path = %s, path_mode = %s, access = %s, "
+            "parent_path_mode = %s, parent_access = %s, "
+            "error_message = %s, errno = %s",
+            failed_path,
+            path_mode,
+            path_access_ok,
+            parent_path_mode,
+            parent_path_access_ok,
+            str(e),
+            errno.errorcode.get(e.errno, e.errno),
+        )
+
+    def _iterremove(self, path: PurePath) -> Iterator[RemoveListing]:
+        with os.scandir(path) as scandir_it:
+            entries = list(scandir_it)
+
+        for entry in entries:
+            entry_path = PurePath(entry.path)
+            if entry.is_dir():
+                yield from self._iterremove(entry_path)
+            else:
+                os.unlink(entry_path)
+                yield RemoveListing(entry_path, is_dir=False)
+        os.rmdir(path)
+        yield RemoveListing(path, is_dir=True)
+
+    async def iterremove(
+        self, path: PurePath, *, recursive: bool = False
+    ) -> AsyncIterator[RemoveListing]:
+        if self._remove_as_dir(path):
             if not recursive:
                 raise IsADirectoryError(
                     errno.EISDIR, "Is a directory, use recursive remove", str(path)
                 )
             try:
-                shutil.rmtree(concrete_path)
+                async for remove_entry in sync_iterator_to_async(
+                    self._loop, self._executor, self._iterremove(path)
+                ):
+                    yield remove_entry
             except OSError as e:
-                # Debug logging
-                if e.filename:
-                    path = e.filename
-                path_access_ok = os.access(path, os.W_OK)
-                try:
-                    path_mode = f"{os.stat(path).st_mode:03o}"
-                except OSError:
-                    path_mode = "?"
-
-                parent_path = os.path.dirname(path)
-                parent_path_access_ok = os.access(parent_path, os.W_OK)
-                try:
-                    parent_path_mode = f"{os.stat(parent_path).st_mode:03o}"
-                except OSError:
-                    parent_path_mode = "?"
-
-                logger.warning(
-                    "OSError for path = %s, path_mode = %s, access = %s, "
-                    "parent_path_mode = %s, parent_access = %s, "
-                    "error_message = %s, errno = %s",
-                    path,
-                    path_mode,
-                    path_access_ok,
-                    parent_path_mode,
-                    parent_path_access_ok,
-                    str(e),
-                    errno.errorcode.get(e.errno, e.errno),
+                await self._loop.run_in_executor(
+                    self._executor, self._log_remove_error, e, path
                 )
                 raise e
         else:
-            concrete_path.unlink()
+            await self._loop.run_in_executor(self._executor, os.unlink, path)
+            yield RemoveListing(path, is_dir=False)
+
+    def _remove(self, path: PurePath, recursive: bool) -> None:
+        if self._remove_as_dir(path):
+            if not recursive:
+                raise IsADirectoryError(
+                    errno.EISDIR, "Is a directory, use recursive remove", str(path)
+                )
+            try:
+                shutil.rmtree(path)
+            except OSError as e:
+                self._log_remove_error(e, path)
+                raise e
+        else:
+            os.unlink(path)
 
     async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path, recursive)
@@ -325,3 +381,42 @@ async def copy_streams(
         if not chunk:
             break
         await instream.write(chunk)
+
+
+_T = TypeVar("_T")
+
+
+async def sync_iterator_to_async(
+    loop: asyncio.AbstractEventLoop,
+    executor: Optional[ThreadPoolExecutor],
+    iter: Iterable[_T],
+    queue_size: int = 5000,
+) -> AsyncIterator[_T]:
+    class EndMark:
+        pass
+
+    chunk_size = max(queue_size / 20, 50)
+
+    queue: asyncio.Queue[Union[_T, EndMark]] = asyncio.Queue(queue_size)
+
+    async def put_to_queue(chunk: List[Union[_T, EndMark]]) -> None:
+        for item in chunk:
+            await queue.put(item)
+
+    def sync_runner() -> None:
+        chunk: List[Union[_T, EndMark]] = []
+        for item in iter:
+            chunk.append(item)
+            if len(chunk) == chunk_size:
+                asyncio.run_coroutine_threadsafe(put_to_queue(chunk), loop).done()
+                chunk = []
+        chunk.append(EndMark())
+        asyncio.run_coroutine_threadsafe(put_to_queue(chunk), loop).done()
+
+    loop.run_in_executor(executor, sync_runner)
+
+    while True:
+        item = await queue.get()
+        if isinstance(item, EndMark):
+            return
+        yield item

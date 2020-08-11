@@ -10,7 +10,7 @@ import yarl
 from neuro_auth_client import User
 
 from platform_storage_api.fs.local import FileStatusType
-from tests.integration.conftest import ApiConfig, get_iterstatus_list
+from tests.integration.conftest import ApiConfig, status_iter_response_to_list
 
 
 class TestStorageListAndResourceSharing:
@@ -130,7 +130,7 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await get_iterstatus_list(response.content)
+            statuses = await status_iter_response_to_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -196,7 +196,7 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await get_iterstatus_list(response.content)
+            statuses = await status_iter_response_to_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -275,7 +275,7 @@ class TestStorageListAndResourceSharing:
         ) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await get_iterstatus_list(response.content)
+            statuses = await status_iter_response_to_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -368,7 +368,7 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await get_iterstatus_list(response.content)
+            statuses = await status_iter_response_to_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -394,7 +394,7 @@ class TestStorageListAndResourceSharing:
         ) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await get_iterstatus_list(response.content)
+            statuses = await status_iter_response_to_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {
@@ -412,7 +412,7 @@ class TestStorageListAndResourceSharing:
         ) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            statuses = await get_iterstatus_list(response.content)
+            statuses = await status_iter_response_to_list(response.content)
             statuses = sorted(statuses, key=self.file_status_sort)
             assert statuses == [
                 {

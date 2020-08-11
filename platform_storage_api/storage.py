@@ -1,3 +1,4 @@
+import dataclasses
 import os
 from contextlib import asynccontextmanager
 from pathlib import PurePath
@@ -6,7 +7,7 @@ from typing import Any, AsyncIterator, List, Union
 import aiohttp
 from aiohttp.abc import AbstractStreamWriter
 
-from .fs.local import FileStatus, FileSystem, copy_streams
+from .fs.local import FileStatus, FileSystem, RemoveListing, copy_streams
 from .trace import trace, tracing_cm
 
 
@@ -113,6 +114,23 @@ class Storage:
     ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         await self._fs.remove(real_path, recursive=recursive)
+
+    @trace
+    async def iterremove(
+        self, path: Union[PurePath, str], *, recursive: bool = False
+    ) -> AsyncIterator[RemoveListing]:
+        real_path = self._resolve_real_path(PurePath(path))
+        return (
+            dataclasses.replace(
+                remove_listing,
+                path=self.sanitize_path(
+                    remove_listing.path.relative_to(self._base_path)
+                ),
+            )
+            async for remove_listing in self._fs.iterremove(
+                real_path, recursive=recursive
+            )
+        )
 
     @trace
     async def rename(

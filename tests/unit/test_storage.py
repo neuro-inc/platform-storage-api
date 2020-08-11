@@ -120,3 +120,23 @@ class TestStorage:
         assert storage_stat.path == real_dir_path
         assert storage_stat.size == 0
         assert storage_stat.modification_time == int(real_stat.st_mtime)
+
+    @pytest.mark.asyncio
+    async def test_iterremove_returns_proper_path(
+        self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
+    ) -> None:
+        base_path = local_tmp_dir_path
+        storage = Storage(fs=local_fs, base_path=base_path)
+
+        dir_name = "dir"
+        real_dir_path = local_tmp_dir_path / dir_name
+        await local_fs.mkdir(real_dir_path)
+
+        remove_listing = [
+            remove_listing
+            async for remove_listing in await storage.iterremove(
+                f"/{dir_name}", recursive=True
+            )
+        ][0]
+
+        assert remove_listing.path == PurePath(f"/{dir_name}")

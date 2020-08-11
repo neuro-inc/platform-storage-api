@@ -2,7 +2,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path, PurePath
-from typing import AsyncIterator, Iterable, Iterator, Set
+from typing import Any, AsyncIterator, Callable, Coroutine, Iterable, Iterator, Set
 from unittest import mock
 
 import pytest
@@ -30,6 +30,18 @@ class TestFileSystem:
     def test_create_s3(self) -> None:
         with pytest.raises(ValueError, match="Unsupported storage type: s3"):
             FileSystem.create(StorageType.S3)
+
+
+async def remove_normal(fs: FileSystem, path: PurePath, recursive: bool) -> None:
+    await fs.remove(path, recursive=recursive)
+
+
+async def remove_iter(fs: FileSystem, path: PurePath, recursive: bool) -> None:
+    async for _ in fs.iterremove(path, recursive=recursive):
+        pass
+
+
+RemoveMethod = Callable[[FileSystem, PurePath, bool], Coroutine[Any, Any, None]]
 
 
 class TestLocalFileSystem:
@@ -266,14 +278,25 @@ class TestLocalFileSystem:
             with pytest.raises(FileNotFoundError):
                 await it.__anext__()
 
+    @pytest.mark.parametrize("recursive", [True, False])
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
-    async def test_rm_non_existent(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_non_existent(
+        self,
+        fs: FileSystem,
+        tmp_dir_path: Path,
+        remove_method: RemoveMethod,
+        recursive: bool,
+    ) -> None:
         path = tmp_dir_path / "nested"
         with pytest.raises(FileNotFoundError):
-            await fs.remove(path)
+            await remove_method(fs, path, recursive)
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
-    async def test_rm_empty_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_empty_dir(
+        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod,
+    ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
         await fs.mkdir(path)
@@ -290,53 +313,56 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(path, recursive=True)
+        await remove_method(fs, path, True)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
-    async def test_rm_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_rm_dir(
+        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod,
+    ) -> None:
         expected_path = Path("nested")
         dir_path = tmp_dir_path / expected_path
-        file_path = dir_path / "file"
         await fs.mkdir(dir_path)
+
+        subdir_path = dir_path / "subdir"
+        subdir_path.mkdir()
+
+        file_path = dir_path / "file"
         async with fs.open(file_path, mode="wb") as f:
             await f.write(b"test")
             await f.flush()
 
-        stat = os.stat(file_path)
-        expected_mtime = int(stat.st_mtime)
-
         statuses = await fs.liststatus(dir_path)
-        assert statuses == [
-            FileStatus(
-                Path("file"),
-                size=4,
-                type=FileStatusType.FILE,
-                modification_time=expected_mtime,
-            )
-        ]
+        assert len(statuses) == 2
 
-        await fs.remove(dir_path, recursive=True)
+        await remove_method(fs, dir_path, True)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
     async def test_rm_dir_non_recursive_fails(
-        self, fs: FileSystem, tmp_dir_path: Path
+        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod
     ) -> None:
         dir_path = tmp_dir_path / "nested"
         await fs.mkdir(dir_path)
 
         with pytest.raises(IsADirectoryError):
-            await fs.remove(dir_path, recursive=False)
+            await remove_method(fs, dir_path, False)
 
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.parametrize("recursive", [True, False])
     @pytest.mark.asyncio
     async def test_rm_file(
-        self, fs: FileSystem, tmp_dir_path: Path, recursive: bool
+        self,
+        fs: FileSystem,
+        tmp_dir_path: Path,
+        recursive: bool,
+        remove_method: RemoveMethod,
     ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
@@ -357,15 +383,20 @@ class TestLocalFileSystem:
             )
         ]
 
-        await fs.remove(path, recursive=recursive)
+        await remove_method(fs, path, recursive)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
     @pytest.mark.parametrize("recursive", [True, False])
+    @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
     async def test_rm_symlink_to_dir(
-        self, fs: FileSystem, tmp_dir_path: Path, recursive: bool
+        self,
+        fs: FileSystem,
+        tmp_dir_path: Path,
+        remove_method: RemoveMethod,
+        recursive: bool,
     ) -> None:
         dir_path = tmp_dir_path / "dir"
         await fs.mkdir(dir_path)
@@ -391,7 +422,7 @@ class TestLocalFileSystem:
             ),
         ]
 
-        await fs.remove(link_path, recursive=recursive)
+        await remove_method(fs, link_path, recursive)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == [
@@ -402,6 +433,36 @@ class TestLocalFileSystem:
                 modification_time=expected_mtime,
             )
         ]
+
+    @pytest.mark.asyncio
+    async def test_iterremove_many_files(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        expected = []
+
+        async def make_files(path: PurePath, count: int) -> None:
+            for i in range(count):
+                name = f"file-{i}"
+                filepath = path / name
+                expected.append((filepath, False))
+                async with fs.open(filepath, "wb"):
+                    pass
+
+        to_remove_dir = tmp_dir_path / "to_remove"
+        to_remove_dir.mkdir()
+        expected.append((to_remove_dir, True))
+
+        for subdir_segments in (("foo",), ("bar",), ("foo", "baz")):
+            subdir = to_remove_dir.joinpath(*subdir_segments)
+            subdir.mkdir()
+            expected.append((subdir, True))
+            await make_files(subdir, 100)
+
+        actual = [
+            (remove_listing.path, remove_listing.is_dir)
+            async for remove_listing in fs.iterremove(to_remove_dir, recursive=True)
+        ]
+        assert sorted(actual) == sorted(expected)
 
     @pytest.mark.asyncio
     async def test_get_filestatus_file(
