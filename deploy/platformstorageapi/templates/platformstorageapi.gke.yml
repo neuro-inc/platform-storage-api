@@ -21,6 +21,22 @@ spec:
       - name: platformstorageapi
         image: {{ .Values.IMAGE }}
         imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /api/v1/ping
+            port: tcp-web
+          initialDelaySeconds: 30
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/v1/ping
+            port: tcp-web
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        ports:
+          - containerPort: 8080
+            name: tcp-web
+            protocol: TCP
         resources:
           requests:
             cpu: {{ .Values.NP_STORAGE_REQUESTS_CPU }}
