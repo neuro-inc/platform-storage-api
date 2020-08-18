@@ -685,8 +685,10 @@ class TestStorage:
             }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("use_stream_response", [False, True])
     async def test_cant_delete_folder_without_non_recursive(
         self,
+        use_stream_response: bool,
         server_url: str,
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
@@ -696,11 +698,14 @@ class TestStorage:
         headers = {"Authorization": "Bearer " + user.token}
         params_mkdir = {"op": "MKDIRS"}
         params_delete = {"recursive": "false"}
-        path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
+        path_str = f"/{user.name}/new/nested/foobar222/{uuid.uuid4()}"
         url = f"{server_url}{path_str}"
 
         async with client.put(url, headers=headers, params=params_mkdir) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        if use_stream_response:
+            headers["Accept"] = "application/x-ndjson"
 
         async with client.delete(
             url, headers=headers, params=params_delete
