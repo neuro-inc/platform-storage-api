@@ -557,11 +557,14 @@ class StorageHandler:
         recursive = request.query.get("recursive", "true") == "true"
         response = web.StreamResponse()
         response.headers["Content-Type"] = "application/x-ndjson"
-        await response.prepare(request)
+        request_prepared = False
         try:
             async for remove_listing in await self._storage.iterremove(
                 storage_path, recursive=recursive
             ):
+                if not request_prepared:
+                    await response.prepare(request)
+                    request_prepared = True
                 listing_dict = {
                     "path": str(remove_listing.path),
                     "is_dir": remove_listing.is_dir,
