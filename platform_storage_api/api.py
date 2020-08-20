@@ -587,6 +587,8 @@ class StorageHandler:
                     "is_dir": remove_listing.is_dir,
                 }
                 await response.write(json.dumps(listing_dict).encode() + b"\r\n")
+        except asyncio.CancelledError:
+            raise
         except IsADirectoryError as e:
             return await send_error("Target is a directory", e.errno)
         except OSError as e:
