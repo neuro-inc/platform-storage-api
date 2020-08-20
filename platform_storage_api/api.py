@@ -558,6 +558,23 @@ class StorageHandler:
         response = web.StreamResponse()
         response.headers["Content-Type"] = "application/x-ndjson"
         request_prepared = False
+
+        async def send_error(
+            str_error: str, errno: Optional[int] = None
+        ) -> web.StreamResponse:
+            if request_prepared:
+                error_dict = dict(
+                    error=str_error,
+                    errno=errorcode[errno]
+                    if errno is not None and errno in errorcode
+                    else errno,
+                )
+                await response.write(json.dumps(error_dict).encode())
+                await response.write_eof()
+                return response
+            else:
+                raise _http_bad_request(str_error, errno=errno)
+
         try:
             async for remove_listing in await self._storage.iterremove(
                 storage_path, recursive=recursive
@@ -571,7 +588,11 @@ class StorageHandler:
                 }
                 await response.write(json.dumps(listing_dict).encode() + b"\r\n")
         except IsADirectoryError as e:
-            raise _http_bad_request("Target is a directory", errno=e.errno)
+            return await send_error("Target is a directory", e.errno)
+        except OSError as e:
+            return await send_error(e.strerror, e.errno)
+        except Exception:
+            return await send_error("Unknown error")
         else:
             await response.write_eof()
             return response
