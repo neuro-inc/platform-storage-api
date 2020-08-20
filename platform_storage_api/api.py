@@ -6,6 +6,7 @@ import time
 from contextlib import AsyncExitStack
 from enum import Enum
 from errno import errorcode
+from functools import partial
 from pathlib import PurePath
 from typing import (
     Any,
@@ -481,25 +482,29 @@ class StorageHandler:
     async def _handle_iterstatus(
         self, request: Request, storage_path: PurePath, tree: ClientAccessSubTreeView
     ) -> web.StreamResponse:
+        response = web.StreamResponse()
+        response.headers["Content-Type"] = "application/x-ndjson"
+        handle_error = partial(handle_error_if_streamed, response)
         try:
             async with self._storage.iterstatus(storage_path) as statuses:
-                response = web.StreamResponse()
-                response.headers["Content-Type"] = "application/x-ndjson"
                 await response.prepare(request)
                 async for fstat in self._liststatus_filter(statuses, tree):
                     stat_dict = {
                         "FileStatus": self._convert_filestatus_to_primitive(fstat)
                     }
                     await response.write(json.dumps(stat_dict).encode() + b"\r\n")
-                await response.write_eof()
-
-                return response
-        except FileNotFoundError:
-            raise web.HTTPNotFound
-        except NotADirectoryError:
-            return web.json_response(
-                {"error": "Not a directory"}, status=web.HTTPBadRequest.status_code
-            )
+        except asyncio.CancelledError:
+            raise
+        except FileNotFoundError as e:
+            await handle_error("Not found", errno=e.errno, error_class=web.HTTPNotFound)
+        except NotADirectoryError as e:
+            await handle_error("Not a directory", errno=e.errno)
+        except Exception as e:
+            msg_str = _unknown_error_message(e, request)
+            logging.exception(msg_str)
+            await handle_error(msg_str, error_class=web.HTTPInternalServerError)
+        await response.write_eof()
+        return response
 
     async def _liststatus_filter(
         self, statuses: AsyncIterable[FileStatus], tree: ClientAccessSubTreeView
@@ -557,31 +562,14 @@ class StorageHandler:
         recursive = request.query.get("recursive", "true") == "true"
         response = web.StreamResponse()
         response.headers["Content-Type"] = "application/x-ndjson"
-        request_prepared = False
-
-        async def send_error(
-            str_error: str, errno: Optional[int] = None
-        ) -> web.StreamResponse:
-            if request_prepared:
-                error_dict = dict(
-                    error=str_error,
-                    errno=errorcode[errno]
-                    if errno is not None and errno in errorcode
-                    else errno,
-                )
-                await response.write(json.dumps(error_dict).encode())
-                await response.write_eof()
-                return response
-            else:
-                raise _http_bad_request(str_error, errno=errno)
+        handle_error = partial(handle_error_if_streamed, response)
 
         try:
             async for remove_listing in await self._storage.iterremove(
                 storage_path, recursive=recursive
             ):
-                if not request_prepared:
+                if not response.prepared:
                     await response.prepare(request)
-                    request_prepared = True
                 listing_dict = {
                     "path": str(remove_listing.path),
                     "is_dir": remove_listing.is_dir,
@@ -590,14 +578,15 @@ class StorageHandler:
         except asyncio.CancelledError:
             raise
         except IsADirectoryError as e:
-            return await send_error("Target is a directory", e.errno)
+            await handle_error("Target is a directory", e.errno)
         except OSError as e:
-            return await send_error(e.strerror, e.errno)
-        except Exception:
-            return await send_error("Unknown error")
-        else:
-            await response.write_eof()
-            return response
+            await handle_error(e.strerror, e.errno)
+        except Exception as e:
+            msg_str = _unknown_error_message(e, request)
+            logging.exception(msg_str)
+            await handle_error(msg_str, error_class=web.HTTPInternalServerError)
+        await response.write_eof()
+        return response
 
     async def _handle_rename(
         self, old: PurePath, request: web.Request
@@ -644,6 +633,24 @@ class StorageHandler:
         )
 
 
+async def handle_error_if_streamed(
+    response: web.StreamResponse,
+    str_error: str,
+    errno: Optional[int] = None,
+    error_class: Type[web.HTTPError] = web.HTTPBadRequest,
+) -> None:
+    if response.prepared:
+        error_dict = dict(
+            error=str_error,
+            errno=errorcode[errno]
+            if errno is not None and errno in errorcode
+            else errno,
+        )
+        await response.write(json.dumps(error_dict).encode())
+    else:
+        raise _http_exception(error_class, str_error, errno=errno)
+
+
 def _http_exception(
     error_class: Type[web.HTTPError],
     message: str,
@@ -664,6 +671,13 @@ def _http_bad_request(message: str, **kwargs: Any) -> web.HTTPError:
     return _http_exception(web.HTTPBadRequest, message, **kwargs)
 
 
+def _unknown_error_message(exc: Exception, request: web.Request) -> str:
+    return (
+        f"Unexpected exception {exc.__class__.__name__}: {str(exc)}. "
+        f"Path with query: {request.path_qs}."
+    )
+
+
 @web.middleware
 async def handle_exceptions(
     request: web.Request,
@@ -678,10 +692,7 @@ async def handle_exceptions(
     except web.HTTPException:
         raise
     except Exception as e:
-        msg_str = (
-            f"Unexpected exception {e.__class__.__name__}: {str(e)}. "
-            f"Path with query: {request.path_qs}."
-        )
+        msg_str = _unknown_error_message(e, request)
         logging.exception(msg_str)
         raise _http_exception(web.HTTPInternalServerError, msg_str)
 
