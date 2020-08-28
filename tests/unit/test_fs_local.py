@@ -295,7 +295,7 @@ class TestLocalFileSystem:
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
     async def test_rm_empty_dir(
-        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod,
+        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod
     ) -> None:
         expected_path = Path("nested")
         path = tmp_dir_path / expected_path
@@ -321,7 +321,7 @@ class TestLocalFileSystem:
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.asyncio
     async def test_rm_dir(
-        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod,
+        self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod
     ) -> None:
         expected_path = Path("nested")
         dir_path = tmp_dir_path / expected_path
