@@ -191,7 +191,7 @@ class TestStorageListAndResourceSharing:
 
         root_uri = f"storage://{cluster_name}/{user1.name}"
         await granter(
-            user2.name, [{"uri": root_uri + "/path/to/first", "action": "read"}], user1,
+            user2.name, [{"uri": root_uri + "/path/to/first", "action": "read"}], user1
         )
         async with client.get(dir_url, headers=headers2, params=params) as response:
             assert response.status == 200
@@ -352,7 +352,7 @@ class TestStorageListAndResourceSharing:
 
         root_uri = f"storage://{cluster_name}/{user1.name}"
         await granter(
-            user2.name, [{"uri": root_uri + "/path/to/file", "action": "read"}], user1,
+            user2.name, [{"uri": root_uri + "/path/to/file", "action": "read"}], user1
         )
         await granter(
             user2.name,
