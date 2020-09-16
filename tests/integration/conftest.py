@@ -25,6 +25,7 @@ from platform_storage_api.api import create_app
 from platform_storage_api.config import (
     AuthConfig,
     Config,
+    CORSConfig,
     EnvironConfigFactory,
     ServerConfig,
     StorageConfig,
@@ -104,6 +105,7 @@ def config(in_docker: bool, admin_token: str, cluster_name: str) -> Config:
         storage=storage_config,
         auth=auth,
         zipkin=zipkin,
+        cors=CORSConfig(),
         cluster_name=cluster_name,
     )
 

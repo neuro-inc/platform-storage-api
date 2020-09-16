@@ -66,6 +66,8 @@ spec:
           value: "{{ .Values.NP_CLUSTER_NAME }}"
         - name: NP_STORAGE_API_KEEP_ALIVE_TIMEOUT
           value: "{{ .Values.NP_STORAGE_API_KEEP_ALIVE_TIMEOUT }}"
+        - name: NP_CORS_ORIGINS
+          value: {{ .Values.NP_CORS_ORIGINS | quote }}
         volumeMounts:
         - name: storage
           mountPath: /var/storage

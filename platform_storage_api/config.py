@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import PurePath
-from typing import Dict, Optional
+from typing import Dict, Optional, Sequence
 
 from yarl import URL
 
@@ -41,11 +41,17 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
+class CORSConfig:
+    allowed_origins: Sequence[str] = ()
+
+
+@dataclass(frozen=True)
 class Config:
     server: ServerConfig
     storage: StorageConfig
     auth: AuthConfig
     zipkin: ZipkinConfig
+    cors: CORSConfig
     cluster_name: str
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
@@ -91,11 +97,19 @@ class EnvironConfigFactory:
         sample_rate = float(self._environ["NP_STORAGE_ZIPKIN_SAMPLE_RATE"])
         return ZipkinConfig(url=url, sample_rate=sample_rate)
 
+    def create_cors(self) -> CORSConfig:
+        origins: Sequence[str] = CORSConfig.allowed_origins
+        origins_str = self._environ.get("NP_CORS_ORIGINS", "").strip()
+        if origins_str:
+            origins = origins_str.split(",")
+        return CORSConfig(allowed_origins=origins)
+
     def create(self) -> Config:
         server_config = self.create_server()
         storage_config = self.create_storage()
         auth_config = self.create_auth()
         zipkin_config = self.create_zipkin()
+        cors_config = self.create_cors()
         cluster_name = self._environ["NP_CLUSTER_NAME"]
         assert cluster_name
         permission_expiration_interval_s: float = float(
@@ -115,6 +129,7 @@ class EnvironConfigFactory:
             storage=storage_config,
             auth=auth_config,
             zipkin=zipkin_config,
+            cors=cors_config,
             cluster_name=cluster_name,
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,

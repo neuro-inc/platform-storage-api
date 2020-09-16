@@ -11,6 +11,7 @@ install_requires = (
     "neuro_auth_client==19.10.5",
     "uvloop==0.14.0",
     "platform-logging==0.3",
+    "aiohttp-cors==0.7.0",
 )
 
 setup(
