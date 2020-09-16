@@ -9,7 +9,7 @@ export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
 #export IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
 build:
-	@docker build --build-arg PIP_INDEX_URL --target service -t $(IMAGE) .
+	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
 	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
 pull:
