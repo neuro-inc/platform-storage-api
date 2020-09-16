@@ -51,6 +51,7 @@ class TestConfig:
         assert config.zipkin.url == URL("https://zipkin.io:9411/")
         assert config.zipkin.sample_rate == 0.3
         assert config.cluster_name == "test-cluster"
+        assert config.cors.allowed_origins == ()
 
     def test_from_environ_custom(self) -> None:
         environ = {
@@ -62,6 +63,7 @@ class TestConfig:
             "NP_STORAGE_ZIPKIN_SAMPLE_RATE": "0.3",
             "NP_CLUSTER_NAME": "test-cluster",
             "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT": "900",
+            "NP_CORS_ORIGINS": "https://domain1.com,http://do.main",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
@@ -72,3 +74,4 @@ class TestConfig:
         assert config.zipkin.url == URL("https://zipkin.io:9411/")
         assert config.zipkin.sample_rate == 0.3
         assert config.cluster_name == "test-cluster"
+        assert config.cors.allowed_origins == ["https://domain1.com", "http://do.main"]

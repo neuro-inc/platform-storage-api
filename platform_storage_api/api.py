@@ -21,6 +21,7 @@ from typing import (
 )
 
 import aiohttp
+import aiohttp_cors
 import aiozipkin
 import cbor
 import uvloop
@@ -32,7 +33,7 @@ from neuro_auth_client.security import AuthScheme, setup_security
 from platform_logging import init_logging
 
 from .cache import PermissionsCache
-from .config import Config
+from .config import Config, CORSConfig
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
@@ -711,6 +712,24 @@ async def create_tracer(config: Config) -> aiozipkin.Tracer:
     return tracer
 
 
+def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
+    if not config.allowed_origins:
+        return
+
+    logger.info(f"Setting up CORS with allowed origins: {config.allowed_origins}")
+    default_options = aiohttp_cors.ResourceOptions(
+        allow_credentials=True,
+        expose_headers="*",
+        allow_headers="*",
+    )
+    cors = aiohttp_cors.setup(
+        app, defaults={origin: default_options for origin in config.allowed_origins}
+    )
+    for route in app.router.routes():
+        logger.debug(f"Setting up CORS for {route}")
+        cors.add(route)
+
+
 async def create_app(config: Config, storage: Storage) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
@@ -770,6 +789,8 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     aiozipkin.setup(app, tracer)
     app.middlewares.append(store_span_middleware)
+
+    _setup_cors(app, config.cors)
 
     logger.info("Storage API has been initialized, ready to serve.")
 
