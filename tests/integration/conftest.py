@@ -105,7 +105,7 @@ def config(in_docker: bool, admin_token: str, cluster_name: str) -> Config:
         storage=storage_config,
         auth=auth,
         zipkin=zipkin,
-        cors=CORSConfig(),
+        cors=CORSConfig(allowed_origins=["http://localhost:8000"]),
         cluster_name=cluster_name,
     )
 

@@ -47,6 +47,33 @@ class TestApi:
 
 class TestStorage:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("method", ["GET", "PUT", "POST", "DELETE", "HEAD"])
+    async def test_options_allowed(
+        self, server_url: str, client: aiohttp.ClientSession, method: str
+    ) -> None:
+        headers = {
+            "Origin": "http://localhost:8000",
+            "Access-Control-Request-Method": method,
+        }
+
+        async with client.options(f"{server_url}/user", headers=headers) as response:
+            assert response.status == 200, await response.text()
+
+    @pytest.mark.asyncio
+    async def test_options_forbidden(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+    ) -> None:
+        headers = {
+            "Origin": "http://otherhost:8000",
+            "Access-Control-Request-Method": "GET",
+        }
+
+        async with client.options(f"{server_url}/user", headers=headers) as response:
+            assert response.status == 403, await response.text()
+
+    @pytest.mark.asyncio
     async def test_put_head_get(
         self,
         server_url: str,
