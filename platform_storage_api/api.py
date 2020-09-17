@@ -27,6 +27,7 @@ import cbor
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
+from aiohttp_cors import CorsConfig
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
@@ -117,17 +118,14 @@ class StorageHandler:
                 forgetting_interval_s=config.permission_forgetting_interval_s,
             )
 
-    def register(self, app: web.Application) -> None:
-        app.add_routes(
-            (
-                # TODO (A Danshyn 04/23/18): add some unit test for path matching
-                web.put(r"/{path:.*}", self.handle_put),
-                web.post(r"/{path:.*}", self.handle_post),
-                web.head(r"/{path:.*}", self.handle_head),
-                web.get(r"/{path:.*}", self.handle_get),
-                web.delete(r"/{path:.*}", self.handle_delete),
-            )
-        )
+    def register(self, app: web.Application, cors: CorsConfig) -> None:
+        # TODO (A Danshyn 04/23/18): add some unit test for path matching
+        path_resource = app.router.add_resource(r"/{path:.*}")
+        cors.add(path_resource.add_route("PUT", self.handle_put))
+        cors.add(path_resource.add_route("POST", self.handle_post))
+        cors.add(path_resource.add_route("HEAD", self.handle_head))
+        cors.add(path_resource.add_route("GET", self.handle_get))
+        cors.add(path_resource.add_route("DELETE", self.handle_delete))
 
     async def handle_put(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_put_operation(request)
@@ -712,9 +710,9 @@ async def create_tracer(config: Config) -> aiozipkin.Tracer:
     return tracer
 
 
-def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
+def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> CorsConfig:
     if not config.allowed_origins:
-        return
+        return aiohttp_cors.setup(app)
 
     logger.info(f"Setting up CORS with allowed origins: {config.allowed_origins}")
     default_options = aiohttp_cors.ResourceOptions(
@@ -725,9 +723,7 @@ def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
     cors = aiohttp_cors.setup(
         app, defaults={origin: default_options for origin in config.allowed_origins}
     )
-    for route in app.router.routes():
-        logger.debug(f"Setting up CORS for {route}")
-        cors.add(route)
+    return cors
 
 
 async def create_app(config: Config, storage: Storage) -> web.Application:
@@ -736,6 +732,8 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
         handler_args=dict(keepalive_timeout=config.server.keep_alive_timeout_s),
     )
     app["config"] = config
+
+    cors = _setup_cors(app, config.cors)
 
     tracer = await create_tracer(config)
 
@@ -782,15 +780,13 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     storage_app = web.Application()
     storage_handler = StorageHandler(api_v1_app, storage, config)
-    storage_handler.register(storage_app)
+    storage_handler.register(storage_app, cors)
 
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)
 
     aiozipkin.setup(app, tracer)
     app.middlewares.append(store_span_middleware)
-
-    _setup_cors(app, config.cors)
 
     logger.info("Storage API has been initialized, ready to serve.")
 
