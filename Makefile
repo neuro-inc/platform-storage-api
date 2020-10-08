@@ -4,6 +4,14 @@ ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_REF)" | awk -F/ '{print $$NF}')
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_K8S_GKE ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
 IMAGE_K8S_AWS ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
+IMAGE_K8S_AZURE ?= $(AZURE_DEV_ACR_NAME).azurecr.io/$(IMAGE_NAME)
+
+CLOUD_IMAGE_gke   ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
+CLOUD_IMAGE_aws   ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
+CLOUD_IMAGE_azure ?= $(AZURE_DEV_ACR_NAME).azurecr.io/$(IMAGE_NAME)
+
+CLOUD_IMAGE  = ${CLOUD_IMAGE_${CLOUD_PROVIDER}}
+
 
 export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
 #export IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
@@ -78,18 +86,21 @@ eks_login:
 	pip install --upgrade awscli
 	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
 
+aks_login:
+	az aks get-credentials --resource-group $(AZURE_DEV_RG_NAME) --name $(CLUSTER_NAME)
+
 _helm:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v $(HELM_VERSION)
 	helm init --client-only
 
 docker_push: build
-	docker tag $(IMAGE) $(IMAGE_K8S_AWS):latest
-	docker tag $(IMAGE_K8S_AWS):latest $(IMAGE_K8S_AWS):$(IMAGE_TAG)
-	docker push  $(IMAGE_K8S_AWS):latest
-	docker push  $(IMAGE_K8S_AWS):$(IMAGE_TAG)
+	docker tag $(IMAGE) $(CLOUD_IMAGE):latest
+	docker tag $(CLOUD_IMAGE):latest $(CLOUD_IMAGE):$(IMAGE_TAG)
+	docker push  $(CLOUD_IMAGE):latest
+	docker push  $(CLOUD_IMAGE):$(IMAGE_TAG)
 
 helm_deploy:
-	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(IMAGE_K8S_AWS):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
+	helm -f deploy/platformstorageapi/values-$(HELM_ENV)-aws.yaml --set "IMAGE=$(CLOUD_IMAGE):$(IMAGE_TAG)" upgrade --install platformstorageapi deploy/platformstorageapi/ --namespace platform --wait --timeout 600
 
 artifactory_docker_push: build
 	docker tag $(IMAGE) $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
