@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 install_requires = (
     "aiodns==2.0.0",
     "aiofiles==0.5.0",
-    "aiohttp==3.6.2",
+    "aiohttp==3.6.3",
     "aiozipkin==0.7.1",
     "cbor==1.0.0",
     "cchardet==2.1.6",
