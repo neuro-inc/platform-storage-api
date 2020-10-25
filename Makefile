@@ -2,9 +2,6 @@ IMAGE_NAME ?= platformstorageapi
 IMAGE_TAG ?= $(GITHUB_SHA)
 ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_REF)" | awk -F/ '{print $$NF}')
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
-#IMAGE_K8S_GKE ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
-#IMAGE_K8S_AWS ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
-#IMAGE_K8S_AZURE ?= $(AZURE_DEV_ACR_NAME).azurecr.io/$(IMAGE_NAME)
 
 CLOUD_IMAGE_gke   ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
 CLOUD_IMAGE_aws   ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
@@ -12,9 +9,7 @@ CLOUD_IMAGE_azure ?= $(AZURE_DEV_ACR_NAME).azurecr.io/$(IMAGE_NAME)
 
 CLOUD_IMAGE  = ${CLOUD_IMAGE_${CLOUD_PROVIDER}}
 
-
 export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
-#export IMAGE_REPO ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
 build:
 	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
@@ -82,14 +77,14 @@ gke_login:
 	gcloud config set $(SET_CLUSTER_ZONE_REGION)
 	gcloud auth configure-docker
 
-eks_login:
+aws_k8s_login:
 	pip install --upgrade awscli
-	aws eks --region $(AWS_REGION) update-kubeconfig --name $(AWS_CLUSTER_NAME)
+	aws eks --region $(AWS_REGION) update-kubeconfig --name $(CLUSTER_NAME)
 
-aks_login:
+azure_k8s_login:
 	az aks get-credentials --resource-group $(AZURE_DEV_RG_NAME) --name $(CLUSTER_NAME)
 
-_helm:
+helm_install:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v $(HELM_VERSION)
 	helm init --client-only
 
@@ -107,7 +102,7 @@ artifactory_docker_push: build
 	docker login $(ARTIFACTORY_DOCKER_REPO) --username=$(ARTIFACTORY_USERNAME) --password=$(ARTIFACTORY_PASSWORD)
 	docker push $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME):$(ARTIFACTORY_TAG)
 
-artifactory_helm_push: _helm
+artifactory_helm_push: helm_install
 	mkdir -p temp_deploy/platformstorageapi
 	cp -Rf deploy/platformstorageapi/. temp_deploy/platformstorageapi
 	cp temp_deploy/platformstorageapi/values-template.yaml temp_deploy/platformstorageapi/values.yaml
