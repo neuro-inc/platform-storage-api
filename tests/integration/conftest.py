@@ -19,6 +19,7 @@ import aiohttp
 import pytest
 from jose import jwt
 from neuro_auth_client import AuthClient, User
+from neuro_auth_client.client import Cluster
 from yarl import URL
 
 from platform_storage_api.api import create_app
@@ -132,7 +133,7 @@ async def regular_user_factory(
     async def _factory(name: Optional[str] = None) -> User:
         if not name:
             name = str(uuid.uuid4())
-        user = User(name=name, cluster_name=cluster_name)
+        user = User(name=name, clusters=[Cluster(name=cluster_name)])
         await auth_client.add_user(user)
         # Grant permissions to the user home directory
         headers = auth_client._generate_headers(admin_token)

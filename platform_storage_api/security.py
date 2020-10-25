@@ -5,7 +5,7 @@ from pathlib import PurePath
 
 from aiohttp import web
 from aiohttp_security import check_authorized, check_permission
-from neuro_auth_client import AuthClient, Permission, User
+from neuro_auth_client import AuthClient, Permission
 from neuro_auth_client.client import ClientAccessSubTreeView
 
 from .config import Config
@@ -56,10 +56,10 @@ class PermissionChecker(AbstractPermissionChecker):
     async def get_user_permissions_tree(  # type: ignore
         self, request: web.Request, target_path: PurePath
     ) -> ClientAccessSubTreeView:
-        username = await self._get_user_from_request(request)
+        username = await self._get_username_from_request(request)
         auth_client = self._get_auth_client()
         target_path_uri = self._path_to_uri(target_path)
-        tree = await auth_client.get_permissions_tree(username.name, target_path_uri)
+        tree = await auth_client.get_permissions_tree(username, target_path_uri)
         if tree.sub_tree.action == AuthAction.DENY.value:
             raise web.HTTPNotFound
         return tree.sub_tree
@@ -86,12 +86,12 @@ class PermissionChecker(AbstractPermissionChecker):
             headers={"WWW-Authenticate": f'Bearer realm="{self._config.server.name}"'}
         )
 
-    async def _get_user_from_request(self, request: web.Request) -> User:
+    async def _get_username_from_request(self, request: web.Request) -> str:
         try:
             user_name = await check_authorized(request)
         except web.HTTPUnauthorized:
             self._raise_unauthorized()
-        return User(name=user_name, cluster_name=self._config.cluster_name)
+        return user_name
 
     def _get_auth_client(self) -> AuthClient:
         return self._app["auth_client"]
