@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLOUD_PROVIDER: ${{ secrets.CLOUD_PROVIDER_DEV }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AZURE_RG_NAME: ${{ secrets.AZURE_DEV_RG_NAME }}
     steps:
       - name: Checkout commit
         uses: actions/checkout@v2
