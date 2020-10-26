@@ -17,8 +17,6 @@ jobs:
     name: Run tests
     runs-on: ubuntu-latest
     env:
-      IMAGE_REPO : ${{ format('{0}.dkr.ecr.{1}.amazonaws.com', secrets.AWS_ACCOUNT_ID, secrets.AWS_REGION) }}
-#      IMAGE_REPO : ${{ format('{0}.azurecr.io', secrets.AZURE_DEV_ACR_NAME) }}
       CLOUD_PROVIDER: ${{ secrets.CLOUD_PROVIDER_DEV }}
     steps:
       - name: Checkout commit

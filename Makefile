@@ -3,11 +3,12 @@ IMAGE_TAG ?= $(GITHUB_SHA)
 ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_REF)" | awk -F/ '{print $$NF}')
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 
-CLOUD_IMAGE_gke   ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
-CLOUD_IMAGE_aws   ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
-CLOUD_IMAGE_azure ?= $(AZURE_DEV_ACR_NAME).azurecr.io/$(IMAGE_NAME)
+IMAGE_REPO_gke   ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)
+IMAGE_REPO_aws   ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO_azure ?= $(AZURE_ACR_NAME).azurecr.io
 
-CLOUD_IMAGE  = ${CLOUD_IMAGE_${CLOUD_PROVIDER}}
+export IMAGE_REPO  ?= ${IMAGE_REPO_${CLOUD_PROVIDER}}
+CLOUD_IMAGE  ?=$(IMAGE_REPO)/$(IMAGE_NAME)
 
 export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
 
@@ -82,7 +83,7 @@ aws_k8s_login:
 	aws eks --region $(AWS_REGION) update-kubeconfig --name $(CLUSTER_NAME)
 
 azure_k8s_login:
-	az aks get-credentials --resource-group $(AZURE_DEV_RG_NAME) --name $(CLUSTER_NAME)
+	az aks get-credentials --resource-group $(AZURE_RG_NAME) --name $(CLUSTER_NAME)
 
 helm_install:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v $(HELM_VERSION)
