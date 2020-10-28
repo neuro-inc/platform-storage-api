@@ -7,7 +7,7 @@ install_requires = (
     "aiohttp==3.7.1",
     "aiozipkin==0.7.1",
     "cbor==1.0.0",
-    "cchardet==2.1.6",
+    "cchardet==2.1.7",
     "neuro_auth_client==19.11.26",
     "uvloop==0.14.0",
     "platform-logging==0.3",
