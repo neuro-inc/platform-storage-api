@@ -33,6 +33,8 @@ jobs:
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-py-3.7.7-${{ hashFiles('requirements-dev.txt') }}-${{ hashFiles('setup.py') }}
+      - name: Install dependencies
+        run: make setup
       - name: Configure AWS credentials
         if: env.CLOUD_PROVIDER == 'aws'
         uses: aws-actions/configure-aws-credentials@v1

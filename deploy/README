@@ -17,9 +17,8 @@
 
 #Deploy in staging and dev clusters
 
-Dev : 
+Dev :
 	- helm --set "global.env=dev" upgrade --install platformstorageapi --name=platformstorageapi
 
 Staging :
 	- helm --set "global.env=stage" upgrade --install platformstorageapi --name=platformstorageapi
-
