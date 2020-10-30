@@ -258,7 +258,7 @@ class StorageHandler:
             ops.append(request.query["op"].upper())
 
         op_values = set(StorageOperation.values())
-        param_names = set(name.upper() for name in request.query)
+        param_names = {name.upper() for name in request.query}
         ops += op_values & param_names
 
         if len(ops) > 1:

@@ -12,6 +12,10 @@ CLOUD_IMAGE  ?=$(IMAGE_REPO)/$(IMAGE_NAME)
 
 export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
 
+setup:
+	pip install -r requirements-dev.txt
+	pre-commit install
+
 build:
 	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
 	docker tag $(IMAGE) $(IMAGE_NAME):latest
@@ -21,10 +25,10 @@ pull:
 	    -f tests/docker/e2e.compose.yml pull
 
 format:
-	isort platform_storage_api tests setup.py
-	black platform_storage_api tests setup.py pip_extra_index_url.py
+	pre-commit run --all-files --show-diff-on-failure
 
-lint: build_test lint_built
+lint: format
+	mypy platform_storage_api tests
 
 test_unit: build_test test_unit_built
 
@@ -32,9 +36,6 @@ test_integration: build_test test_integration_built
 
 build_test: build
 	docker build -t platformstorageapi-test -f tests/Dockerfile .
-
-lint_built:
-	docker run --rm platformstorageapi-test make _lint
 
 test_integration_built: pull
 	docker-compose --project-directory=`pwd` -f tests/docker/e2e.compose.yml run test make _test_integration; \
@@ -53,12 +54,6 @@ _test_unit:
 
 _test_integration:
 	pytest -vv tests/integration
-
-_lint:
-	black --check platform_storage_api tests setup.py
-	isort --check --diff platform_storage_api tests setup.py
-	flake8 platform_storage_api tests setup.py
-	mypy platform_storage_api tests
 
 run:
 	docker run -it --rm --name platformstorageapi \
@@ -112,4 +107,3 @@ artifactory_helm_push: helm_install
 	helm package --app-version=$(ARTIFACTORY_TAG) --version=$(ARTIFACTORY_TAG) temp_deploy/platformstorageapi/
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
 	helm push-artifactory $(IMAGE_NAME)-$(ARTIFACTORY_TAG).tgz $(ARTIFACTORY_HELM_REPO) --username $(ARTIFACTORY_USERNAME) --password $(ARTIFACTORY_PASSWORD)
-
