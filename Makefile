@@ -25,7 +25,12 @@ pull:
 	    -f tests/docker/e2e.compose.yml pull
 
 format:
+ifdef CI_LINT_RUN
 	pre-commit run --all-files --show-diff-on-failure
+else
+	pre-commit run --all-files
+endif
+
 
 lint: format
 	mypy platform_storage_api tests
