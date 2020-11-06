@@ -508,12 +508,12 @@ class StorageHandler:
         self, request: web.Request, storage_path: PurePath
     ) -> web.StreamResponse:
         try:
+            fstat = await self._storage.get_filestatus(storage_path)
+        except FileNotFoundError:
+            raise web.HTTPNotFound
+        try:
             rng = request.http_range
             whole = rng.start is rng.stop is None
-            try:
-                fstat = await self._storage.get_filestatus(storage_path)
-            except FileNotFoundError:
-                raise web.HTTPNotFound
             start, stop, _ = rng.indices(fstat.size)
             size = stop - start
             if not size and not whole:
