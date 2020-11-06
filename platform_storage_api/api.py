@@ -262,7 +262,7 @@ class StorageHandler:
         except IsADirectoryError as e:
             raise _http_bad_request("Destination is a directory", errno=e.errno)
 
-        return web.Response(status=201)
+        raise web.HTTPCreated
 
     def _unsupported_headers(
         self, request: web.Request, unsupported: Iterable[str]
@@ -309,7 +309,7 @@ class StorageHandler:
         except IsADirectoryError as e:
             raise _http_bad_request("Destination is a directory", errno=e.errno)
 
-        return web.Response(status=201)
+        raise web.HTTPOk
 
     def _parse_operation(self, request: web.Request) -> Optional[StorageOperation]:
         ops = []
