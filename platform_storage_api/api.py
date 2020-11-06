@@ -290,7 +290,7 @@ class StorageHandler:
                 reason="Content-Type should be application/octet-stream"
             )
         self._unsupported_headers(
-            request, ["If-Range", "If-Match", "If-Match", "If-Unmodified-Since"]
+            request, ["If-Match", "If-Not-Match", "If-Range", "If-Unmodified-Since"]
         )
 
         rng = self._parse_content_range(request)
@@ -508,12 +508,14 @@ class StorageHandler:
         self, request: web.Request, storage_path: PurePath
     ) -> web.StreamResponse:
         try:
-            fstat = await self._storage.get_filestatus(storage_path)
-        except FileNotFoundError:
-            raise web.HTTPNotFound
-        try:
             rng = request.http_range
-            if rng.start is not None and rng.start >= fstat.size:
+            try:
+                fstat = await self._storage.get_filestatus(storage_path)
+            except FileNotFoundError:
+                raise web.HTTPNotFound
+            start, stop, _ = rng.indices(fstat.size)
+            size = stop - start
+            if not size:
                 raise ValueError
         except ValueError:
             response = web.StreamResponse(
@@ -525,16 +527,13 @@ class StorageHandler:
 
         response = self._create_response(fstat)
         if rng.start is rng.stop is None:
-            start = 0
-            size = None
+            start = size = 0
         else:
-            start, stop, _ = rng.indices(fstat.size)
-            size = stop - start
             response.set_status(web.HTTPPartialContent.status_code)
             response.headers["Content-Range"] = f"bytes {start}-{stop-1}/{fstat.size}"
             response.content_length = size
         await response.prepare(request)
-        await self._storage.retrieve(response, storage_path, start, size)
+        await self._storage.retrieve(response, storage_path, start, size or None)
         await response.write_eof()
 
         return response
