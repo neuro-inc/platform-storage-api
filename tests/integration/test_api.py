@@ -188,7 +188,7 @@ class TestStorage:
         headers["Range"] = "bytes=-4"
         async with client.get(url, headers=headers) as response:
             assert response.status == 206
-            assert response.content_length == 12
+            assert response.content_length == 4
             assert response.headers["X-File-Type"] == "FILE"
             assert response.headers["X-File-Permission"] == "read"
             assert response.headers["X-File-Length"] == "12"
