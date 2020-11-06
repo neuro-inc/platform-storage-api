@@ -290,7 +290,7 @@ class StorageHandler:
                 reason="Content-Type should be application/octet-stream"
             )
         self._unsupported_headers(
-            request, ["If-Match", "If-Not-Match", "If-Range", "If-Unmodified-Since"]
+            request, ["If-Match", "If-None-Match", "If-Range", "If-Unmodified-Since"]
         )
 
         rng = self._parse_content_range(request)
@@ -509,13 +509,14 @@ class StorageHandler:
     ) -> web.StreamResponse:
         try:
             rng = request.http_range
+            whole = rng.start is rng.stop is None
             try:
                 fstat = await self._storage.get_filestatus(storage_path)
             except FileNotFoundError:
                 raise web.HTTPNotFound
             start, stop, _ = rng.indices(fstat.size)
             size = stop - start
-            if not size:
+            if not size and not whole:
                 raise ValueError
         except ValueError:
             response = web.StreamResponse(
@@ -526,7 +527,7 @@ class StorageHandler:
             return response
 
         response = self._create_response(fstat)
-        if rng.start is rng.stop is None:
+        if whole:
             start = size = 0
         else:
             response.set_status(web.HTTPPartialContent.status_code)

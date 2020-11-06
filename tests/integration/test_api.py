@@ -183,15 +183,15 @@ class TestStorage:
 
         headers["Range"] = "bytes=5-4"
         async with client.get(url, headers=headers) as response:
-            assert response.status == 416
+            assert response.status == 416, await response.text()
 
         headers["Range"] = "bytes=12-"
         async with client.get(url, headers=headers) as response:
-            assert response.status == 416
+            assert response.status == 416, await response.text()
 
         headers["Range"] = "chars=5-8"
         async with client.get(url, headers=headers) as response:
-            assert response.status == 416
+            assert response.status == 416, await response.text()
 
     @pytest.mark.asyncio
     async def test_patch(
@@ -249,33 +249,33 @@ class TestStorage:
 
         # No Content-Range
         async with client.patch(url, headers=headers, data=b"spam") as response:
-            assert response.status == 400
+            assert response.status == 400, await response.text()
 
         # Invalid Content-Range
         headers2 = {**headers, "Content-Range": "bytes 5-8"}
         async with client.patch(url, headers=headers2, data=b"spam") as response:
-            assert response.status == 400
+            assert response.status == 400, await response.text()
 
         headers["Content-Range"] = "bytes 5-8/12"
         headers2 = {**headers, "Content-Type": "text/plain"}
         async with client.patch(url, headers=headers2, data=b"spam") as response:
-            assert response.status == 400
+            assert response.status == 400, await response.text()
 
         headers2 = {**headers, "If-Match": '"xyzzy"'}
         async with client.patch(url, headers=headers2, data=b"spam") as response:
-            assert response.status == 400
+            assert response.status == 400, await response.text()
 
         headers2 = {**headers, "If-None-Match": "*"}
         async with client.patch(url, headers=headers2, data=b"spam") as response:
-            assert response.status == 400
+            assert response.status == 400, await response.text()
 
         headers2 = {**headers, "If-Unmodified-Since": "Sat, 29 Oct 1994 19:43:31 GMT"}
         async with client.patch(url, headers=headers2, data=b"spam") as response:
-            assert response.status == 400
+            assert response.status == 400, await response.text()
 
         headers2 = {**headers, "If-Range": "Wed, 21 Oct 2015 07:28:00 GMT"}
         async with client.patch(url, headers=headers2, data=b"spam") as response:
-            assert response.status == 400
+            assert response.status == 400, await response.text()
 
     @pytest.mark.asyncio
     async def test_head_non_existent(
