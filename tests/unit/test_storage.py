@@ -61,6 +61,54 @@ class TestStorage:
             assert payload == expected_payload
 
     @pytest.mark.asyncio
+    async def test_store_dont_create(
+        self, local_fs: FileSystem, local_tmp_dir_path: Path
+    ) -> None:
+        base_path = local_tmp_dir_path
+        storage = Storage(fs=local_fs, base_path=base_path)
+
+        outstream = AsyncBytesIO(b"test")
+        path = "/path/to/file"
+        # outstream should be aiohttp.AbstractStreamWriter actually
+        with pytest.raises(FileNotFoundError):
+            await storage.store(outstream, path, create=False)
+
+        files = await local_fs.listdir(local_tmp_dir_path)
+        assert files == []
+
+        path = "/path/to/file"
+        with pytest.raises(FileNotFoundError):
+            await storage.store(outstream, path, create=False)
+
+        files = await local_fs.listdir(local_tmp_dir_path)
+        assert files == []
+
+    @pytest.mark.asyncio
+    async def test_store_range(
+        self, local_fs: FileSystem, local_tmp_dir_path: Path
+    ) -> None:
+        base_path = local_tmp_dir_path
+        storage = Storage(fs=local_fs, base_path=base_path)
+
+        real_file_path = local_tmp_dir_path / "file"
+        async with local_fs.open(real_file_path, "wb") as f:
+            await f.write(b"test content")
+
+        outstream = AsyncBytesIO(b"spam")
+        path = "/file"
+        # outstream should be aiohttp.AbstractStreamWriter actually
+        await storage.store(outstream, path, 5, 4, create=False)
+        async with local_fs.open(real_file_path, "rb") as f:
+            payload = await f.read()
+            assert payload == b"test spament"
+
+        outstream = AsyncBytesIO(b"ham")
+        await storage.store(outstream, path, 15, 3, create=False)
+        async with local_fs.open(real_file_path, "rb") as f:
+            payload = await f.read()
+            assert payload == b"test spament\0\0\0ham"
+
+    @pytest.mark.asyncio
     async def test_retrieve(
         self, local_fs: FileSystem, local_tmp_dir_path: Path
     ) -> None:
@@ -79,6 +127,30 @@ class TestStorage:
         instream.seek(0)
         payload = await instream.read()
         assert payload == expected_payload
+
+    @pytest.mark.asyncio
+    async def test_retrieve_range(
+        self, local_fs: FileSystem, local_tmp_dir_path: Path
+    ) -> None:
+        base_path = local_tmp_dir_path
+        storage = Storage(fs=local_fs, base_path=base_path)
+
+        real_file_path = local_tmp_dir_path / "file"
+        async with local_fs.open(real_file_path, "wb") as f:
+            await f.write(b"test content")
+
+        instream = AsyncBytesIO()
+        # instream should be aiohttp.StreamReader actually
+        await storage.retrieve(instream, "/file", 5)
+        instream.seek(0)
+        payload = await instream.read()
+        assert payload == b"content"
+
+        instream = AsyncBytesIO()
+        await storage.retrieve(instream, "/file", 5, 4)
+        instream.seek(0)
+        payload = await instream.read()
+        assert payload == b"cont"
 
     @pytest.mark.asyncio
     async def test_filestatus_file(

@@ -377,17 +377,29 @@ DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
 
 
 async def copy_streams(
-    outstream: Any, instream: Any, chunk_size: int = DEFAULT_CHUNK_SIZE
+    outstream: Any,
+    instream: Any,
+    *,
+    size: Optional[int] = None,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
 ) -> None:
     """perform chunked copying of data between two streams.
 
     It is assumed that stream implementations would handle retries themselves.
     """
-    while True:
-        chunk = await outstream.read(chunk_size)
-        if not chunk:
-            break
-        await instream.write(chunk)
+    if size is None:
+        while True:
+            chunk = await outstream.read(chunk_size)
+            if not chunk:
+                break
+            await instream.write(chunk)
+    else:
+        while size > 0:
+            chunk = await outstream.read(min(size, chunk_size))
+            if not chunk:
+                break
+            size -= len(chunk)
+            await instream.write(chunk)
 
 
 _T = TypeVar("_T")

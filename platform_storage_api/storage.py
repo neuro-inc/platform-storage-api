@@ -2,7 +2,7 @@ import dataclasses
 import os
 from contextlib import asynccontextmanager
 from pathlib import PurePath
-from typing import Any, AsyncIterator, List, Union
+from typing import Any, AsyncIterator, List, Optional, Union
 
 import aiohttp
 from aiohttp.abc import AbstractStreamWriter
@@ -17,6 +17,10 @@ class Storage:
         self._base_path = PurePath(base_path)
 
         # TODO (A Danshyn 04/23/18): implement StoragePathResolver
+
+    @property
+    def base_path(self) -> PurePath:
+        return self._base_path
 
     def _resolve_real_path(self, path: PurePath) -> PurePath:
         # TODO: (A Danshyn 04/23/18): validate paths
@@ -34,20 +38,35 @@ class Storage:
 
     @trace
     async def store(
-        self, outstream: AbstractStreamWriter, path: Union[PurePath, str]
+        self,
+        outstream: AbstractStreamWriter,
+        path: Union[PurePath, str],
+        offset: int = 0,
+        size: Optional[int] = None,
+        *,
+        create: bool = True,
     ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
-        await self._fs.mkdir(real_path.parent)
-        async with self._fs.open(real_path, "wb") as f:
-            await copy_streams(outstream, f)
+        if create:
+            await self._fs.mkdir(real_path.parent)
+        async with self._fs.open(real_path, "wb" if create else "rb+") as f:
+            if offset:
+                await f.seek(offset)
+            await copy_streams(outstream, f, size=size)
 
     @trace
     async def retrieve(
-        self, instream: aiohttp.StreamReader, path: Union[PurePath, str]
+        self,
+        instream: aiohttp.StreamReader,
+        path: Union[PurePath, str],
+        offset: int = 0,
+        size: Optional[int] = None,
     ) -> None:
         real_path = self._resolve_real_path(PurePath(path))
         async with self._fs.open(real_path, "rb") as f:
-            await copy_streams(f, instream)
+            if offset:
+                await f.seek(offset)
+            await copy_streams(f, instream, size=size)
 
     @asynccontextmanager
     async def _open(self, path: Union[PurePath, str]) -> Any:

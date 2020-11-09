@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 import struct
 import time
 from contextlib import AsyncExitStack
@@ -15,6 +16,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    Iterable,
     List,
     Optional,
     Type,
@@ -83,6 +85,7 @@ class StorageOperation(str, Enum):
     MKDIRS = "MKDIRS"
     DELETE = "DELETE"
     RENAME = "RENAME"
+    WRITE = "WRITE"
     WEBSOCKET = "WEBSOCKET"
     WEBSOCKET_READ = "WEBSOCKET_READ"
     WEBSOCKET_WRITE = "WEBSOCKET_WRITE"
@@ -126,6 +129,7 @@ class StorageHandler:
         cors.add(path_resource.add_route("HEAD", self.handle_head))
         cors.add(path_resource.add_route("GET", self.handle_get))
         cors.add(path_resource.add_route("DELETE", self.handle_delete))
+        cors.add(path_resource.add_route("PATCH", self.handle_patch))
 
     async def handle_put(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_put_operation(request)
@@ -139,6 +143,14 @@ class StorageHandler:
             return await self._handle_mkdirs(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
 
+    async def handle_patch(self, request: web.Request) -> web.StreamResponse:
+        operation = self._parse_patch_operation(request)
+        if operation == StorageOperation.WRITE:
+            storage_path = self._get_fs_path_from_request(request)
+            await self._check_user_permissions(request, storage_path)
+            return await self._handle_write(request, storage_path)
+        raise ValueError(f"Illegal operation: {operation}")
+
     def _create_response(self, fstat: FileStatus) -> web.StreamResponse:
         response = web.StreamResponse()
         response.content_length = fstat.size
@@ -146,6 +158,7 @@ class StorageHandler:
         response.headers["X-File-Type"] = str(fstat.type)
         response.headers["X-File-Permission"] = fstat.permission.value
         if fstat.type == FileStatusType.FILE:
+            response.headers["Accept-Range"] = "bytes"
             response.headers["X-File-Length"] = str(fstat.size)
         return response
 
@@ -249,7 +262,54 @@ class StorageHandler:
         except IsADirectoryError as e:
             raise _http_bad_request("Destination is a directory", errno=e.errno)
 
-        return web.Response(status=201)
+        raise web.HTTPCreated
+
+    def _unsupported_headers(
+        self, request: web.Request, unsupported: Iterable[str]
+    ) -> None:
+        for name in unsupported:
+            if name in request.headers:
+                raise web.HTTPBadRequest(reason=f"Unsupported header {name}")
+
+    def _parse_content_range(self, request: web.Request) -> slice:
+        rng_str = request.headers.get("Content-Range")
+        if rng_str is None:
+            raise web.HTTPBadRequest(reason="Required header Content-Range")
+        m = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", rng_str)
+        if not m:
+            raise web.HTTPBadRequest
+        start = int(m[1])
+        end = int(m[2])
+        return slice(start, end + 1)
+
+    async def _handle_write(
+        self, request: web.Request, storage_path: PurePath
+    ) -> web.Response:
+        if request.content_type != "application/octet-stream":
+            raise web.HTTPBadRequest(
+                reason="Content-Type should be application/octet-stream"
+            )
+        self._unsupported_headers(
+            request, ["If-Match", "If-None-Match", "If-Range", "If-Unmodified-Since"]
+        )
+
+        rng = self._parse_content_range(request)
+
+        # TODO (A Danshyn 04/23/18): check aiohttp default limits
+        try:
+            await self._storage.store(
+                request.content,
+                storage_path,
+                create=False,
+                offset=rng.start,
+                size=rng.stop - rng.start,
+            )
+        except FileNotFoundError:
+            raise web.HTTPNotFound
+        except IsADirectoryError as e:
+            raise _http_bad_request("Destination is a directory", errno=e.errno)
+
+        raise web.HTTPOk
 
     def _parse_operation(self, request: web.Request) -> Optional[StorageOperation]:
         ops = []
@@ -280,6 +340,9 @@ class StorageHandler:
 
     def _parse_post_operation(self, request: web.Request) -> StorageOperation:
         return self._parse_operation(request) or StorageOperation.RENAME
+
+    def _parse_patch_operation(self, request: web.Request) -> StorageOperation:
+        return self._parse_operation(request) or StorageOperation.WRITE
 
     def _validate_path(self, path: str) -> None:
         if not path:
@@ -448,10 +511,30 @@ class StorageHandler:
             fstat = await self._storage.get_filestatus(storage_path)
         except FileNotFoundError:
             raise web.HTTPNotFound
+        try:
+            rng = request.http_range
+            whole = rng.start is rng.stop is None
+            start, stop, _ = rng.indices(fstat.size)
+            size = stop - start
+            if not size and not whole:
+                raise ValueError
+        except ValueError:
+            response = web.StreamResponse(
+                status=web.HTTPRequestRangeNotSatisfiable.status_code,
+                headers={"Content-Range": f"bytes */{fstat.size}"},
+            )
+            await response.prepare(request)
+            return response
 
         response = self._create_response(fstat)
+        if whole:
+            start = size = 0
+        else:
+            response.set_status(web.HTTPPartialContent.status_code)
+            response.headers["Content-Range"] = f"bytes {start}-{stop-1}/{fstat.size}"
+            response.content_length = size
         await response.prepare(request)
-        await self._storage.retrieve(response, storage_path)
+        await self._storage.retrieve(response, storage_path, start, size or None)
         await response.write_eof()
 
         return response

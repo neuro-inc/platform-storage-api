@@ -1,7 +1,6 @@
 import json
 import time
 import uuid
-from io import BytesIO
 from pathlib import PurePath
 from time import time as current_time
 from typing import Any, AsyncContextManager, Awaitable, Callable
@@ -87,7 +86,7 @@ class TestStorage:
         payload = b"test"
         mtime_min = int(current_time())
 
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == 201
 
         async with client.head(url, headers=headers) as response:
@@ -102,6 +101,8 @@ class TestStorage:
             assert response.headers["X-File-Type"] == "FILE"
             assert response.headers["X-File-Permission"] == "read"
             assert response.headers["X-File-Length"] == str(len(payload))
+            assert response.headers["Accept-Range"] == "bytes"
+            assert "Content-Range" not in response.headers
 
         async with client.get(url, headers=headers) as response:
             assert response.status == 200
@@ -110,8 +111,171 @@ class TestStorage:
             assert response.headers["X-File-Type"] == "FILE"
             assert response.headers["X-File-Permission"] == "read"
             assert response.headers["X-File-Length"] == str(len(payload))
+            assert response.headers["Accept-Range"] == "bytes"
+            assert "Content-Range" not in response.headers
             result_payload = await response.read()
             assert result_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_get_partial(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test content"
+
+        async with client.put(url, headers=headers, data=payload) as response:
+            assert response.status == 201
+
+        headers["Range"] = "bytes=5-8"
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 206
+            assert response.content_length == 4
+            assert response.headers["X-File-Type"] == "FILE"
+            assert response.headers["X-File-Permission"] == "read"
+            assert response.headers["X-File-Length"] == "12"
+            assert response.headers["Content-Range"] == "bytes 5-8/12"
+            result_payload = await response.read()
+            assert result_payload == b"cont"
+
+        headers["Range"] = "bytes=5-"
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 206
+            assert response.content_length == 7
+            assert response.headers["X-File-Type"] == "FILE"
+            assert response.headers["X-File-Permission"] == "read"
+            assert response.headers["X-File-Length"] == "12"
+            assert response.headers["Content-Range"] == "bytes 5-11/12"
+            result_payload = await response.read()
+            assert result_payload == b"content"
+
+        headers["Range"] = "bytes=-4"
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 206
+            assert response.content_length == 4
+            assert response.headers["X-File-Type"] == "FILE"
+            assert response.headers["X-File-Permission"] == "read"
+            assert response.headers["X-File-Length"] == "12"
+            assert response.headers["Content-Range"] == "bytes 8-11/12"
+            result_payload = await response.read()
+            assert result_payload == b"tent"
+
+    @pytest.mark.asyncio
+    async def test_get_partial_invalid_range(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test content"
+
+        async with client.put(url, headers=headers, data=payload) as response:
+            assert response.status == 201
+
+        headers["Range"] = "bytes=5-4"
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 416, await response.text()
+
+        headers["Range"] = "bytes=12-"
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 416, await response.text()
+
+        headers["Range"] = "chars=5-8"
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 416, await response.text()
+
+    @pytest.mark.asyncio
+    async def test_patch(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test content"
+
+        async with client.put(url, headers=headers, data=payload) as response:
+            assert response.status == 201
+
+        headers2 = {**headers, "Content-Range": "bytes 5-8/12"}
+        async with client.patch(url, headers=headers2, data=b"spam") as response:
+            assert response.status == 200
+
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 200
+            assert response.content_length == 12
+            assert response.headers["X-File-Length"] == "12"
+            result_payload = await response.read()
+            assert result_payload == b"test spament"
+
+        headers2 = {**headers, "Content-Range": "bytes 15-18/20"}
+        async with client.patch(url, headers=headers2, data=b"ham") as response:
+            assert response.status == 200
+
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 200
+            result_payload = await response.read()
+            assert response.content_length == 18
+            assert response.headers["X-File-Length"] == "18"
+            assert result_payload == b"test spament\0\0\0ham"
+
+    @pytest.mark.asyncio
+    async def test_patch_invalid_headers(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        url = f"{server_url}/{user.name}/path/to/file"
+        payload = b"test content"
+
+        async with client.put(url, headers=headers, data=payload) as response:
+            assert response.status == 201
+
+        # No Content-Range
+        async with client.patch(url, headers=headers, data=b"spam") as response:
+            assert response.status == 400, await response.text()
+
+        # Invalid Content-Range
+        headers2 = {**headers, "Content-Range": "bytes 5-8"}
+        async with client.patch(url, headers=headers2, data=b"spam") as response:
+            assert response.status == 400, await response.text()
+
+        headers["Content-Range"] = "bytes 5-8/12"
+        headers2 = {**headers, "Content-Type": "text/plain"}
+        async with client.patch(url, headers=headers2, data=b"spam") as response:
+            assert response.status == 400, await response.text()
+
+        headers2 = {**headers, "If-Match": '"xyzzy"'}
+        async with client.patch(url, headers=headers2, data=b"spam") as response:
+            assert response.status == 400, await response.text()
+
+        headers2 = {**headers, "If-None-Match": "*"}
+        async with client.patch(url, headers=headers2, data=b"spam") as response:
+            assert response.status == 400, await response.text()
+
+        headers2 = {**headers, "If-Unmodified-Since": "Sat, 29 Oct 1994 19:43:31 GMT"}
+        async with client.patch(url, headers=headers2, data=b"spam") as response:
+            assert response.status == 400, await response.text()
+
+        headers2 = {**headers, "If-Range": "Wed, 21 Oct 2015 07:28:00 GMT"}
+        async with client.patch(url, headers=headers2, data=b"spam") as response:
+            assert response.status == 400, await response.text()
 
     @pytest.mark.asyncio
     async def test_head_non_existent(
@@ -141,6 +305,24 @@ class TestStorage:
         url = f"{server_url}/{user.name}/non-existent"
 
         async with client.get(url, headers=headers) as response:
+            assert response.status == 404
+
+    @pytest.mark.asyncio
+    async def test_patch_non_existent(
+        self,
+        server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: Callable[[], User],
+        api: ApiConfig,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {
+            "Authorization": "Bearer " + user.token,
+            "Content-Range": "bytes 5-8/12",
+        }
+        url = f"{server_url}/{user.name}/non-existent"
+
+        async with client.patch(url, headers=headers, data=b"spam") as response:
             assert response.status == 404
 
     @pytest.mark.asyncio
@@ -196,7 +378,7 @@ class TestStorage:
 
         payload = b"test"
         mtime_min = int(current_time())
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == 201
 
         params = {"op": "LISTSTATUS"}
@@ -234,7 +416,7 @@ class TestStorage:
         payload = b"test"
 
         mtime_min = int(current_time())
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == 201
 
         headers["Accept"] = "application/x-ndjson"
@@ -285,7 +467,7 @@ class TestStorage:
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
 
-        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
+        async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == 201
 
         params = {"op": "LISTSTATUS"}
@@ -312,7 +494,7 @@ class TestStorage:
 
         payload = b"test"
         mtime_min = int(current_time())
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == 201
 
         params = {"op": "LISTSTATUS"}
@@ -348,7 +530,7 @@ class TestStorage:
         payload = b"test"
 
         mtime_min = int(current_time())
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == 201
 
         async with client.get(dir_url + "?liststatus", headers=headers) as response:
@@ -446,7 +628,7 @@ class TestStorage:
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
 
-        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
+        async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == 201
 
         params = {"op": "LISTSTATUS"}
@@ -512,7 +694,7 @@ class TestStorage:
         headers = {"Authorization": "Bearer " + user.token}
         path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
         url = f"{server_url}{path_str}"
-        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
+        async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == 201
 
         params = {"op": "MKDIRS"}
@@ -535,7 +717,7 @@ class TestStorage:
         path_str = f"/{user.name}/new/nested/{uuid.uuid4()}"
         url = f"{server_url}{path_str}"
         dir_url = f"{server_url}{path_str}/dir"
-        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
+        async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == 201
 
         params = {"op": "MKDIRS"}
@@ -560,7 +742,7 @@ class TestStorage:
         async with client.put(url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
-        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
+        async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == aiohttp.web.HTTPBadRequest.status_code
             payload = await response.json()
             assert payload["error"] == "Destination is a directory"
@@ -586,6 +768,8 @@ class TestStorage:
             assert response.content_length == 0
             assert response.headers["X-File-Type"] == "DIRECTORY"
             assert response.headers["X-File-Permission"] == "read"
+            assert "X-File-Length" not in response.headers
+            assert "Accept-Range" not in response.headers
 
     @pytest.mark.asyncio
     async def test_get_target_is_directory(
@@ -607,6 +791,8 @@ class TestStorage:
             assert response.content_length == 0
             assert response.headers["X-File-Type"] == "DIRECTORY"
             assert response.headers["X-File-Permission"] == "read"
+            assert "X-File-Length" not in response.headers
+            assert "Accept-Range" not in response.headers
             payload = await response.read()
             assert payload == b""
 
@@ -639,7 +825,7 @@ class TestStorage:
         url = f"{server_url}{path_str}"
         payload = b"test"
 
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
         async with client.delete(url, headers=headers) as response:
@@ -659,7 +845,7 @@ class TestStorage:
         url = f"{server_url}{path_str}"
         payload = b"test"
 
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
         headers["Accept"] = "application/x-ndjson"
@@ -689,7 +875,7 @@ class TestStorage:
         payload = b"test"
 
         async with client.put(
-            f"{server_url}{file_path_str}", headers=headers, data=BytesIO(payload)
+            f"{server_url}{file_path_str}", headers=headers, data=payload
         ) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
@@ -782,7 +968,7 @@ class TestGetFileStatus:
     ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
         url = make_url(server_url, user, path)
-        async with client.put(url, headers=headers, data=BytesIO(b"test")) as response:
+        async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
     @classmethod
@@ -1227,7 +1413,7 @@ class TestRename:
     ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
         url = make_url(server_url, user, path)
-        async with client.put(url, headers=headers, data=BytesIO(payload)) as response:
+        async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
     @classmethod
