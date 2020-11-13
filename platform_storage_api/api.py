@@ -275,7 +275,7 @@ class StorageHandler:
         rng_str = request.headers.get("Content-Range")
         if rng_str is None:
             raise web.HTTPBadRequest(reason="Required header Content-Range")
-        m = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", rng_str)
+        m = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+|\*)", rng_str)
         if not m:
             raise web.HTTPBadRequest
         start = int(m[1])

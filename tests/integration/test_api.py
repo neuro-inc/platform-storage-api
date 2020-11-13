@@ -3,7 +3,15 @@ import time
 import uuid
 from pathlib import PurePath
 from time import time as current_time
-from typing import Any, AsyncContextManager, Awaitable, Callable
+from typing import (
+    Any,
+    AsyncContextManager,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    Tuple,
+)
 from unittest import mock
 
 import aiohttp
@@ -193,14 +201,14 @@ class TestStorage:
         async with client.get(url, headers=headers) as response:
             assert response.status == 416, await response.text()
 
-    @pytest.mark.asyncio
-    async def test_patch(
+    @pytest.fixture()
+    async def put_test_file(
         self,
         server_url: str,
         client: aiohttp.ClientSession,
         regular_user_factory: Callable[[], User],
         api: ApiConfig,
-    ) -> None:
+    ) -> AsyncIterator[Tuple[str, Dict[str, str]]]:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -208,6 +216,16 @@ class TestStorage:
 
         async with client.put(url, headers=headers, data=payload) as response:
             assert response.status == 201
+
+        yield (url, headers)
+
+    @pytest.mark.asyncio
+    async def test_patch(
+        self,
+        client: aiohttp.ClientSession,
+        put_test_file: Tuple[str, Dict[str, str]],
+    ) -> None:
+        url, headers = put_test_file
 
         headers2 = {**headers, "Content-Range": "bytes 5-8/12"}
         async with client.patch(url, headers=headers2, data=b"spam") as response:
@@ -220,6 +238,33 @@ class TestStorage:
             result_payload = await response.read()
             assert result_payload == b"test spament"
 
+    @pytest.mark.asyncio
+    async def test_patch_unknown_size(
+        self,
+        client: aiohttp.ClientSession,
+        put_test_file: Tuple[str, Dict[str, str]],
+    ) -> None:
+        url, headers = put_test_file
+
+        headers2 = {**headers, "Content-Range": "bytes 5-8/*"}
+        async with client.patch(url, headers=headers2, data=b"spam") as response:
+            assert response.status == 200
+
+        async with client.get(url, headers=headers) as response:
+            assert response.status == 200
+            assert response.content_length == 12
+            assert response.headers["X-File-Length"] == "12"
+            result_payload = await response.read()
+            assert result_payload == b"test spament"
+
+    @pytest.mark.asyncio
+    async def test_patch_past_the_end(
+        self,
+        client: aiohttp.ClientSession,
+        put_test_file: Tuple[str, Dict[str, str]],
+    ) -> None:
+        url, headers = put_test_file
+
         headers2 = {**headers, "Content-Range": "bytes 15-18/20"}
         async with client.patch(url, headers=headers2, data=b"ham") as response:
             assert response.status == 200
@@ -229,23 +274,15 @@ class TestStorage:
             result_payload = await response.read()
             assert response.content_length == 18
             assert response.headers["X-File-Length"] == "18"
-            assert result_payload == b"test spament\0\0\0ham"
+            assert result_payload == b"test content\0\0\0ham"
 
     @pytest.mark.asyncio
     async def test_patch_invalid_headers(
         self,
-        server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
-        api: ApiConfig,
+        put_test_file: Tuple[str, Dict[str, str]],
     ) -> None:
-        user = await regular_user_factory()
-        headers = {"Authorization": "Bearer " + user.token}
-        url = f"{server_url}/{user.name}/path/to/file"
-        payload = b"test content"
-
-        async with client.put(url, headers=headers, data=payload) as response:
-            assert response.status == 201
+        url, headers = put_test_file
 
         # No Content-Range
         async with client.patch(url, headers=headers, data=b"spam") as response:
