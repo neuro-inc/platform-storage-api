@@ -5,7 +5,7 @@ install_requires = (
     "aiodns==2.0.0",
     "aiofiles==0.6.0",
     "aiohttp==3.7.3",
-    "aiozipkin==0.7.1",
+    "aiozipkin==1.0.0",
     "cbor==1.0.0",
     "cchardet==2.1.7",
     "neuro_auth_client==19.11.26",
