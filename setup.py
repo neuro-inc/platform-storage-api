@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from setuptools import find_packages, setup
 
 
@@ -18,23 +16,15 @@ install_requires = (
     "aiohttp-cors==0.7.0",
 )
 
-if Path(".git").exists():
-    version_kwargs = {
-        "use_scm_version": {
-            "tag_regex": r"(artifactory/)?(?P<version>.*)",
-            "git_describe_command": (
-                "git describe --dirty --tags --long --match artifactory/*.*.*"
-            ),
-        },
-    }
-else:
-    # Only used to install requirements in docker in separate step
-    version_kwargs = {"version": "0.0.1"}
-
 setup(
     name="platform-storage-api",
-    version="0.0.1b1",
     url="https://github.com/neuromation/platform-storage-api",
+    use_scm_version={
+        "tag_regex": r"(artifactory/)?(?P<version>.*)",
+        "git_describe_command": (
+            "git describe --dirty --tags --long --match artifactory/*.*.*"
+        ),
+    },
     packages=find_packages(),
     setup_requires=setup_requires,
     install_requires=install_requires,

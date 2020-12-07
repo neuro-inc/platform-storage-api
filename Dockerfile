@@ -1,28 +1,16 @@
-FROM python:3.7.4-stretch as requirements
-
-WORKDIR /neuromation
+FROM python:3.7.5-stretch as installer
 
 ARG PIP_INDEX_URL
+ARG DIST_FILENAME
 
-# installing dependencies ONLY
-COPY setup.py ./
-RUN \
-    pip install --user -e . && \
-    pip uninstall -y platform-storage-api
+COPY dist/${DIST_FILENAME} ${DIST_FILENAME}
+RUN pip install --user $DIST_FILENAME
 
 FROM python:3.7.4-stretch AS service
 
 WORKDIR /neuromation
 
-COPY setup.py ./
-COPY --from=requirements /root/.local/ /root/.local/
-
-# installing platform-storage-api
-COPY platform_storage_api platform_storage_api
-COPY .git .git
-RUN pip install --user -e .
-RUN rm -rf .git
-
+COPY --from=installer /root/.local/ /root/.local/
 
 ENV PATH=/root/.local/bin:$PATH
 ENV NP_STORAGE_API_PORT=8080

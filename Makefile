@@ -17,7 +17,10 @@ setup:
 	pre-commit install
 
 build:
-	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
+	python setup.py sdist
+	docker build -f Dockerfile -t $(IMAGE) \
+	--build-arg PIP_INDEX_URL \
+	--build-arg DIST_FILENAME=`python setup.py --fullname`.tar.gz .
 	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
 pull:
