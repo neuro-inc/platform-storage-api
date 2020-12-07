@@ -2,6 +2,7 @@
 !setup.py
 !setup.cfg
 !platform_storage_api
+!.git
 
 !Makefile
 !tests

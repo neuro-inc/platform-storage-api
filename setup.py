@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from setuptools import find_packages, setup
 
 
@@ -13,6 +15,19 @@ install_requires = (
     "platform-logging==0.3",
     "aiohttp-cors==0.7.0",
 )
+
+if Path(".git").exists():
+    version_kwargs = {
+        "use_scm_version": {
+            "tag_regex": r"(artifactory/)?(?P<version>.*)",
+            "git_describe_command": (
+                "git describe --dirty --tags --long --match artifactory/*.*.*"
+            ),
+        },
+    }
+else:
+    # Only used to install requirements in docker in separate step
+    version_kwargs = {"version": "0.0.1"}
 
 setup(
     name="platform-storage-api",

@@ -19,7 +19,9 @@ COPY --from=requirements /root/.local/ /root/.local/
 
 # installing platform-storage-api
 COPY platform_storage_api platform_storage_api
+COPY .git .git
 RUN pip install --user -e .
+RUN rm -rf .git
 
 
 ENV PATH=/root/.local/bin:$PATH
