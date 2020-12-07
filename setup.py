@@ -3,6 +3,8 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 
+setup_requires = ("setuptools_scm",)
+
 install_requires = (
     "aiodns==2.0.0",
     "aiofiles==0.6.0",
@@ -34,6 +36,7 @@ setup(
     version="0.0.1b1",
     url="https://github.com/neuromation/platform-storage-api",
     packages=find_packages(),
+    setup_requires=setup_requires,
     install_requires=install_requires,
     python_requires=">=3.7",
     entry_points={
