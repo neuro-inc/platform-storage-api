@@ -3,6 +3,11 @@ FROM python:3.7.5-stretch as installer
 ARG PIP_INDEX_URL
 ARG DIST_FILENAME
 
+# Separate step for requirements to speed up docker builds
+COPY platform_storage_api.egg-info/requires.txt requires.txt
+RUN pip install --user -r requires.txt
+
+# Install service itself
 COPY dist/${DIST_FILENAME} ${DIST_FILENAME}
 RUN pip install --user $DIST_FILENAME
 

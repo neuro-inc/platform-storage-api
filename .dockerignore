@@ -1,4 +1,10 @@
 *
 !dist
+!requirements-test.txt
+!platform_storage_api.egg-info
+
+!Makefile
+!tests
+!requirements-test.txt
 
 **/*.pyc
