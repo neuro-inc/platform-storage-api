@@ -26,6 +26,7 @@ import aiohttp
 import aiohttp_cors
 import aiozipkin
 import cbor
+import pkg_resources
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
@@ -809,6 +810,13 @@ def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> CorsConfig:
     return cors
 
 
+package_version = pkg_resources.get_distribution("platform-storage-api").version
+
+
+async def add_version_to_header(request: Request, response: web.StreamResponse) -> None:
+    response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
+
+
 async def create_app(config: Config, storage: Storage) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
@@ -870,6 +878,8 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     aiozipkin.setup(app, tracer)
     app.middlewares.append(store_span_middleware)
+
+    app.on_response_prepare.append(add_version_to_header)
 
     logger.info("Storage API has been initialized, ready to serve.")
 

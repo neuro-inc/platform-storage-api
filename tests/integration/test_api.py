@@ -51,6 +51,14 @@ class TestApi:
         async with client.get(api.ping_url) as response:
             assert response.status == 200
 
+    @pytest.mark.asyncio
+    async def test_ping_includes_version(
+        self, api: ApiConfig, client: aiohttp.ClientSession
+    ) -> None:
+        async with client.get(api.ping_url) as resp:
+            assert resp.status == 200
+            assert "platform-storage-api" in resp.headers["X-Service-Version"]
+
 
 class TestStorage:
     @pytest.mark.asyncio

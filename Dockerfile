@@ -1,26 +1,21 @@
-FROM python:3.7.4-stretch as requirements
-
-WORKDIR /neuromation
+FROM python:3.7.5-stretch as installer
 
 ARG PIP_INDEX_URL
+ARG DIST_FILENAME
 
-# installing dependencies ONLY
-COPY setup.py ./
-RUN \
-    pip install --user -e . && \
-    pip uninstall -y platform-storage-api
+# Separate step for requirements to speed up docker builds
+COPY platform_storage_api.egg-info/requires.txt requires.txt
+RUN pip install --user -r requires.txt
+
+# Install service itself
+COPY dist/${DIST_FILENAME} ${DIST_FILENAME}
+RUN pip install --user $DIST_FILENAME
 
 FROM python:3.7.4-stretch AS service
 
 WORKDIR /neuromation
 
-COPY setup.py ./
-COPY --from=requirements /root/.local/ /root/.local/
-
-# installing platform-storage-api
-COPY platform_storage_api platform_storage_api
-RUN pip install --user -e .
-
+COPY --from=installer /root/.local/ /root/.local/
 
 ENV PATH=/root/.local/bin:$PATH
 ENV NP_STORAGE_API_PORT=8080

@@ -17,7 +17,10 @@ setup:
 	pre-commit install
 
 build:
-	@docker build --build-arg PIP_INDEX_URL -t $(IMAGE) .
+	python setup.py sdist
+	docker build -f Dockerfile -t $(IMAGE) \
+	--build-arg PIP_INDEX_URL \
+	--build-arg DIST_FILENAME=`python setup.py --fullname`.tar.gz .
 	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
 pull:
@@ -35,7 +38,8 @@ endif
 lint: format
 	mypy platform_storage_api tests
 
-test_unit: build_test test_unit_built
+test_unit:
+	pytest -vv tests/unit
 
 test_integration: build_test test_integration_built
 
@@ -50,12 +54,6 @@ test_integration_built: pull
 	docker-compose --project-directory=`pwd` \
 	    -f tests/docker/e2e.compose.yml rm -f; \
 	exit $$exit_code
-
-test_unit_built:
-	docker run --rm platformstorageapi-test make _test_unit
-
-_test_unit:
-	pytest -vv tests/unit
 
 _test_integration:
 	pytest -vv tests/integration

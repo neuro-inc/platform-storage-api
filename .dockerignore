@@ -1,7 +1,7 @@
 *
-!setup.py
-!setup.cfg
-!platform_storage_api
+!dist
+!requirements-test.txt
+!platform_storage_api.egg-info
 
 !Makefile
 !tests
