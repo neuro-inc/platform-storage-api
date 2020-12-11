@@ -102,7 +102,7 @@ class Storage:
     async def iterstatus(
         self, path: Union[PurePath, str]
     ) -> AsyncIterator[AsyncIterator[FileStatus]]:
-        async with tracing_cm("iterstatus"):
+        async with tracing_cm("Storage.iterstatus"):
             real_path = self._resolve_real_path(PurePath(path))
             async with self._fs.iterstatus(real_path) as it:
                 yield it
