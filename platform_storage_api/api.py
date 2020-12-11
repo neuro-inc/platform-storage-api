@@ -41,7 +41,7 @@ from .config import Config, CORSConfig
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
-from .trace import store_span_middleware
+from .trace import sentry_init, store_span_middleware
 
 
 uvloop.install()
@@ -890,6 +890,8 @@ def main() -> None:
     init_logging()
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
+
+    sentry_init(config.sentry, config.cluster_name)
 
     loop = asyncio.get_event_loop()
 

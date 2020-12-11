@@ -20,8 +20,14 @@ class ServerConfig:
 
 @dataclass(frozen=True)
 class ZipkinConfig:
-    url: URL
-    sample_rate: float
+    url: URL = URL("")
+    sample_rate: float = 0.0
+
+
+@dataclass(frozen=True)
+class SentryConfig:
+    url: URL = URL("")
+    sample_rate: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -50,9 +56,10 @@ class Config:
     server: ServerConfig
     storage: StorageConfig
     auth: AuthConfig
-    zipkin: ZipkinConfig
     cors: CORSConfig
     cluster_name: str
+    zipkin: ZipkinConfig = ZipkinConfig()
+    sentry: SentryConfig = SentryConfig()
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -93,9 +100,18 @@ class EnvironConfigFactory:
         return AuthConfig(server_endpoint_url=url, service_token=token)
 
     def create_zipkin(self) -> ZipkinConfig:
-        url = URL(self._environ["NP_STORAGE_ZIPKIN_URL"])
-        sample_rate = float(self._environ["NP_STORAGE_ZIPKIN_SAMPLE_RATE"])
+        url = URL(self._environ.get("NP_STORAGE_ZIPKIN_URL", ZipkinConfig.url))
+        sample_rate = float(
+            self._environ.get("NP_STORAGE_ZIPKIN_SAMPLE_RATE", ZipkinConfig.sample_rate)
+        )
         return ZipkinConfig(url=url, sample_rate=sample_rate)
+
+    def create_sentry(self) -> SentryConfig:
+        url = URL(self._environ.get("NP_STORAGE_SENTRY_URL", SentryConfig.url))
+        sample_rate = float(
+            self._environ.get("NP_STORAGE_SENTRY_SAMPLE_RATE", SentryConfig.sample_rate)
+        )
+        return SentryConfig(url=url, sample_rate=sample_rate)
 
     def create_cors(self) -> CORSConfig:
         origins: Sequence[str] = CORSConfig.allowed_origins
@@ -109,6 +125,7 @@ class EnvironConfigFactory:
         storage_config = self.create_storage()
         auth_config = self.create_auth()
         zipkin_config = self.create_zipkin()
+        sentry_config = self.create_sentry()
         cors_config = self.create_cors()
         cluster_name = self._environ["NP_CLUSTER_NAME"]
         assert cluster_name
@@ -129,6 +146,7 @@ class EnvironConfigFactory:
             storage=storage_config,
             auth=auth_config,
             zipkin=zipkin_config,
+            sentry=sentry_config,
             cors=cors_config,
             cluster_name=cluster_name,
             permission_expiration_interval_s=permission_expiration_interval_s,
