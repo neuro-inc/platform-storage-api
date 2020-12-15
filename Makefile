@@ -1,6 +1,6 @@
 IMAGE_NAME ?= platformstorageapi
 IMAGE_TAG ?= $(GITHUB_SHA)
-ARTIFACTORY_TAG ?=$(shell echo "$(GITHUB_REF)" | awk -F/ '{print $$NF}')
+ARTIFACTORY_TAG ?= $(shell echo $${GITHUB_REF\#refs/tags/v})
 IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 
 IMAGE_REPO_gke   ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)
