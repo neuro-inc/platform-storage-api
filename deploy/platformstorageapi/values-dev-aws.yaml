@@ -13,8 +13,6 @@ NP_CLUSTER_NAME: 'default'
 NP_STORAGE_API_KEEP_ALIVE_TIMEOUT: "900"
 NP_CORS_ORIGINS: http://localhost:8000,https://master--neuro-web.netlify.com,https://master--neuro-web.netlify.app,https://master--megafon-neuro.netlify.app
 
-env: dev
-
 platform:
   token:
     valueFrom:
@@ -33,4 +31,6 @@ resources:
 secrets: []
 
 ingress:
+  extraAnnotations:
+    external-dns.platform.neuromation.io: "true"
   hosts: [dev.neu.ro]
