@@ -2,10 +2,6 @@ NP_STORAGE_NFS_SERVER: '10.100.104.98'
 NP_STORAGE_NFS_PATH: '/'
 IMAGE: ''
 NP_STORAGE_AUTH_URL: http://platformauthapi:8080
-NP_STORAGE_REQUESTS_CPU: "0.1"
-NP_STORAGE_LIMITS_CPU: "0.2"
-NP_STORAGE_REQUESTS_MEMORY: "300Mi"
-NP_STORAGE_LIMITS_MEMORY: "600Mi"
 NP_STORAGE_REPLICAS: "2"
 NP_PERMISSION_EXPIRATION_INTERVAL: "60"
 NP_PERMISSION_FORGETTING_INTERVAL: "600"
@@ -16,3 +12,25 @@ NP_STORAGE_SENTRY_SAMPLE_RATE: '1'  # 100% of traces are saved
 NP_CLUSTER_NAME: 'default'
 NP_STORAGE_API_KEEP_ALIVE_TIMEOUT: "900"
 NP_CORS_ORIGINS: http://localhost:8000,https://master--neuro-web.netlify.com,https://master--neuro-web.netlify.app,https://master--megafon-neuro.netlify.app
+
+platform:
+  token:
+    valueFrom:
+      secretKeyRef:
+        name: platformservices-secret
+        key: storage_token
+
+resources:
+  requests:
+    cpu: "0.1"
+    memory: "300Mi"
+  limits:
+    cpu: "0.2"
+    memory: "600Mi"
+
+secrets: []
+
+ingress:
+  extraAnnotations:
+    external-dns.platform.neuromation.io: "true"
+  hosts: [dev.neu.ro]
