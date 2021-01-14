@@ -1,7 +1,7 @@
 version: "3"
 services:
   auth_server:
-    image: ${IMAGE_REPO}/platformauthapi:latest
+    image: ${CLOUD_IMAGE_REPO_BASE}/platformauthapi:latest
     ports:
     - "5003:5003"
     environment:
