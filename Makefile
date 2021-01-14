@@ -106,7 +106,7 @@ helm_install:
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
 
 docker_push: build
-	docker tag $(CLOUD_IMAGE) $(CLOUD_IMAGE)
+	docker tag $(IMAGE) $(CLOUD_IMAGE)
 	docker push $(CLOUD_IMAGE)
 
 _helm_fetch:
