@@ -1,8 +1,6 @@
 NP_STORAGE_NFS_SERVER: '10.100.104.98'
 NP_STORAGE_NFS_PATH: '/'
-IMAGE: ''
 NP_STORAGE_AUTH_URL: http://platformauthapi:8080
-NP_STORAGE_REPLICAS: "2"
 NP_PERMISSION_EXPIRATION_INTERVAL: "60"
 NP_PERMISSION_FORGETTING_INTERVAL: "600"
 NP_STORAGE_ZIPKIN_URL: 'http://zipkin:9411'
@@ -20,17 +18,9 @@ platform:
         name: platformservices-secret
         key: storage_token
 
-resources:
-  requests:
-    cpu: "0.1"
-    memory: "300Mi"
-  limits:
-    cpu: "0.2"
-    memory: "600Mi"
-
-secrets: []
-
 ingress:
+  enabled: true
+
   extraAnnotations:
     external-dns.platform.neuromation.io: "true"
   hosts: [dev.neu.ro]

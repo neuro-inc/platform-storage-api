@@ -23,8 +23,8 @@ Make sure you have docker installed.
 To build docker image where test run, you should set the following ENV variables:
 
 ```
-export IMAGE_TAG=latest
-export IMAGE_REPO=%link-to-docker-repo%
+export TAG=latest
+export CLOUD_IMAGE_REPO=%link-to-docker-repo%
 ```
 
 The `%link-to-docker-repo%` links to repo with other services docker images.

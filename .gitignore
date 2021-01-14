@@ -10,3 +10,5 @@ dist
 .mypy_cache
 
 .python-version
+
+temp_deploy/
