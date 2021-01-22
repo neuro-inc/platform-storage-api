@@ -53,7 +53,7 @@ class PermissionChecker(AbstractPermissionChecker):
         return f"storage://{self._config.cluster_name}{target_path!s}"
 
     @trace
-    async def get_user_permissions_tree(  # type: ignore
+    async def get_user_permissions_tree(
         self, request: web.Request, target_path: PurePath
     ) -> ClientAccessSubTreeView:
         username = await self._get_username_from_request(request)
@@ -65,7 +65,7 @@ class PermissionChecker(AbstractPermissionChecker):
         return tree.sub_tree
 
     @trace
-    async def check_user_permissions(  # type: ignore
+    async def check_user_permissions(
         self, request: web.Request, target_path: PurePath, action: str
     ) -> None:
         uri = self._path_to_uri(target_path)

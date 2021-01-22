@@ -4,9 +4,6 @@ from contextlib import asynccontextmanager
 from pathlib import PurePath
 from typing import Any, AsyncIterator, List, Optional, Union
 
-import aiohttp
-from aiohttp.abc import AbstractStreamWriter
-
 from .fs.local import FileStatus, FileSystem, RemoveListing, copy_streams
 from .trace import trace, tracing_cm
 
@@ -39,7 +36,7 @@ class Storage:
     @trace
     async def store(
         self,
-        outstream: AbstractStreamWriter,
+        outstream: Any,
         path: Union[PurePath, str],
         offset: int = 0,
         size: Optional[int] = None,
@@ -57,7 +54,7 @@ class Storage:
     @trace
     async def retrieve(
         self,
-        instream: aiohttp.StreamReader,
+        instream: Any,
         path: Union[PurePath, str],
         offset: int = 0,
         size: Optional[int] = None,

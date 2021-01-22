@@ -41,7 +41,7 @@ from .config import Config, CORSConfig
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
-from .trace import sentry_init, store_span_middleware
+from .trace import create_zipkin_tracer, setup_sentry, setup_zipkin
 
 
 uvloop.install()
@@ -780,20 +780,6 @@ async def handle_exceptions(
         raise _http_exception(web.HTTPInternalServerError, msg_str)
 
 
-async def create_tracer(config: Config) -> aiozipkin.Tracer:
-    endpoint = aiozipkin.create_endpoint(
-        "platformstorageapi",  # the same name as pod prefix on a cluster
-        ipv4=config.server.host,
-        port=config.server.port,
-    )
-
-    zipkin_address = config.zipkin.url / "api/v2/spans"
-    tracer = await aiozipkin.create(
-        str(zipkin_address), endpoint, sample_rate=config.zipkin.sample_rate
-    )
-    return tracer
-
-
 def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> CorsConfig:
     if not config.allowed_origins:
         return aiohttp_cors.setup(app)
@@ -826,7 +812,14 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     cors = _setup_cors(app, config.cors)
 
-    tracer = await create_tracer(config)
+    appname = "platformstorageapi"  # the same name as pod prefix on a cluster
+    tracer = await create_zipkin_tracer(
+        appname,
+        config.server.host,
+        config.server.port,
+        config.zipkin.url,
+        config.zipkin.sample_rate,
+    )
 
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
@@ -876,8 +869,7 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)
 
-    aiozipkin.setup(app, tracer)
-    app.middlewares.append(store_span_middleware)
+    setup_zipkin(app, tracer)
 
     app.on_response_prepare.append(add_version_to_header)
 
@@ -891,7 +883,12 @@ def main() -> None:
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
 
-    sentry_init(config.sentry, config.cluster_name)
+    setup_sentry(
+        "platformstorageapi",
+        config.cluster_name,
+        config.sentry.url,
+        config.sentry.sample_rate,
+    )
 
     loop = asyncio.get_event_loop()
 
