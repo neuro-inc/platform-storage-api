@@ -74,6 +74,17 @@ def trace(func: T) -> T:
     return cast(T, tracer)
 
 
+def notrace(func: T) -> T:
+    @functools.wraps(func)
+    async def tracer(*args: Any, **kwargs: Any) -> Any:
+        with sentry_sdk.Hub.current.configure_scope() as scope:
+            assert isinstance(scope, sentry_sdk.tracing.Transaction)
+            scope.sampled = False
+            return await func(*args, **kwargs)
+
+    return cast(T, tracer)
+
+
 @web.middleware
 async def store_span_middleware(
     request: web.Request, handler: Handler
