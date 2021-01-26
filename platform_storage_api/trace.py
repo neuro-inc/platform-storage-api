@@ -78,8 +78,9 @@ def notrace(func: T) -> T:
     @functools.wraps(func)
     async def tracer(*args: Any, **kwargs: Any) -> Any:
         with sentry_sdk.Hub.current.configure_scope() as scope:
-            assert isinstance(scope, sentry_sdk.tracing.Transaction)
-            scope.sampled = False
+            transaction = scope.transaction
+            if transaction is not None:
+                transaction.sampled = False
             return await func(*args, **kwargs)
 
     return cast(T, tracer)
