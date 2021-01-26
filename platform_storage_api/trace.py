@@ -107,12 +107,12 @@ async def create_zipkin_tracer(
     )
 
 
-async def setup_zipkin(app: web.Application, tracer: aiozipkin.Tracer) -> None:
+def setup_zipkin(app: web.Application, tracer: aiozipkin.Tracer) -> None:
     aiozipkin.setup(app, tracer)
     app.middlewares.append(store_span_middleware)
 
 
-async def setup_sentry(
+def setup_sentry(
     appname: str, cluster_name: str, sentry_url: URL, sample_rate: float
 ) -> None:
     if sentry_url:
