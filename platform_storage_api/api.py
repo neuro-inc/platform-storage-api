@@ -41,7 +41,7 @@ from .config import Config, CORSConfig
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
-from .trace import create_zipkin_tracer, setup_sentry, setup_zipkin
+from .trace import create_zipkin_tracer, notrace, setup_sentry, setup_zipkin
 
 
 uvloop.install()
@@ -59,6 +59,7 @@ class ApiHandler:
     def register(self, app: web.Application) -> None:
         app.add_routes((web.get("/ping", self.handle_ping),))
 
+    @notrace
     async def handle_ping(self, request: web.Request) -> web.Response:
         return web.Response()
 

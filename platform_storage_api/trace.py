@@ -74,6 +74,18 @@ def trace(func: T) -> T:
     return cast(T, tracer)
 
 
+def notrace(func: T) -> T:
+    @functools.wraps(func)
+    async def tracer(*args: Any, **kwargs: Any) -> Any:
+        with sentry_sdk.Hub.current.configure_scope() as scope:
+            transaction = scope.transaction
+            if transaction is not None:
+                transaction.sampled = False
+            return await func(*args, **kwargs)
+
+    return cast(T, tracer)
+
+
 @web.middleware
 async def store_span_middleware(
     request: web.Request, handler: Handler
@@ -95,12 +107,12 @@ async def create_zipkin_tracer(
     )
 
 
-async def setup_zipkin(app: web.Application, tracer: aiozipkin.Tracer) -> None:
+def setup_zipkin(app: web.Application, tracer: aiozipkin.Tracer) -> None:
     aiozipkin.setup(app, tracer)
     app.middlewares.append(store_span_middleware)
 
 
-async def setup_sentry(
+def setup_sentry(
     appname: str, cluster_name: str, sentry_url: URL, sample_rate: float
 ) -> None:
     if sentry_url:
