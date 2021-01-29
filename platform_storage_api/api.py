@@ -41,7 +41,13 @@ from .config import Config, CORSConfig
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
-from .trace import create_zipkin_tracer, notrace, setup_sentry, setup_zipkin
+from .trace import (
+    create_zipkin_tracer,
+    notrace,
+    setup_sentry,
+    setup_sentry_trace_config,
+    setup_zipkin,
+)
 
 
 uvloop.install()
@@ -827,6 +833,7 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
             logger.info("Initializing Auth Client For Storage API")
 
             trace_config = aiozipkin.make_trace_config(tracer)
+            setup_sentry_trace_config(trace_config)
 
             auth_client = await exit_stack.enter_async_context(
                 AuthClient(

@@ -1,11 +1,19 @@
 import functools
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from types import SimpleNamespace
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional, TypeVar, cast
 
 import aiozipkin
 import sentry_sdk
-from aiohttp import web
+from aiohttp import (
+    ClientSession,
+    TraceConfig,
+    TraceRequestEndParams,
+    TraceRequestExceptionParams,
+    TraceRequestStartParams,
+    web,
+)
 from aiozipkin.span import SpanAbc
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from yarl import URL
@@ -125,3 +133,58 @@ def setup_sentry(
         )
     sentry_sdk.set_tag("app", appname)
     sentry_sdk.set_tag("cluster", cluster_name)
+
+
+def setup_sentry_trace_config(trace_config: TraceConfig) -> None:
+    """Creates aiohttp.TraceConfig with enabled Sentry distributive tracing
+    for aiohttp client.
+    """
+    trace_config = TraceConfig()
+
+    async def on_request_start(
+        session: ClientSession,
+        context: SimpleNamespace,
+        params: TraceRequestStartParams,
+    ) -> None:
+        parent_span = sentry_sdk.Hub.current.scope.span
+        if parent_span is None:
+            return
+
+        span_name = f"{params.method.upper()} {params.url.path}"
+        span = parent_span.start_child(op="client", description=span_name)
+        context._span = span
+        span.__enter__()
+
+        ctx = context.trace_request_ctx
+        propagate_headers = ctx is None or ctx.get("propagate_headers", True)
+        if propagate_headers:
+            params.headers.update(span.iter_headers())
+
+    async def on_request_end(
+        session: ClientSession, context: SimpleNamespace, params: TraceRequestEndParams
+    ) -> None:
+        parent_span = sentry_sdk.Hub.current.scope.span
+        if parent_span is None:
+            return
+
+        span = context._span
+        span.__exit__(None, None, None)
+        del context._span
+
+    async def on_request_exception(
+        session: ClientSession,
+        context: SimpleNamespace,
+        params: TraceRequestExceptionParams,
+    ) -> None:
+        parent_span = sentry_sdk.Hub.current.scope.span
+        if parent_span is None:
+            return
+
+        span = context._span
+        exc = params.exception
+        span.__exit__(type(exc), exc, exc.__traceback__)
+        del context._span
+
+    trace_config.on_request_start.append(on_request_start)
+    trace_config.on_request_end.append(on_request_end)
+    trace_config.on_request_exception.append(on_request_exception)
