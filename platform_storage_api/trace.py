@@ -30,8 +30,8 @@ T = TypeVar("T", bound=Callable[..., Awaitable[Any]])
 
 
 @asynccontextmanager
-async def zipkin_tracing_cm(name: str) -> AsyncIterator[SpanAbc]:
-    tracer = CURRENT_TRACER.get(None)  # type: ignore
+async def zipkin_tracing_cm(name: str) -> AsyncIterator[Optional[SpanAbc]]:
+    tracer = CURRENT_TRACER.get(None)
     if tracer is None:
         # No tracer is set,
         # the call is made from unittest most likely.
