@@ -23,7 +23,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
 )
 
 import aiofiles
@@ -45,7 +44,7 @@ class FileStatusType(str, enum.Enum):
     FILE = "FILE"
 
     def __str__(self) -> str:
-        return cast(str, self.value)
+        return self.value
 
 
 class FileStatusPermission(str, enum.Enum):
