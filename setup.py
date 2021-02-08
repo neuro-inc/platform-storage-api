@@ -21,7 +21,7 @@ setup(
     name="platform-storage-api",
     url="https://github.com/neuromation/platform-storage-api",
     use_scm_version={
-        "git_describe_command": "git describe --dirty --tags --long --match v/*.*.*",
+        "git_describe_command": "git describe --dirty --tags --long --match v*.*.*",
     },
     packages=find_packages(),
     setup_requires=setup_requires,
