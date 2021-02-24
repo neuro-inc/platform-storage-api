@@ -10,7 +10,7 @@ NP_STORAGE_SENTRY_URL: 'https://11316dd021994d7085c50e86c2ae404c@o454648.ingest.
 NP_STORAGE_SENTRY_SAMPLE_RATE: '0.1'  # 10% of traces are saved
 NP_CLUSTER_NAME: 'default'
 NP_STORAGE_API_KEEP_ALIVE_TIMEOUT: "900"
-NP_CORS_ORIGINS: http://localhost:8000,https://master--neuro-web.netlify.com,https://master--neuro-web.netlify.app,https://master--megafon-neuro.netlify.app
+NP_CORS_ORIGINS: http://localhost:8000,https://master--neuro-web.netlify.app,https://master--megafon-web.netlify.app,https://master--mts-web.netlify.app,https://master--minzdav-web.netlify.app
 
 platform:
   token:
