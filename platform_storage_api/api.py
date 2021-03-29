@@ -24,7 +24,6 @@ from typing import (
 
 import aiohttp
 import aiohttp_cors
-import aiozipkin
 import cbor
 import pkg_resources
 import uvloop
@@ -43,9 +42,9 @@ from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
 from .trace import (
     create_zipkin_tracer,
+    make_sentry_trace_config,
     notrace,
     setup_sentry,
-    setup_sentry_trace_config,
     setup_zipkin,
 )
 
@@ -832,14 +831,11 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
         async with AsyncExitStack() as exit_stack:
             logger.info("Initializing Auth Client For Storage API")
 
-            trace_config = aiozipkin.make_trace_config(tracer)
-            setup_sentry_trace_config(trace_config)
-
             auth_client = await exit_stack.enter_async_context(
                 AuthClient(
                     url=config.auth.server_endpoint_url,
                     token=config.auth.service_token,
-                    trace_config=trace_config,
+                    trace_config=make_sentry_trace_config(),
                 )
             )
 

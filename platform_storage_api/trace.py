@@ -135,10 +135,11 @@ def setup_sentry(
     sentry_sdk.set_tag("cluster", cluster_name)
 
 
-def setup_sentry_trace_config(trace_config: TraceConfig) -> None:
+def make_sentry_trace_config() -> TraceConfig:
     """Creates aiohttp.TraceConfig with enabled Sentry distributive tracing
     for aiohttp client.
     """
+
     trace_config = TraceConfig()
 
     async def on_request_start(
@@ -188,3 +189,5 @@ def setup_sentry_trace_config(trace_config: TraceConfig) -> None:
     trace_config.on_request_start.append(on_request_start)
     trace_config.on_request_end.append(on_request_end)
     trace_config.on_request_exception.append(on_request_exception)
+
+    return trace_config
