@@ -4,8 +4,9 @@ from contextlib import asynccontextmanager
 from pathlib import PurePath
 from typing import Any, AsyncIterator, List, Optional, Union
 
+from platform_logging import trace, trace_cm
+
 from .fs.local import FileStatus, FileSystem, RemoveListing, copy_streams
-from .trace import trace, tracing_cm
 
 
 class Storage:
@@ -99,7 +100,7 @@ class Storage:
     async def iterstatus(
         self, path: Union[PurePath, str]
     ) -> AsyncIterator[AsyncIterator[FileStatus]]:
-        async with tracing_cm("Storage.iterstatus"):
+        async with trace_cm("Storage.iterstatus"):
             real_path = self._resolve_real_path(PurePath(path))
             async with self._fs.iterstatus(real_path) as it:
                 yield it

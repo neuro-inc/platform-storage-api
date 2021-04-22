@@ -57,20 +57,26 @@ spec:
           value: "{{ .Values.NP_PERMISSION_EXPIRATION_INTERVAL }}"
         - name: NP_PERMISSION_FORGETTING_INTERVAL
           value: "{{ .Values.NP_PERMISSION_FORGETTING_INTERVAL }}"
-        - name: NP_STORAGE_ZIPKIN_URL
-          value: {{ .Values.NP_STORAGE_ZIPKIN_URL }}
-        - name: NP_STORAGE_ZIPKIN_SAMPLE_RATE
-          value: "{{ .Values.NP_STORAGE_ZIPKIN_SAMPLE_RATE }}"
-        - name: NP_STORAGE_SENTRY_URL
-          value: {{ .Values.NP_STORAGE_SENTRY_URL }}
-        - name: NP_STORAGE_SENTRY_SAMPLE_RATE
-          value: "{{ .Values.NP_STORAGE_SENTRY_SAMPLE_RATE }}"
         - name: NP_CLUSTER_NAME
           value: "{{ .Values.NP_CLUSTER_NAME }}"
         - name: NP_STORAGE_API_KEEP_ALIVE_TIMEOUT
           value: "{{ .Values.NP_STORAGE_API_KEEP_ALIVE_TIMEOUT }}"
         - name: NP_CORS_ORIGINS
           value: {{ .Values.NP_CORS_ORIGINS | quote }}
+        {{- if .Values.zipkin }}
+        - name: NP_ZIPKIN_URL
+          value: {{ .Values.zipkin.url }}
+        - name: NP_ZIPKIN_SAMPLE_RATE
+          value: {{ .Values.zipkin.sampleRate | default 0 | quote }}
+        {{- end }}
+        {{- if .Values.sentry }}
+        - name: NP_SENTRY_DSN
+          value: {{ .Values.sentry.dsn }}
+        - name: NP_SENTRY_CLUSTER_NAME
+          value: {{ .Values.sentry.clusterName }}
+        - name: NP_SENTRY_SAMPLE_RATE
+          value: {{ .Values.sentry.sampleRate | default 0 | quote }}
+        {{- end }}
         volumeMounts:
         - name: storage
           mountPath: /var/storage

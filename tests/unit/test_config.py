@@ -4,7 +4,14 @@ from typing import Dict
 import pytest
 from yarl import URL
 
-from platform_storage_api.config import Config, ServerConfig, StorageConfig
+from platform_storage_api.config import (
+    Config,
+    EnvironConfigFactory,
+    SentryConfig,
+    ServerConfig,
+    StorageConfig,
+    ZipkinConfig,
+)
 
 
 class TestServerConfig:
@@ -31,6 +38,63 @@ class TestStorageConfig:
             StorageConfig.from_environ(environ)
 
 
+class TestZipkinConfig:
+    def test_create_zipkin_none(self) -> None:
+        result = EnvironConfigFactory({}).create_zipkin()
+
+        assert result is None
+
+    def test_create_zipkin_default(self) -> None:
+        env = {"NP_ZIPKIN_URL": "https://zipkin:9411"}
+        result = EnvironConfigFactory(env).create_zipkin()
+
+        assert result == ZipkinConfig(url=URL("https://zipkin:9411"))
+
+    def test_create_zipkin_custom(self) -> None:
+        env = {
+            "NP_ZIPKIN_URL": "https://zipkin:9411",
+            "NP_ZIPKIN_APP_NAME": "api",
+            "NP_ZIPKIN_SAMPLE_RATE": "1",
+        }
+        result = EnvironConfigFactory(env).create_zipkin()
+
+        assert result == ZipkinConfig(
+            url=URL("https://zipkin:9411"), app_name="api", sample_rate=1
+        )
+
+
+class TestSentryConfig:
+    def test_create_sentry_none(self) -> None:
+        result = EnvironConfigFactory({}).create_sentry()
+
+        assert result is None
+
+    def test_create_sentry_default(self) -> None:
+        env = {
+            "NP_SENTRY_DSN": "https://sentry",
+            "NP_SENTRY_CLUSTER_NAME": "test",
+        }
+        result = EnvironConfigFactory(env).create_sentry()
+
+        assert result == SentryConfig(dsn=URL("https://sentry"), cluster_name="test")
+
+    def test_create_sentry_custom(self) -> None:
+        env = {
+            "NP_SENTRY_DSN": "https://sentry",
+            "NP_SENTRY_APP_NAME": "api",
+            "NP_SENTRY_CLUSTER_NAME": "test",
+            "NP_SENTRY_SAMPLE_RATE": "1",
+        }
+        result = EnvironConfigFactory(env).create_sentry()
+
+        assert result == SentryConfig(
+            dsn=URL("https://sentry"),
+            app_name="api",
+            cluster_name="test",
+            sample_rate=1,
+        )
+
+
 class TestConfig:
     def test_from_environ_defaults(self) -> None:
         environ = {
@@ -46,10 +110,8 @@ class TestConfig:
         assert config.storage.fs_local_thread_pool_size == 100
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
         assert config.auth.service_token == "hello-token"
-        assert config.zipkin.url == URL("")
-        assert config.zipkin.sample_rate == 0.0
-        assert config.sentry.url == URL("")
-        assert config.sentry.sample_rate == 0.0
+        assert config.zipkin is None
+        assert config.sentry is None
         assert config.cluster_name == "test-cluster"
         assert config.cors.allowed_origins == ()
 
@@ -59,13 +121,12 @@ class TestConfig:
             "NP_STORAGE_LOCAL_THREAD_POOL_SIZE": "123",
             "NP_STORAGE_AUTH_URL": "http://127.0.0.1/",
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
-            "NP_STORAGE_ZIPKIN_URL": "https://zipkin.io:9411/",
-            "NP_STORAGE_ZIPKIN_SAMPLE_RATE": "0.25",
-            "NP_STORAGE_SENTRY_URL": "https://sentry",
-            "NP_STORAGE_SENTRY_SAMPLE_RATE": "0.5",
             "NP_CLUSTER_NAME": "test-cluster",
             "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT": "900",
             "NP_CORS_ORIGINS": "https://domain1.com,http://do.main",
+            "NP_ZIPKIN_URL": "https://zipkin.io:9411/",
+            "NP_SENTRY_DSN": "https://sentry",
+            "NP_SENTRY_CLUSTER_NAME": "test",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
@@ -73,9 +134,10 @@ class TestConfig:
         assert config.storage.fs_local_thread_pool_size == 123
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
         assert config.auth.service_token == "hello-token"
+        assert config.zipkin
         assert config.zipkin.url == URL("https://zipkin.io:9411/")
-        assert config.zipkin.sample_rate == 0.25
-        assert config.sentry.url == URL("https://sentry")
-        assert config.sentry.sample_rate == 0.5
+        assert config.sentry
+        assert config.sentry.dsn == URL("https://sentry")
+        assert config.sentry.cluster_name == "test"
         assert config.cluster_name == "test-cluster"
         assert config.cors.allowed_origins == ["https://domain1.com", "http://do.main"]
