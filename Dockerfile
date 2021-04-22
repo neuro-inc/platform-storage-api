@@ -9,7 +9,7 @@ RUN python -c 'from pkg_resources import Distribution, PathMetadata;\
 dist = Distribution(metadata=PathMetadata(".", "."));\
 print("\n".join(str(r) for r in dist.requires()));\
 ' > requirements.txt
-RUN pip install --user -r requirements.txt
+RUN pip install -U pip && pip install --user -r requirements.txt
 
 # Install service itself
 COPY dist/${DIST_FILENAME} ${DIST_FILENAME}

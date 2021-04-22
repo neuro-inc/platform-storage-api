@@ -31,6 +31,7 @@ export CLOUD_IMAGE_REPO_BASE
 export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
 
 setup:
+	pip install -U pip
 	pip install -r requirements-dev.txt
 	pre-commit install
 
