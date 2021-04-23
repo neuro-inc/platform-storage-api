@@ -888,11 +888,7 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     return app
 
 
-def main() -> None:
-    init_logging()
-    config = Config.from_environ()
-    logging.info("Loaded config: %r", config)
-
+def setup_tracing(config: Config) -> None:
     if config.zipkin:
         setup_zipkin_tracer(
             config.zipkin.app_name,
@@ -909,6 +905,14 @@ def main() -> None:
             cluster_name=config.sentry.cluster_name,
             sample_rate=config.sentry.sample_rate,
         )
+
+
+def main() -> None:
+    init_logging()
+    config = Config.from_environ()
+    logging.info("Loaded config: %r", config)
+
+    setup_tracing(config)
 
     loop = asyncio.get_event_loop()
 
