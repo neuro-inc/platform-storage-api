@@ -811,6 +811,18 @@ async def add_version_to_header(request: Request, response: web.StreamResponse) 
     response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
 
 
+def make_tracing_trace_configs(config: Config) -> List[aiohttp.TraceConfig]:
+    trace_configs = []
+
+    if config.zipkin:
+        trace_configs.append(make_zipkin_trace_config())
+
+    if config.sentry:
+        trace_configs.append(make_sentry_trace_config())
+
+    return trace_configs
+
+
 async def create_app(config: Config, storage: Storage) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
@@ -820,23 +832,15 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     cors = _setup_cors(app, config.cors)
 
-    trace_configs = []
-
-    if config.zipkin:
-        trace_configs.append(make_zipkin_trace_config())
-
-    if config.sentry:
-        trace_configs.append(make_sentry_trace_config())
-
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
             logger.info("Initializing Auth Client For Storage API")
 
             auth_client = await exit_stack.enter_async_context(
                 AuthClient(
-                    url=config.auth.server_endpoint_url,
-                    token=config.auth.service_token,
-                    trace_configs=trace_configs,
+                    config.auth.server_endpoint_url,
+                    config.auth.service_token,
+                    make_tracing_trace_configs(config),
                 )
             )
 
@@ -876,10 +880,10 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     app.on_response_prepare.append(add_version_to_header)
 
-    logger.info("Storage API has been initialized, ready to serve.")
-
     if config.zipkin:
         setup_zipkin(app, skip_routes=probes_routes)
+
+    logger.info("Storage API has been initialized, ready to serve.")
 
     return app
 
