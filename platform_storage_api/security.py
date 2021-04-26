@@ -7,9 +7,9 @@ from aiohttp import web
 from aiohttp_security import check_authorized, check_permission
 from neuro_auth_client import AuthClient, Permission
 from neuro_auth_client.client import ClientAccessSubTreeView
+from platform_logging import trace
 
 from .config import Config
-from .trace import trace
 
 
 logger = logging.getLogger(__name__)

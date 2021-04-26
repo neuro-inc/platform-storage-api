@@ -24,30 +24,31 @@ from typing import (
 
 import aiohttp
 import aiohttp_cors
-import aiozipkin
 import cbor
 import pkg_resources
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
+from aiohttp.web_urldispatcher import AbstractRoute
 from aiohttp_cors import CorsConfig
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
-from platform_logging import init_logging
+from platform_logging import (
+    init_logging,
+    make_sentry_trace_config,
+    make_zipkin_trace_config,
+    notrace,
+    setup_sentry,
+    setup_zipkin,
+    setup_zipkin_tracer,
+)
 
 from .cache import PermissionsCache
 from .config import Config, CORSConfig
 from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
-from .trace import (
-    create_zipkin_tracer,
-    notrace,
-    setup_sentry,
-    setup_sentry_trace_config,
-    setup_zipkin,
-)
 
 
 uvloop.install()
@@ -62,8 +63,8 @@ MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2 ** 16 + 100
 
 
 class ApiHandler:
-    def register(self, app: web.Application) -> None:
-        app.add_routes((web.get("/ping", self.handle_ping),))
+    def register(self, app: web.Application) -> List[AbstractRoute]:
+        return app.add_routes((web.get("/ping", self.handle_ping),))
 
     @notrace
     async def handle_ping(self, request: web.Request) -> web.Response:
@@ -810,6 +811,18 @@ async def add_version_to_header(request: Request, response: web.StreamResponse) 
     response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
 
 
+def make_tracing_trace_configs(config: Config) -> List[aiohttp.TraceConfig]:
+    trace_configs = []
+
+    if config.zipkin:
+        trace_configs.append(make_zipkin_trace_config())
+
+    if config.sentry:
+        trace_configs.append(make_sentry_trace_config())
+
+    return trace_configs
+
+
 async def create_app(config: Config, storage: Storage) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
@@ -819,27 +832,15 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     cors = _setup_cors(app, config.cors)
 
-    appname = "platformstorageapi"  # the same name as pod prefix on a cluster
-    tracer = await create_zipkin_tracer(
-        appname,
-        config.server.host,
-        config.server.port,
-        config.zipkin.url,
-        config.zipkin.sample_rate,
-    )
-
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
             logger.info("Initializing Auth Client For Storage API")
 
-            trace_config = aiozipkin.make_trace_config(tracer)
-            setup_sentry_trace_config(trace_config)
-
             auth_client = await exit_stack.enter_async_context(
                 AuthClient(
-                    url=config.auth.server_endpoint_url,
-                    token=config.auth.service_token,
-                    trace_config=trace_config,
+                    config.auth.server_endpoint_url,
+                    config.auth.service_token,
+                    make_tracing_trace_configs(config),
                 )
             )
 
@@ -867,7 +868,7 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
 
     api_v1_app = web.Application()
     api_v1_handler = ApiHandler()
-    api_v1_handler.register(api_v1_app)
+    probes_routes = api_v1_handler.register(api_v1_app)
     app["api_v1"] = api_v1_app
 
     storage_app = web.Application()
@@ -877,13 +878,33 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)
 
-    setup_zipkin(app, tracer)
-
     app.on_response_prepare.append(add_version_to_header)
+
+    if config.zipkin:
+        setup_zipkin(app, skip_routes=probes_routes)
 
     logger.info("Storage API has been initialized, ready to serve.")
 
     return app
+
+
+def setup_tracing(config: Config) -> None:
+    if config.zipkin:
+        setup_zipkin_tracer(
+            config.zipkin.app_name,
+            config.server.host,
+            config.server.port,
+            config.zipkin.url,
+            config.zipkin.sample_rate,
+        )
+
+    if config.sentry:
+        setup_sentry(
+            config.sentry.dsn,
+            app_name=config.sentry.app_name,
+            cluster_name=config.sentry.cluster_name,
+            sample_rate=config.sentry.sample_rate,
+        )
 
 
 def main() -> None:
@@ -891,12 +912,7 @@ def main() -> None:
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
 
-    setup_sentry(
-        "platformstorageapi",
-        config.cluster_name,
-        config.sentry.url,
-        config.sentry.sample_rate,
-    )
+    setup_tracing(config)
 
     loop = asyncio.get_event_loop()
 

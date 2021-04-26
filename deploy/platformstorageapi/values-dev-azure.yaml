@@ -4,10 +4,6 @@ NP_STORAGE_PVC_CLAIM_NAME: 'pvc-platform-storage'
 NP_STORAGE_AUTH_URL: http://platformauthapi:8080
 NP_PERMISSION_EXPIRATION_INTERVAL: "60"
 NP_PERMISSION_FORGETTING_INTERVAL: "600"
-NP_STORAGE_ZIPKIN_URL: 'http://zipkin:9411'
-NP_STORAGE_ZIPKIN_SAMPLE_RATE: '1'  # 100% of traces are saved
-NP_STORAGE_SENTRY_URL: 'https://11316dd021994d7085c50e86c2ae404c@o454648.ingest.sentry.io/5597106'
-NP_STORAGE_SENTRY_SAMPLE_RATE: '0.1'  # 10% of traces are saved
 NP_CLUSTER_NAME: 'default'
 NP_STORAGE_API_KEEP_ALIVE_TIMEOUT: "900"
 NP_CORS_ORIGINS: http://localhost:8000,https://master--neuro-web.netlify.app,https://master--megafon-web.netlify.app,https://master--mts-web.netlify.app,https://master--minzdav-web.netlify.app
@@ -26,3 +22,8 @@ ingress:
   extraAnnotations:
     external-dns.platform.neuromation.io: "true"
   hosts: [dev.neu.ro]
+
+sentry:
+  dsn: https://11316dd021994d7085c50e86c2ae404c@o454648.ingest.sentry.io/5597106
+  clusterName: dev
+  sampleRate: 0.1
