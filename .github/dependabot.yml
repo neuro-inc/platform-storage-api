@@ -13,6 +13,5 @@ updates:
     interval: daily
     time: "03:00"
   open-pull-requests-limit: 10
-  ignore: []
   registries:
   - python-index-devpi-dev-neu-ro-testuser-dev
