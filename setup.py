@@ -5,7 +5,7 @@ setup_requires = ("setuptools_scm",)
 
 install_requires = (
     "aiodns==2.0.0",
-    "aiofiles==0.6.0",
+    "aiofiles==0.7.0",
     "aiohttp==3.7.4.post0",
     "aiozipkin==1.0.0",
     "cbor==1.0.0",
