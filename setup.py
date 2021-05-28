@@ -12,7 +12,7 @@ install_requires = (
     "cchardet==2.1.7",
     "neuro_auth_client==21.5.17",
     "uvloop==0.15.2",
-    "platform-logging==21.5.13",
+    "platform-logging==21.5.27",
     "aiohttp-cors==0.7.0",
     "sentry-sdk==1.1.0",
 )
