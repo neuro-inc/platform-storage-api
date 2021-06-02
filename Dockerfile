@@ -1,4 +1,4 @@
-FROM python:3.7.5-stretch as installer
+FROM python:3.8.10-buster as installer
 
 ARG PIP_INDEX_URL
 ARG DIST_FILENAME
@@ -15,7 +15,7 @@ RUN pip install -U pip && pip install --user -r requirements.txt
 COPY dist/${DIST_FILENAME} ${DIST_FILENAME}
 RUN pip install --user $DIST_FILENAME
 
-FROM python:3.7.4-stretch AS service
+FROM python:3.8.10-buster AS service
 
 WORKDIR /neuromation
 
