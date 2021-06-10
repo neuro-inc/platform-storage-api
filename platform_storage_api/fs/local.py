@@ -205,10 +205,7 @@ class LocalFileSystem(FileSystem):
     # Actual return type is an async version of io.FileIO
     @contextlib.asynccontextmanager
     async def open(self, path: PurePath, mode: str = "r") -> Any:
-        # typeshed have added types for aiofiles, but they aren't complete
-        # Probably this PR will fix it: https://github.com/python/typeshed/pull/4650
-        # Ignoring types for now
-        async with aiofiles.open(  # type: ignore
+        async with aiofiles.open(
             path,
             mode=mode,
             executor=self._executor,
