@@ -93,6 +93,13 @@ class RemoveListing:
     is_dir: bool
 
 
+@dataclass(frozen=True)
+class DiskUsageInfo:
+    total: int
+    used: int
+    free: int
+
+
 class FileSystem(AbstractAsyncContextManager):  # type: ignore
     @classmethod
     def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
@@ -165,6 +172,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
 
     @abc.abstractmethod
     async def rename(self, old: PurePath, new: PurePath) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def disk_usage(self, path: PurePath) -> DiskUsageInfo:
         pass
 
 
@@ -367,6 +378,16 @@ class LocalFileSystem(FileSystem):
 
     async def rename(self, old: PurePath, new: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
+
+    async def disk_usage(self, path: PurePath) -> DiskUsageInfo:
+        total, used, free = await self._loop.run_in_executor(
+            self._executor, shutil.disk_usage, Path(path)
+        )
+        return DiskUsageInfo(
+            total=total,
+            used=used,
+            free=free,
+        )
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB

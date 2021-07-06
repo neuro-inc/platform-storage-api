@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 import uuid
 from pathlib import Path, PurePath
@@ -1129,3 +1130,11 @@ class TestLocalFileSystem:
         async with fs.open(old_file_path, mode="rb") as f:
             real_payload = await f.read()
             assert real_payload == payload
+
+    @pytest.mark.asyncio
+    async def test_disk_usage(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+        res = await fs.disk_usage(tmp_dir_path)
+        total, used, free = shutil.disk_usage(tmp_dir_path)
+        assert res.total == total
+        assert res.used == used
+        assert res.free == free
