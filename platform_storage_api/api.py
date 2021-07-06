@@ -215,7 +215,10 @@ class StorageHandler:
             )
             return await self._handle_getfilestatus(storage_path, action)
         elif operation == StorageOperation.GETDISKUSAGE:
-            await self._check_user_permissions(request, PurePath("/"))
+            storage_path = self._get_fs_path_from_request(request)
+            await self._check_user_permissions(
+                request, storage_path, AuthAction.READ.value
+            )
             return await self._handle_getdiskusage()
         elif operation == StorageOperation.WEBSOCKET:
             storage_path = self._get_fs_path_from_request(request)

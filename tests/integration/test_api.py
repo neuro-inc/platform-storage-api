@@ -532,12 +532,11 @@ class TestStorage:
         regular_user_factory: Callable[[], Awaitable[User]],
     ) -> None:
         user = await regular_user_factory()
-        admin_headers = {"Authorization": "Bearer " + admin_token}
-        user_headers = {"Authorization": "Bearer " + user.token}
+        headers = {"Authorization": "Bearer " + user.token}
 
         params = {"op": "GETDISKUSAGE"}
         async with client.get(
-            server_url + "/", headers=admin_headers, params=params
+            server_url + f"/{user.name}/", headers=headers, params=params
         ) as response:
             assert response.status == 200
             res = await response.json()
@@ -546,11 +545,6 @@ class TestStorage:
             assert "total" in res
             assert "used" in res
             assert "free" in res
-
-        async with client.get(
-            server_url + "/", headers=user_headers, params=params
-        ) as response:
-            assert response.status >= 400
 
     @pytest.mark.asyncio
     async def test_liststatus(
