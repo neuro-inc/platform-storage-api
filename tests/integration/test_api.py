@@ -537,7 +537,7 @@ class TestStorage:
 
         params = {"op": "GETDISKUSAGE"}
         async with client.get(
-            server_url, headers=admin_headers, params=params
+            server_url + "/", headers=admin_headers, params=params
         ) as response:
             assert response.status == 200
             res = await response.json()
@@ -548,7 +548,7 @@ class TestStorage:
             assert "free" in res
 
         async with client.get(
-            server_url, headers=user_headers, params=params
+            server_url + "/", headers=user_headers, params=params
         ) as response:
             assert response.status >= 400
 

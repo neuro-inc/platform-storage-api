@@ -86,6 +86,7 @@ class StorageOperation(str, Enum):
     The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     The RENAME operation handles moving of files and directories.
+    The GETDISKUSAGE operation handles getting total disk usage of the storage.
     The WEBSOCKET operation handles operations via the WebSocket protocol.
     The WEBSOCKET_READ operation handles immutable operations via the WebSocket
     protocol (deprecated).
