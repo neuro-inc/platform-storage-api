@@ -6,7 +6,7 @@ from typing import Any, AsyncIterator, List, Optional, Union
 
 from platform_logging import trace, trace_cm
 
-from .fs.local import FileStatus, FileSystem, RemoveListing, copy_streams
+from .fs.local import DiskUsageInfo, FileStatus, FileSystem, RemoveListing, copy_streams
 
 
 class Storage:
@@ -156,3 +156,9 @@ class Storage:
         real_old = self._resolve_real_path(PurePath(old))
         real_new = self._resolve_real_path(PurePath(new))
         await self._fs.rename(real_old, real_new)
+
+    @trace
+    async def disk_usage(
+        self,
+    ) -> DiskUsageInfo:
+        return await self._fs.disk_usage(self._base_path)

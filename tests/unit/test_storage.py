@@ -1,4 +1,5 @@
 import os
+import shutil
 from io import BytesIO
 from pathlib import Path, PurePath
 from typing import Any
@@ -206,3 +207,16 @@ class TestStorage:
         ][0]
 
         assert remove_listing.path == PurePath(f"/{dir_name}")
+
+    @pytest.mark.asyncio
+    async def test_disk_usage(
+        self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
+    ) -> None:
+        base_path = local_tmp_dir_path
+        storage = Storage(fs=local_fs, base_path=base_path)
+
+        res = await storage.disk_usage()
+        total, used, free = shutil.disk_usage(base_path)
+        assert res.total == total
+        assert res.used == used
+        assert res.free == free

@@ -523,6 +523,30 @@ class TestStorage:
             assert payload["error"] == "Not a directory"
 
     @pytest.mark.asyncio
+    async def test_disk_usage(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        admin_token: str,
+        regular_user_factory: Callable[[], Awaitable[User]],
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+
+        params = {"op": "GETDISKUSAGE"}
+        async with client.get(
+            server_url + f"/{user.name}/", headers=headers, params=params
+        ) as response:
+            assert response.status == 200
+            res = await response.json()
+
+            # Cannot test exact values here
+            assert "total" in res
+            assert "used" in res
+            assert "free" in res
+
+    @pytest.mark.asyncio
     async def test_liststatus(
         self,
         server_url: str,

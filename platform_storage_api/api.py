@@ -46,7 +46,13 @@ from platform_logging import (
 
 from .cache import PermissionsCache
 from .config import Config, CORSConfig
-from .fs.local import FileStatus, FileStatusPermission, FileStatusType, LocalFileSystem
+from .fs.local import (
+    DiskUsageInfo,
+    FileStatus,
+    FileStatusPermission,
+    FileStatusType,
+    LocalFileSystem,
+)
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
 from .storage import Storage
 
@@ -80,6 +86,7 @@ class StorageOperation(str, Enum):
     The GETFILESTATUS operation handles getting statistics for files and directories.
     The MKDIRS operation handles recursive creation of directories.
     The RENAME operation handles moving of files and directories.
+    The GETDISKUSAGE operation handles getting total disk usage of the storage.
     The WEBSOCKET operation handles operations via the WebSocket protocol.
     The WEBSOCKET_READ operation handles immutable operations via the WebSocket
     protocol (deprecated).
@@ -95,6 +102,7 @@ class StorageOperation(str, Enum):
     DELETE = "DELETE"
     RENAME = "RENAME"
     WRITE = "WRITE"
+    GETDISKUSAGE = "GETDISKUSAGE"
     WEBSOCKET = "WEBSOCKET"
     WEBSOCKET_READ = "WEBSOCKET_READ"
     WEBSOCKET_WRITE = "WEBSOCKET_WRITE"
@@ -206,6 +214,12 @@ class StorageHandler:
                 request, storage_path
             )
             return await self._handle_getfilestatus(storage_path, action)
+        elif operation == StorageOperation.GETDISKUSAGE:
+            storage_path = self._get_fs_path_from_request(request)
+            await self._check_user_permissions(
+                request, storage_path, AuthAction.READ.value
+            )
+            return await self._handle_getdiskusage()
         elif operation == StorageOperation.WEBSOCKET:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._permission_checker.get_user_permissions_tree(
@@ -628,6 +642,17 @@ class StorageHandler:
         stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
         return web.json_response(stat_dict)
 
+    async def _handle_getdiskusage(
+        self,
+    ) -> web.StreamResponse:
+        try:
+            usage = await self._storage.disk_usage()
+        except FileNotFoundError:
+            raise web.HTTPNotFound
+
+        usage_dict = self._convert_disk_usage_to_primitive(usage)
+        return web.json_response(usage_dict)
+
     async def _handle_mkdirs(self, storage_path: PurePath) -> web.StreamResponse:
         try:
             await self._storage.mkdir(storage_path)
@@ -709,6 +734,14 @@ class StorageHandler:
             "modificationTime": status.modification_time,
             "permission": status.permission.value,
             "type": str(status.type),
+        }
+
+    @classmethod
+    def _convert_disk_usage_to_primitive(cls, status: DiskUsageInfo) -> Dict[str, Any]:
+        return {
+            "total": status.total,
+            "used": status.used,
+            "free": status.free,
         }
 
     async def _check_user_permissions(
