@@ -14,7 +14,7 @@ install_requires = (
     "uvloop==0.15.3",
     "platform-logging==21.7.28",
     "aiohttp-cors==0.7.0",
-    "sentry-sdk==1.3.0",
+    "sentry-sdk==1.3.1",
 )
 
 setup(
