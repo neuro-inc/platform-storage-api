@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import PurePath
 from typing import Any, AsyncIterator, List, Optional, Union
 
-from platform_logging import trace, trace_cm
+from neuro_logging import trace, trace_cm
 
 from .fs.local import DiskUsageInfo, FileStatus, FileSystem, RemoveListing, copy_streams
 
