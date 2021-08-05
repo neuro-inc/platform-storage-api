@@ -10,7 +10,7 @@ install_requires = (
     "aiozipkin==1.1.0",
     "cbor==1.0.0",
     "cchardet==2.1.7",
-    "neuro_auth_client==21.7.27",
+    "neuro_auth_client==21.8.4",
     "uvloop==0.15.3",
     "neuro-logging==21.8.4.1",
     "aiohttp-cors==0.7.0",
