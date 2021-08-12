@@ -11,7 +11,7 @@ install_requires = (
     "cbor==1.0.0",
     "cchardet==2.1.7",
     "neuro_auth_client==21.8.4",
-    "uvloop==0.15.3",
+    "uvloop==0.16.0",
     "neuro-logging==21.8.4.1",
     "aiohttp-cors==0.7.0",
     "sentry-sdk==1.3.1",
