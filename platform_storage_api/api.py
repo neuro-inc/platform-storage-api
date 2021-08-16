@@ -665,7 +665,7 @@ class StorageHandler:
     async def _handle_delete(
         self, storage_path: PurePath, request: web.Request
     ) -> web.StreamResponse:
-        recursive = request.query.get("recursive", "true") == "true"
+        recursive = _get_bool_param(request, "recursive", True)
         try:
             await self._storage.remove(storage_path, recursive=recursive)
         except IsADirectoryError as e:
@@ -675,7 +675,7 @@ class StorageHandler:
     async def _handle_iterdelete(
         self, request: Request, storage_path: PurePath
     ) -> web.StreamResponse:
-        recursive = request.query.get("recursive", "true") == "true"
+        recursive = _get_bool_param(request, "recursive", True)
         response = web.StreamResponse()
         response.headers["Content-Type"] = "application/x-ndjson"
         handle_error = partial(handle_error_if_streamed, response)
@@ -819,6 +819,18 @@ async def handle_exceptions(
         msg_str = _unknown_error_message(e, request)
         logging.exception(msg_str)
         raise _http_exception(web.HTTPInternalServerError, msg_str)
+
+
+def _get_bool_param(request: Request, name: str, default: bool = False) -> bool:
+    param = request.query.get(name)
+    if param is None:
+        return default
+    param = param.lower()
+    if param in ("1", "true"):
+        return True
+    if param in ("0", "false"):
+        return False
+    raise ValueError(f'"{name}" request parameter can be "true"/"1" or "false"/"0"')
 
 
 def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> CorsConfig:
