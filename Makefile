@@ -28,8 +28,6 @@ HELM_CHART = platformstorageapi
 
 export CLOUD_IMAGE_REPO_BASE
 
-export PIP_INDEX_URL ?= $(shell python pip_extra_index_url.py)
-
 setup:
 	pip install -U pip
 	pip install -r requirements-dev.txt
@@ -38,7 +36,6 @@ setup:
 build:
 	python setup.py sdist
 	docker build -f Dockerfile -t $(IMAGE) \
-	--build-arg PIP_INDEX_URL \
 	--build-arg DIST_FILENAME=`python setup.py --fullname`.tar.gz .
 	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
