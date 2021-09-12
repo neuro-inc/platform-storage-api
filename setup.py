@@ -19,7 +19,7 @@ install_requires = (
 
 setup(
     name="platform-storage-api",
-    url="https://github.com/neuromation/platform-storage-api",
+    url="https://github.com/neuro-inc/platform-storage-api",
     use_scm_version={
         "git_describe_command": "git describe --dirty --tags --long --match v*.*.*",
     },
