@@ -1,6 +1,5 @@
 FROM python:3.8.10-buster as installer
 
-ARG PIP_INDEX_URL
 ARG DIST_FILENAME
 
 # Separate step for requirements to speed up docker builds
