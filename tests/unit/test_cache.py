@@ -40,10 +40,12 @@ class MockPermissionChecker(AbstractPermissionChecker):
         assert parts[0] == "/"
         for part in parts[1:]:
             action = tree.action
-            tree = tree.children.get(part)
-            if tree is None:
+            sub_tree = tree.children.get(part)
+            if sub_tree is None:
                 tree = ClientAccessSubTreeView(action=action, children={})
                 break
+            else:
+                tree = sub_tree
         if not tree.can_list():
             raise HTTPNotFound
         return tree

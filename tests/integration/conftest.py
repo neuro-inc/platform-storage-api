@@ -116,7 +116,7 @@ async def auth_client(config: Config, admin_token: str) -> AsyncIterator[AuthCli
         yield client
 
 
-_UserFactory = Callable[..., User]
+_UserFactory = Callable[..., Awaitable[_User]]
 
 
 @pytest.fixture
@@ -127,7 +127,7 @@ async def regular_user_factory(
     granter: Callable[[str, Any, User], Awaitable[None]],
     cluster_name: str,
 ) -> _UserFactory:
-    async def _factory(name: Optional[str] = None) -> User:
+    async def _factory(name: Optional[str] = None) -> _User:
         if not name:
             name = str(uuid.uuid4())
         user = User(name=name, clusters=[Cluster(name=cluster_name)])

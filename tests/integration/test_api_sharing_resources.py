@@ -7,10 +7,11 @@ from unittest import mock
 import aiohttp
 import pytest
 import yarl
-from neuro_auth_client import User
 
 from platform_storage_api.fs.local import FileStatusType
 from tests.integration.conftest import ApiConfig, status_iter_response_to_list
+
+from .conftest import _User, _UserFactory
 
 
 class TestStorageListAndResourceSharing:
@@ -23,7 +24,7 @@ class TestStorageListAndResourceSharing:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user1 = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user1.token}
@@ -48,7 +49,7 @@ class TestStorageListAndResourceSharing:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         # user1 uploads a file
         user1 = await regular_user_factory()
@@ -90,8 +91,8 @@ class TestStorageListAndResourceSharing:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        regular_user_factory: _UserFactory,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()
@@ -157,8 +158,8 @@ class TestStorageListAndResourceSharing:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        regular_user_factory: _UserFactory,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()
@@ -216,8 +217,8 @@ class TestStorageListAndResourceSharing:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        regular_user_factory: _UserFactory,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()
@@ -302,8 +303,8 @@ class TestStorageListAndResourceSharing:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        regular_user_factory: _UserFactory,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()

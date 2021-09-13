@@ -9,7 +9,6 @@ from unittest import mock
 import aiohttp
 import cbor
 import pytest
-from neuro_auth_client import User
 
 from platform_storage_api.api import WSStorageOperation
 from platform_storage_api.fs.local import FileStatusType
@@ -18,6 +17,8 @@ from tests.integration.conftest import (
     get_filestatus_dict,
     get_liststatus_dict,
 )
+
+from .conftest import _User, _UserFactory
 
 
 def ws_request(
@@ -76,7 +77,7 @@ class TestStorageWebSocket:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -149,7 +150,7 @@ class TestStorageWebSocket:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -239,7 +240,7 @@ class TestStorageWebSocket:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
 
         user = await regular_user_factory()
@@ -318,7 +319,7 @@ class TestStorageWebSocket:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -471,8 +472,8 @@ class TestStorageWebSocket:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        regular_user_factory: _UserFactory,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
     ) -> None:
         user1 = await regular_user_factory()

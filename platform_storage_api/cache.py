@@ -107,9 +107,11 @@ class PermissionsCache(AbstractPermissionChecker):
 
         while stack:
             action = tree.action
-            tree = tree.children.get(stack.pop())
-            if tree is None:
+            sub_tree = tree.children.get(stack.pop())
+            if sub_tree is None:
                 return ClientAccessSubTreeView(action=action, children={})
+            else:
+                tree = sub_tree
         return tree
 
     async def _get_identity(self, request: web.Request) -> Optional[str]:

@@ -17,7 +17,6 @@ from unittest import mock
 import aiohttp
 import aiohttp.web
 import pytest
-from neuro_auth_client import User
 
 from platform_storage_api.fs.local import FileStatusType
 from tests.integration.conftest import (
@@ -27,18 +26,20 @@ from tests.integration.conftest import (
     status_iter_response_to_list,
 )
 
+from .conftest import _User, _UserFactory
 
-def make_url(server_url: str, user: User, path: str) -> str:
+
+def make_url(server_url: str, user: _User, path: str) -> str:
     return f"{server_url}/{user.name}/{path}"
 
 
 @pytest.fixture()
-async def alice(regular_user_factory: Callable[[], User]) -> User:
+async def alice(regular_user_factory: _UserFactory) -> _User:
     return await regular_user_factory()
 
 
 @pytest.fixture()
-async def bob(regular_user_factory: Callable[[], User]) -> User:
+async def bob(regular_user_factory: _UserFactory) -> _User:
     return await regular_user_factory()
 
 
@@ -93,7 +94,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -137,7 +138,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -186,7 +187,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -214,7 +215,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> AsyncIterator[Tuple[str, Dict[str, str]]]:
         user = await regular_user_factory()
@@ -327,7 +328,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -342,7 +343,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -357,7 +358,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -376,7 +377,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -394,7 +395,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -412,7 +413,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -450,7 +451,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -487,7 +488,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {
@@ -506,7 +507,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -529,7 +530,7 @@ class TestStorage:
         api: ApiConfig,
         client: aiohttp.ClientSession,
         admin_token: str,
-        regular_user_factory: Callable[[], Awaitable[User]],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -552,7 +553,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -588,7 +589,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -622,7 +623,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -640,7 +641,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -658,7 +659,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -675,7 +676,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -691,7 +692,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -712,7 +713,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -737,7 +738,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -756,7 +757,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -778,7 +779,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -801,7 +802,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -822,7 +823,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -845,7 +846,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -871,7 +872,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -885,7 +886,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -906,7 +907,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -935,7 +936,7 @@ class TestStorage:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -973,7 +974,7 @@ class TestStorage:
         use_stream_response: bool,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -1002,7 +1003,7 @@ class TestStorage:
         self,
         server_url: str,
         client: aiohttp.ClientSession,
-        regular_user_factory: Callable[[], User],
+        regular_user_factory: _UserFactory,
         api: ApiConfig,
     ) -> None:
         user = await regular_user_factory()
@@ -1033,7 +1034,7 @@ class TestGetFileStatus:
 
     @classmethod
     async def put_file(
-        cls, server_url: str, client: aiohttp.ClientSession, user: User, path: str
+        cls, server_url: str, client: aiohttp.ClientSession, user: _User, path: str
     ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
         url = make_url(server_url, user, path)
@@ -1042,7 +1043,7 @@ class TestGetFileStatus:
 
     @classmethod
     async def put_dir(
-        cls, server_url: str, client: aiohttp.ClientSession, user: User, path: str
+        cls, server_url: str, client: aiohttp.ClientSession, user: _User, path: str
     ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
         url = make_url(server_url, user, path)
@@ -1053,11 +1054,11 @@ class TestGetFileStatus:
     @classmethod
     def get_filestatus(
         cls,
-        user: User,
+        user: _User,
         path: str,
         server_url: str,
         client: aiohttp.ClientSession,
-        file_owner: User,
+        file_owner: _User,
     ) -> AsyncContextManager[aiohttp.ClientResponse]:
         headers = {"Authorization": "Bearer " + user.token}
         params = {"op": "GETFILESTATUS"}
@@ -1066,7 +1067,7 @@ class TestGetFileStatus:
 
     @classmethod
     async def init_test_stat(
-        self, server_url: str, client: aiohttp.ClientSession, alice: User
+        self, server_url: str, client: aiohttp.ClientSession, alice: _User
     ) -> int:
         expected_mtime_min = int(current_time())
         # Alice creates a file in her home 'file1.txt'
@@ -1083,8 +1084,8 @@ class TestGetFileStatus:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
+        alice: _User,
+        bob: _User,
     ) -> None:
         mtime_min = await self.init_test_stat(server_url, client, alice)
 
@@ -1142,8 +1143,8 @@ class TestGetFileStatus:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
+        alice: _User,
+        bob: _User,
     ) -> None:
         # Alice creates a file in her home
         await self.put_file(server_url, client, alice, self.file1)
@@ -1160,8 +1161,8 @@ class TestGetFileStatus:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
+        alice: _User,
+        bob: _User,
     ) -> None:
         await self.init_test_stat(server_url, client, alice)
 
@@ -1196,9 +1197,9 @@ class TestGetFileStatus:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        alice: _User,
+        bob: _User,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
         permission: str,
     ) -> None:
@@ -1239,9 +1240,9 @@ class TestGetFileStatus:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        alice: _User,
+        bob: _User,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
         permission: str,
     ) -> None:
@@ -1300,9 +1301,9 @@ class TestGetFileStatus:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        alice: _User,
+        bob: _User,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
         perm_file: str,
         perm_parent_dir: str,
@@ -1348,9 +1349,9 @@ class TestGetFileStatus:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        alice: _User,
+        bob: _User,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
         perm_dir: str,
         perm_parent_dir: str,
@@ -1411,9 +1412,9 @@ class TestGetFileStatus:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        alice: _User,
+        bob: _User,
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
         perm_dir: str,
         perm_child_dir: str,
@@ -1476,7 +1477,7 @@ class TestRename:
         cls,
         server_url: str,
         client: aiohttp.ClientSession,
-        user: User,
+        user: _User,
         path: str,
         payload: bytes,
     ) -> None:
@@ -1487,7 +1488,7 @@ class TestRename:
 
     @classmethod
     async def put_dir(
-        cls, server_url: str, client: aiohttp.ClientSession, user: User, path: str
+        cls, server_url: str, client: aiohttp.ClientSession, user: _User, path: str
     ) -> None:
         headers = {"Authorization": "Bearer " + user.token}
         url = make_url(server_url, user, path)
@@ -1500,8 +1501,8 @@ class TestRename:
         cls,
         server_url: str,
         client: aiohttp.ClientSession,
-        user: User,
-        owner: User,
+        user: _User,
+        owner: _User,
         path: str,
     ) -> aiohttp.ClientResponse:
         headers = {"Authorization": "Bearer " + user.token}
@@ -1526,10 +1527,10 @@ class TestRename:
         cls,
         server_url: str,
         client: aiohttp.ClientSession,
-        user: User,
-        owner1: User,
+        user: _User,
+        owner1: _User,
         path1: str,
-        owner2: User,
+        owner2: _User,
         path2: str,
     ) -> aiohttp.ClientResponse:
         headers = {"Authorization": "Bearer " + user.token}
@@ -1545,8 +1546,8 @@ class TestRename:
         cls,
         server_url: str,
         client: aiohttp.ClientSession,
-        user: User,
-        owner1: User,
+        user: _User,
+        owner1: _User,
         path1: str,
         path2: str,
     ) -> aiohttp.ClientResponse:
@@ -1560,8 +1561,8 @@ class TestRename:
         cls,
         server_url: str,
         client: aiohttp.ClientSession,
-        owner: User,
-        user: User,
+        owner: _User,
+        user: _User,
         path: str,
     ) -> None:
         response_status = await cls.get_filestatus(
@@ -1575,7 +1576,7 @@ class TestRename:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
+        alice: _User,
     ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         old_status = await self.get_filestatus(
@@ -1597,7 +1598,7 @@ class TestRename:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
+        alice: _User,
     ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         old_status = await self.get_filestatus(
@@ -1619,7 +1620,7 @@ class TestRename:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
+        alice: _User,
     ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         await self.put_file(server_url, client, alice, self.file2, self.payload2)
@@ -1639,8 +1640,8 @@ class TestRename:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
+        alice: _User,
+        bob: _User,
     ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         status = await self.get_filestatus(server_url, client, alice, alice, self.file1)
@@ -1659,8 +1660,8 @@ class TestRename:
         server_url: str,
         api: ApiConfig,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
+        alice: _User,
+        bob: _User,
     ) -> None:
         await self.put_file(server_url, client, alice, self.file1, self.payload1)
         status = await self.get_filestatus(server_url, client, alice, alice, self.file1)
@@ -1679,11 +1680,11 @@ class TestRename:
         self,
         server_url: str,
         api: ApiConfig,
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
+        alice: _User,
+        bob: _User,
         permission: str,
     ) -> None:
         await self.put_file(server_url, client, bob, self.file1, self.payload2)
@@ -1718,11 +1719,11 @@ class TestRename:
         self,
         server_url: str,
         api: ApiConfig,
-        granter: Callable[[str, Any, User], Awaitable[None]],
+        granter: Callable[[str, Any, _User], Awaitable[None]],
         cluster_name: str,
         client: aiohttp.ClientSession,
-        alice: User,
-        bob: User,
+        alice: _User,
+        bob: _User,
         permission: str,
     ) -> None:
         await self.put_file(server_url, client, bob, self.file2, self.payload2)
