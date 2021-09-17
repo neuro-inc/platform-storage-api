@@ -8,6 +8,10 @@ on:
       - completed
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+    - run: echo "${{ toJson(github) }}"
   publish:
     name: Publish
     runs-on: ubuntu-latest
