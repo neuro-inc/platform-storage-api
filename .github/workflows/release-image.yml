@@ -8,16 +8,17 @@ on:
       - completed
 
 jobs:
-  debug:
-    runs-on: ubuntu-latest
-    steps:
-    - run: echo "${{ toJson(github) }}"
+  # debug:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - run: echo "${{ toJson(github) }}"
   publish:
     name: Publish
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.event == 'push' &&
-            startsWith(github.ref, 'refs/tags/v') &&
-            github.event.workflow.conclusion == 'success' }}
+            github.ref == 'refs/heads/master' &&
+            github.event.workflow_run.head_branch != 'master' &&
+            github.event.workflow_run.conclusion == 'success' }}
     steps:
     - name: Download image artifact
       run: gh run download ${{ github.event.workflow_run.event.id }} -n image
@@ -34,7 +35,9 @@ jobs:
     - name: Tag GHCR:latest
       run: docker tag platformstorageapi:latest ghcr.io/neuro-inc/platformstorageapi:latest
     - name: Set tag
-      run: echo "TAG=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+      run: echo "TAG=${REF#v}" >> $GITHUB_ENV
+      env:
+        REF: ${{ github.event.workflow_run.head_branch }}
     - name: Tag GHCR:{release}
       run: docker tag platformstorageapi:latest ghcr.io/neuro-inc/platformstorageapi:"${TAG}"
     - name: Push latest
