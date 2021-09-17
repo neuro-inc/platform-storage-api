@@ -1,0 +1,39 @@
+name: Release Image
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.event == 'push' &&
+            startsWith(github.ref, 'refs/tags/v') &&
+            github.event.workflow.conclusion == 'success' }}
+    steps:
+    - name: Download image artifact
+      run: gh run download ${{ github.event.workflow_run.event.id }} -n image
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Log in to the Container registry
+      uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Load image to docker
+      run: docker load -i platformstorageapi.tar
+    - name: Tag GHCR:latest
+      run: docker tag platformstorageapi:latest ghcr.io/neuro-inc/platformstorageapi:latest
+    - name: Set tag
+      run: echo "TAG=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+    - name: Tag GHCR:{release}
+      run: docker tag platformstorageapi:latest ghcr.io/neuro-inc/platformstorageapi:"${TAG}"
+    - name: Push latest
+      run: docker push ghcr.io/neuro-inc/platformstorageapi:latest
+    - name: Push tag
+      run: docker push ghcr.io/neuro-inc/platformstorageapi:"${TAG}"
