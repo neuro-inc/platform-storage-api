@@ -18,7 +18,7 @@ jobs:
     concurrency: release_image
     steps:
     - name: Checkout commit
-      uses: neuro-inc/release-image-action@v0.0.6
+      uses: neuro-inc/release-image-action@v0.0.7
       with:
         github: ${{ toJson(github) }}
         image: platformstorageapi
