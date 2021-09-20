@@ -67,14 +67,11 @@ jobs:
       run: make test_unit
     - name: Run integration tests
       run: make test_integration
-    - name: Export image
-      run: docker save -o platformstorageapi.tar platformstorageapi:latest
     - name: Upload image artifact
-      uses: actions/upload-artifact@v2
+      uses: neuro-inc/upload-image-action@v21.9
       with:
-        name: image
-        path: platformstorageapi.tar
-        if-no-files-found: error
+        image: platformstorageapi
+        token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy_dev:
     name: Deploy on dev
