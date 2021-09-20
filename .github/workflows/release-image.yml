@@ -22,4 +22,4 @@ jobs:
       with:
         github: ${{ toJson(github) }}
         image: platformstorageapi
-        token: ${{ secrets.GHI_TOKEN }}
+        token: ${{ secrets.GH_TOKEN }}
