@@ -68,7 +68,7 @@ jobs:
     - name: Run integration tests
       run: make test_integration
     - name: Upload image artifact
-      uses: neuro-inc/upload-image-action@v21.9
+      uses: neuro-inc/upload-image-action@v21.9.1
       with:
         image: platformstorageapi
         token: ${{ secrets.GITHUB_TOKEN }}
