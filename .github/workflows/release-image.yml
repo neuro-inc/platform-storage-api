@@ -26,11 +26,11 @@ jobs:
     - name: Github Release
       if: ${{ ! steps.release.outputs.skip }}
       run: |
-        FLAGS=""
         if [[ -n $PRERELEASE ]]; then
-          FLAGS="--prerelease"
+          gh release create ${{ steps.release.outputs.tag }} --prerelease --notes Release
+        else
+          gh release create ${{ steps.release.outputs.tag }} --notes Pre-Release
         fi
-        gh release create ${{ steps.release.outputs.tag }} "$FLAGS" --notes Release
       shell: bash
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
