@@ -32,11 +32,12 @@ jobs:
       if: ${{ ! steps.release.outputs.skip }}
       run: |
         if [[ -n $PRERELEASE ]]; then
-          gh release create ${{ steps.release.outputs.tag }} --prerelease --notes Release
+          gh release create "$TAG" --prerelease --notes "docker pull ghcr.io/neuro-inc/platformstorageapi:$TAG"
         else
-          gh release create ${{ steps.release.outputs.tag }} --notes Pre-Release
+          gh release create "$TAG" --notes "docker pull ghcr.io/neuro-inc/platformstorageapi:$TAG"
         fi
       shell: bash
       env:
+        TAG: ${{ steps.release.outputs.tag }}
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
         PRERELEASE: ${{ steps.release.outputs.prerelease }}
