@@ -19,7 +19,7 @@ jobs:
     steps:
     - name: Release image
       id: release
-      uses: neuro-inc/release-image-action@v21.9.34
+      uses: neuro-inc/release-image-action@v21.9.35
       with:
         image: platformstorageapi
         token: ${{ secrets.GH_TOKEN }}
