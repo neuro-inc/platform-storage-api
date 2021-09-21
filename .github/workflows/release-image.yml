@@ -23,6 +23,11 @@ jobs:
       with:
         image: platformstorageapi
         token: ${{ secrets.GH_TOKEN }}
+    - name: Checkout commit
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.sha }}
+        fetch-depth: 0
     - name: Github Release
       if: ${{ ! steps.release.outputs.skip }}
       run: |
