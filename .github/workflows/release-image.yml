@@ -20,7 +20,7 @@ jobs:
     - name: Purge old artifacts
       uses: kolpav/purge-artifacts-action@v1
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GH_TOKEN }}
         expire-in: 30mins
     - name: Release image
       id: release
