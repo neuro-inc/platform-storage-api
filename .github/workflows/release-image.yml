@@ -17,6 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: release_image
     steps:
+    - name: Purge old artifacts
+      uses: kolpav/purge-artifacts-action@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        expire-in: 30mins
     - name: Release image
       id: release
       uses: neuro-inc/release-image-action@v21.9.36
