@@ -17,8 +17,21 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: release_image
     steps:
-    - name: Checkout commit
-      uses: neuro-inc/release-image-action@v21.9.33
+    - name: Release image
+      id: release
+      uses: neuro-inc/release-image-action@v21.9.34
       with:
         image: platformstorageapi
         token: ${{ secrets.GH_TOKEN }}
+    - name: Github Release
+      if: ${{ ! steps.release.outputs.skip }}
+      run: |
+        FLAGS=""
+        if [[ -n $PRERELEASE ]]; then
+          FLAGS="--prerelease"
+        fi
+        gh release create ${{ steps.release.outputs.tag }} "$FLAGS" --notes Release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        PRERELEASE: ${{ steps.release.outputs.prerelease }}
