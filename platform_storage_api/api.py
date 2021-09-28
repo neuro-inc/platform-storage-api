@@ -963,7 +963,7 @@ def main() -> None:
     loop = asyncio.get_event_loop()
 
     fs = LocalFileSystem(executor_max_workers=config.storage.fs_local_thread_pool_size)
-    storage = Storage(fs, SingleStoragePathResolver(config.storage.fs_local_base_path))
+    storage = Storage(SingleStoragePathResolver(config.storage.fs_local_base_path), fs)
 
     async def _init_storage(app: web.Application) -> AsyncIterator[None]:
         async with fs:
