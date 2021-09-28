@@ -158,11 +158,12 @@ class TestStorage:
     async def test_filestatus_file(
         self, storage: Storage, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
     ) -> None:
-        real_file_path = local_tmp_dir_path / "file"
+        file_name = "file.txt"
+        real_file_path = local_tmp_dir_path / file_name
         async with local_fs.open(real_file_path, "wb") as f:
             await f.write(b"test")
 
-        storage_stat = await storage.get_filestatus("/file")
+        storage_stat = await storage.get_filestatus(f"/{file_name}")
 
         real_stat = os.stat(str(real_file_path))
 
