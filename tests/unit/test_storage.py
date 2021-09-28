@@ -203,7 +203,7 @@ class TestStorage:
             )
         ][0]
 
-        assert remove_listing.path == PurePath("/dir")
+        assert remove_listing.path == PurePath(f"/{dir_name}")
 
     @pytest.mark.asyncio
     async def test_disk_usage(
