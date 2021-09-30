@@ -32,7 +32,7 @@ from platform_storage_api.config import (
     StorageConfig,
 )
 from platform_storage_api.fs.local import FileSystem
-from platform_storage_api.storage import Storage
+from platform_storage_api.storage import SingleStoragePathResolver, Storage
 
 
 class ApiConfig(NamedTuple):
@@ -148,7 +148,9 @@ async def regular_user_factory(
 
 @pytest.fixture
 async def storage(local_fs: FileSystem, config: Config) -> Storage:
-    return Storage(fs=local_fs, base_path=config.storage.fs_local_base_path)
+    return Storage(
+        SingleStoragePathResolver(config.storage.fs_local_base_path), local_fs
+    )
 
 
 @pytest.fixture

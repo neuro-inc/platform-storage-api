@@ -7,7 +7,11 @@ from typing import Any
 import pytest
 
 from platform_storage_api.fs.local import FileStatusType, FileSystem, LocalFileSystem
-from platform_storage_api.storage import Storage
+from platform_storage_api.storage import (
+    MultipleStoragePathResolver,
+    SingleStoragePathResolver,
+    Storage,
+)
 
 
 class AsyncBytesIO(BytesIO):
@@ -18,13 +22,30 @@ class AsyncBytesIO(BytesIO):
         return super().write(*args, **kwargs)  # type: ignore
 
 
-class TestStorage:
-    def test_path_sanitize(
+class TestMultipleStoragePathResolver:
+    @pytest.mark.asyncio
+    async def test_resolve_base_path(
         self, local_fs: FileSystem, local_tmp_dir_path: Path
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
+        resolver = MultipleStoragePathResolver(local_fs, local_tmp_dir_path)
 
+        path = await resolver.resolve_base_path()
+        assert path == local_tmp_dir_path
+
+        path = await resolver.resolve_base_path(PurePath("/dir"))
+        assert path == local_tmp_dir_path / "main"
+
+        await local_fs.mkdir(local_tmp_dir_path / "extra/isolated")
+        path = await resolver.resolve_base_path(PurePath("/isolated/dir"))
+        assert path == local_tmp_dir_path / "extra/isolated"
+
+
+class TestStorage:
+    @pytest.fixture
+    def storage(self, local_fs: FileSystem, local_tmp_dir_path: Path) -> Storage:
+        return Storage(SingleStoragePathResolver(local_tmp_dir_path), local_fs)
+
+    def test_path_sanitize(self, storage: Storage) -> None:
         assert PurePath("/") == storage.sanitize_path("")
         assert PurePath("/") == storage.sanitize_path("super/..")
         assert PurePath("/") == storage.sanitize_path("super/../../..")
@@ -35,10 +56,9 @@ class TestStorage:
         assert PurePath("/") == storage.sanitize_path("/super/../path/../..")
 
     @pytest.mark.asyncio
-    async def test_store(self, local_fs: FileSystem, local_tmp_dir_path: Path) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
+    async def test_store(
+        self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
+    ) -> None:
         expected_payload = b"test"
         outstream = AsyncBytesIO(expected_payload)
         path = "/path/to/file"
@@ -57,11 +77,8 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_store_dont_create(
-        self, local_fs: FileSystem, local_tmp_dir_path: Path
+        self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
         outstream = AsyncBytesIO(b"test")
         path = "/path/to/file"
         # outstream should be aiohttp.AbstractStreamWriter actually
@@ -71,7 +88,6 @@ class TestStorage:
         files = await local_fs.listdir(local_tmp_dir_path)
         assert files == []
 
-        path = "/path/to/file"
         with pytest.raises(FileNotFoundError):
             await storage.store(outstream, path, create=False)
 
@@ -80,11 +96,8 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_store_range(
-        self, local_fs: FileSystem, local_tmp_dir_path: Path
+        self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
         real_file_path = local_tmp_dir_path / "file"
         async with local_fs.open(real_file_path, "wb") as f:
             await f.write(b"test content")
@@ -105,11 +118,8 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_retrieve(
-        self, local_fs: FileSystem, local_tmp_dir_path: Path
+        self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
         expected_payload = b"test"
 
         real_file_path = local_tmp_dir_path / "file"
@@ -125,11 +135,8 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_retrieve_range(
-        self, local_fs: FileSystem, local_tmp_dir_path: Path
+        self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
         real_file_path = local_tmp_dir_path / "file"
         async with local_fs.open(real_file_path, "wb") as f:
             await f.write(b"test content")
@@ -149,11 +156,8 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_filestatus_file(
-        self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
+        self, storage: Storage, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
         file_name = "file.txt"
         real_file_path = local_tmp_dir_path / file_name
         async with local_fs.open(real_file_path, "wb") as f:
@@ -170,11 +174,8 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_filestatus_dir(
-        self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
+        self, storage: Storage, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
         dir_name = "dir/"
         real_dir_path = local_tmp_dir_path / dir_name
         await local_fs.mkdir(real_dir_path)
@@ -190,11 +191,8 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_iterremove_returns_proper_path(
-        self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
+        self, storage: Storage, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
         dir_name = "dir"
         real_dir_path = local_tmp_dir_path / dir_name
         await local_fs.mkdir(real_dir_path)
@@ -210,13 +208,10 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_disk_usage(
-        self, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
+        self, storage: Storage, local_tmp_dir_path: PurePath
     ) -> None:
-        base_path = local_tmp_dir_path
-        storage = Storage(fs=local_fs, base_path=base_path)
-
         res = await storage.disk_usage()
-        total, used, free = shutil.disk_usage(base_path)
+        total, used, free = shutil.disk_usage(local_tmp_dir_path)
         assert res.total == total
         assert res.used == used
         assert res.free == free
