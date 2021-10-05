@@ -49,21 +49,23 @@ spec:
         - name: NP_STORAGE_LOCAL_BASE_PATH
           value: /var/storage
         - name: NP_STORAGE_AUTH_URL
-          value: {{ .Values.NP_STORAGE_AUTH_URL }}
+          value: {{ .Values.platform.authUrl }}
         - name: NP_STORAGE_AUTH_TOKEN
 {{- if .Values.platform.token }}
 {{ toYaml .Values.platform.token | indent 10 }}
 {{- end }}
         - name: NP_PERMISSION_EXPIRATION_INTERVAL
-          value: "{{ .Values.NP_PERMISSION_EXPIRATION_INTERVAL }}"
+          value: {{ .Values.permissionExpirationInterval | quote }}
         - name: NP_PERMISSION_FORGETTING_INTERVAL
-          value: "{{ .Values.NP_PERMISSION_FORGETTING_INTERVAL }}"
+          value: {{ .Values.permissionForgettingInterval | quote }}
         - name: NP_CLUSTER_NAME
-          value: "{{ .Values.NP_CLUSTER_NAME }}"
+          value: {{ .Values.platform.clusterName | quote }}
         - name: NP_STORAGE_API_KEEP_ALIVE_TIMEOUT
-          value: "{{ .Values.NP_STORAGE_API_KEEP_ALIVE_TIMEOUT }}"
+          value: {{ .Values.keepAliveTimeout | quote }}
+        {{- if .Values.cors.origins }}
         - name: NP_CORS_ORIGINS
-          value: {{ .Values.NP_CORS_ORIGINS | quote }}
+          value: {{ .Values.cors.origins | join "," }}
+        {{- end }}
         {{- if .Values.zipkin }}
         - name: NP_ZIPKIN_URL
           value: {{ .Values.zipkin.url }}
@@ -78,59 +80,31 @@ spec:
         - name: NP_SENTRY_SAMPLE_RATE
           value: {{ .Values.sentry.sampleRate | default 0 | quote }}
         {{- end }}
+        {{- if .Values.storages }}
         volumeMounts:
-        - name: storage
-          mountPath: /var/storage
+        {{- range $index, $storage := .Values.storages }}
+        - name: storage-{{ $index }}
+          {{- if $storage.path }}
+          mountPath: /var/storage/extra{{ $storage.path }}
+          {{- else }}
+          mountPath: /var/storage/main
+          {{- end }}
+        {{- end }}
+        {{- end }}
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets: {{ .toYaml .Values.imagePullSecrets | nindent 8 }}
       {{- end }}
+      {{- if .Values.storages }}
       volumes:
-        - name: storage
-          {{- if .Values.NP_STORAGE_PVC_CLAIM_NAME }}
-          persistentVolumeClaim:
-            claimName: {{ .Values.NP_STORAGE_PVC_CLAIM_NAME }}
-          {{- else }}
-          nfs:
-            server: {{ .Values.NP_STORAGE_NFS_SERVER }}
-            path: {{ .Values.NP_STORAGE_NFS_PATH }}
-          {{- end }}
----
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/affinity: "true"
-    traefik.ingress.kubernetes.io/session-cookie-name: NEURO_STORAGEAPI_SESSION
-  name: platformstorageapi
-spec:
-  type: ClusterIP
-  ports:
-  - name: http
-    port: 8080
-    targetPort: tcp-web
-  selector:
-    service: platformstorageapi
-{{- if .Values.ingress.enabled }}
----
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
-metadata:
-  name: platformstorageapi
-  annotations:
-    kubernetes.io/ingress.class: traefik
-    traefik.frontend.rule.type: PathPrefix
-{{- if .Values.ingress.extraAnnotations }}
-{{ toYaml .Values.ingress.extraAnnotations | indent 4 }}
-{{- end }}
-spec:
-  rules:
-  {{- range .Values.ingress.hosts }}
-  - host: {{ . | quote }}
-    http:
-      paths:
-      - path: /api/v1/storage
-        backend:
-          serviceName: platformstorageapi
-          servicePort: http
-  {{- end }}
-{{- end }}
+      {{- range $index, $storage := .Values.storages }}
+      - name: storage-{{ $index }}
+        {{- if eq $storage.type "pvc" }}
+        persistentVolumeClaim:
+          claimName: {{ $storage.claimName }}
+        {{- else if eq $storage.type "nfs" }}
+        nfs:
+          server: {{ $storage.server }}
+          path: {{ .Values.exportPath }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
