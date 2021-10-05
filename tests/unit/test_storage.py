@@ -37,7 +37,7 @@ class TestMultipleStoragePathResolver:
 
         await local_fs.mkdir(local_tmp_dir_path / "extra/isolated")
         path = await resolver.resolve_base_path(PurePath("/isolated/dir"))
-        assert path == local_tmp_dir_path / "extra/isolated"
+        assert path == local_tmp_dir_path / "extra"
 
 
 class TestStorage:

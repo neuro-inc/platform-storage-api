@@ -1,3 +1,4 @@
+import enum
 import os
 from dataclasses import dataclass, field
 from pathlib import PurePath
@@ -39,10 +40,17 @@ class AuthConfig:
     service_token: str = field(repr=False)
 
 
+class StorageMode(str, enum.Enum):
+    SINGLE = "single"
+    MULTIPLE = "multiple"
+
+
 @dataclass(frozen=True)
 class StorageConfig:
     fs_local_base_path: PurePath
     fs_local_thread_pool_size: int = 100
+
+    mode: StorageMode = StorageMode.SINGLE
 
     @classmethod
     def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "StorageConfig":
@@ -85,6 +93,9 @@ class EnvironConfigFactory:
             )
         )
         return StorageConfig(
+            mode=StorageMode(
+                self._environ.get("NP_STORAGE_MODE", StorageConfig.mode).lower()
+            ),
             fs_local_base_path=PurePath(fs_local_base_path),
             fs_local_thread_pool_size=fs_local_thread_pool_size,
         )

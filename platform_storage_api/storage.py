@@ -39,7 +39,7 @@ class MultipleStoragePathResolver(StoragePathResolver):
             return self._base_path
         isolated_folder = Path(self._base_path, "extra", path.relative_to("/").parts[0])
         if await self._fs.exists(isolated_folder):
-            return isolated_folder
+            return Path(self._base_path, "extra")
         return PurePath(self._base_path, "main")
 
 

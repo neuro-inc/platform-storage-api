@@ -45,7 +45,7 @@ from neuro_logging import (
 )
 
 from .cache import PermissionsCache
-from .config import Config, CORSConfig
+from .config import Config, CORSConfig, StorageMode
 from .fs.local import (
     DiskUsageInfo,
     FileStatus,
@@ -54,7 +54,12 @@ from .fs.local import (
     LocalFileSystem,
 )
 from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
-from .storage import SingleStoragePathResolver, Storage
+from .storage import (
+    MultipleStoragePathResolver,
+    SingleStoragePathResolver,
+    Storage,
+    StoragePathResolver,
+)
 
 
 uvloop.install()
@@ -124,9 +129,8 @@ class WSStorageOperation(str, Enum):
 
 
 class StorageHandler:
-    def __init__(self, app: web.Application, storage: Storage, config: Config) -> None:
+    def __init__(self, app: web.Application, config: Config) -> None:
         self._app = app
-        self._storage = storage
         self._config = config
         self._permission_checker: AbstractPermissionChecker = PermissionChecker(
             app, config
@@ -147,6 +151,10 @@ class StorageHandler:
         cors.add(path_resource.add_route("GET", self.handle_get))
         cors.add(path_resource.add_route("DELETE", self.handle_delete))
         cors.add(path_resource.add_route("PATCH", self.handle_patch))
+
+    @property
+    def _storage(self) -> Storage:
+        return self._app["storage"]
 
     async def handle_put(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_put_operation(request)
@@ -868,7 +876,7 @@ def make_tracing_trace_configs(config: Config) -> List[aiohttp.TraceConfig]:
     return trace_configs
 
 
-async def create_app(config: Config, storage: Storage) -> web.Application:
+async def create_app(config: Config) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
         handler_args=dict(keepalive_timeout=config.server.keep_alive_timeout_s),
@@ -900,6 +908,22 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
                 f"URL={config.auth.server_endpoint_url}"
             )
 
+            fs = await exit_stack.enter_async_context(
+                LocalFileSystem(
+                    executor_max_workers=config.storage.fs_local_thread_pool_size
+                )
+            )
+            if config.storage.mode == StorageMode.SINGLE:
+                path_resolver: StoragePathResolver = SingleStoragePathResolver(
+                    config.storage.fs_local_base_path
+                )
+            else:
+                path_resolver = MultipleStoragePathResolver(
+                    fs, config.storage.fs_local_base_path
+                )
+            storage = Storage(path_resolver, fs)
+            app["api_v1"]["storage"] = storage
+
             # TODO (Rafa Zubairov): configured service shall ensure that
             # pre-requisites are up and running
             # TODO here we shall test whether AuthClient properly
@@ -917,7 +941,7 @@ async def create_app(config: Config, storage: Storage) -> web.Application:
     app["api_v1"] = api_v1_app
 
     storage_app = web.Application()
-    storage_handler = StorageHandler(api_v1_app, storage, config)
+    storage_handler = StorageHandler(api_v1_app, config)
     storage_handler.register(storage_app, cors)
 
     api_v1_app.add_subapp("/storage", storage_app)
@@ -961,16 +985,5 @@ def main() -> None:
     setup_tracing(config)
 
     loop = asyncio.get_event_loop()
-
-    fs = LocalFileSystem(executor_max_workers=config.storage.fs_local_thread_pool_size)
-    storage = Storage(SingleStoragePathResolver(config.storage.fs_local_base_path), fs)
-
-    async def _init_storage(app: web.Application) -> AsyncIterator[None]:
-        async with fs:
-            logging.info("Initializing the storage file system")
-            yield
-            logging.info("Closing the storage file system")
-
-    app = loop.run_until_complete(create_app(config, storage))
-    app.cleanup_ctx.append(_init_storage)
+    app = loop.run_until_complete(create_app(config))
     web.run_app(app, host=config.server.host, port=config.server.port)

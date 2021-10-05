@@ -10,6 +10,7 @@ from platform_storage_api.config import (
     SentryConfig,
     ServerConfig,
     StorageConfig,
+    StorageMode,
     ZipkinConfig,
 )
 
@@ -106,6 +107,7 @@ class TestConfig:
         config = Config.from_environ(environ)
         assert config.server.port == 8080
         assert config.server.keep_alive_timeout_s == 75
+        assert config.storage.mode == StorageMode.SINGLE
         assert config.storage.fs_local_base_path == PurePath("/path/to/dir")
         assert config.storage.fs_local_thread_pool_size == 100
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
@@ -117,6 +119,7 @@ class TestConfig:
 
     def test_from_environ_custom(self) -> None:
         environ = {
+            "NP_STORAGE_MODE": "multiple",
             "NP_STORAGE_LOCAL_BASE_PATH": "/path/to/dir",
             "NP_STORAGE_LOCAL_THREAD_POOL_SIZE": "123",
             "NP_STORAGE_AUTH_URL": "http://127.0.0.1/",
@@ -130,6 +133,7 @@ class TestConfig:
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
+        assert config.storage.mode == StorageMode.MULTIPLE
         assert config.storage.fs_local_base_path == PurePath("/path/to/dir")
         assert config.storage.fs_local_thread_pool_size == 123
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")

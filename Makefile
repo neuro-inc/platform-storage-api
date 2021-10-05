@@ -39,10 +39,6 @@ build:
 	--build-arg DIST_FILENAME=`python setup.py --fullname`.tar.gz .
 	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
-pull:
-	-docker-compose --project-directory=`pwd` -p platformregistryapi \
-	    -f tests/docker/e2e.compose.yml pull
-
 format:
 ifdef CI_LINT_RUN
 	pre-commit run --all-files --show-diff-on-failure
@@ -56,22 +52,13 @@ lint: format
 test_unit:
 	pytest -vv tests/unit
 
-test_integration: build_test test_integration_built
-
-build_test: build
-	docker build -t platformstorageapi-test -f tests/Dockerfile .
-
-test_integration_built: pull
-	docker-compose --project-directory=`pwd` -f tests/docker/e2e.compose.yml run test make _test_integration; \
+test_integration:
+	docker-compose -f tests/docker/e2e.compose.yml up -d
+	pytest -vv tests/integration; \
 	exit_code=$$?; \
-	docker-compose --project-directory=`pwd` \
-	    -f tests/docker/e2e.compose.yml kill; \
-	docker-compose --project-directory=`pwd` \
-	    -f tests/docker/e2e.compose.yml rm -f; \
+	docker-compose -f tests/docker/e2e.compose.yml kill; \
+	docker-compose -f tests/docker/e2e.compose.yml rm -f; \
 	exit $$exit_code
-
-_test_integration:
-	pytest -vv tests/integration
 
 run:
 	docker run -it --rm --name platformstorageapi \
