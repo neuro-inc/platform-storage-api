@@ -1,7 +1,8 @@
+import calendar
 import json
 import time
 import uuid
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from time import time as current_time
 from typing import (
     Any,
@@ -18,6 +19,7 @@ import aiohttp
 import aiohttp.web
 import pytest
 
+from platform_storage_api.config import Config
 from platform_storage_api.fs.local import FileStatusType
 from tests.integration.conftest import (
     ApiConfig,
@@ -110,7 +112,7 @@ class TestStorage:
             assert response.status == 200
             assert response.content_length == len(payload)
             last_modified = response.headers["Last-Modified"]
-            mtime = time.mktime(
+            mtime = calendar.timegm(
                 time.strptime(last_modified, "%a, %d %b %Y %H:%M:%S %Z")
             )
             assert mtime >= mtime_min
@@ -1751,3 +1753,61 @@ class TestRename:
             )
             await self.assert_filestatus_equal(status, new_status)
             await self.assert_no_file(server_url, client, alice, bob, self.file2)
+
+
+class TestMultiStorage:
+    @pytest.mark.asyncio
+    async def test_put_main_storage(
+        self,
+        multi_storage_config: Config,
+        multi_storage_server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: _UserFactory,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"{user.name}/path/to"
+        dir_url = f"{multi_storage_server_url}/{dir_path}"
+        file_name = "file.txt"
+        url = f"{dir_url}/{file_name}"
+
+        async with client.put(url, headers=headers, data=b"test") as response:
+            assert response.status == 201
+
+        assert Path(
+            multi_storage_config.storage.fs_local_base_path,
+            "main",
+            dir_path,
+            file_name,
+        ).exists()
+
+    @pytest.mark.asyncio
+    async def test_put_extra_storage(
+        self,
+        multi_storage_config: Config,
+        multi_storage_server_url: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: _UserFactory,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"{user.name}/path/to"
+        dir_url = f"{multi_storage_server_url}/{dir_path}"
+        file_name = "file.txt"
+        url = f"{dir_url}/{file_name}"
+
+        Path(
+            multi_storage_config.storage.fs_local_base_path,
+            "extra",
+            user.name,
+        ).mkdir(parents=True)
+
+        async with client.put(url, headers=headers, data=b"test") as response:
+            assert response.status == 201
+
+        assert Path(
+            multi_storage_config.storage.fs_local_base_path,
+            "extra",
+            dir_path,
+            file_name,
+        ).exists()

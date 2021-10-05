@@ -1,8 +1,7 @@
 import json
-import os
 import uuid
-from dataclasses import dataclass
-from pathlib import PurePath
+from dataclasses import dataclass, replace
+from pathlib import Path, PurePath
 from typing import (
     Any,
     AsyncIterable,
@@ -27,12 +26,10 @@ from platform_storage_api.config import (
     AuthConfig,
     Config,
     CORSConfig,
-    EnvironConfigFactory,
     ServerConfig,
     StorageConfig,
+    StorageMode,
 )
-from platform_storage_api.fs.local import FileSystem
-from platform_storage_api.storage import SingleStoragePathResolver, Storage
 
 
 class ApiConfig(NamedTuple):
@@ -50,11 +47,6 @@ class ApiConfig(NamedTuple):
     @property
     def ping_url(self) -> str:
         return self.endpoint + "/ping"
-
-
-@pytest.fixture(scope="session")
-def in_docker() -> bool:
-    return os.path.isfile("/.dockerenv")
 
 
 _TokenFactory = Callable[[str], str]
@@ -81,18 +73,17 @@ class _User:
 
 
 @pytest.fixture
-def server_url(in_docker: bool, api: ApiConfig) -> str:
-    if in_docker:
-        return "http://storage:5000/api/v1/storage"
-    else:
-        return api.storage_base_url
+def server_url(api: ApiConfig) -> str:
+    return api.storage_base_url
 
 
 @pytest.fixture
-def config(in_docker: bool, admin_token: str, cluster_name: str) -> Config:
-    if in_docker:
-        return EnvironConfigFactory().create()
+def multi_storage_server_url(multi_storage_api: ApiConfig) -> str:
+    return multi_storage_api.storage_base_url
 
+
+@pytest.fixture
+def config(admin_token: str, cluster_name: str) -> Config:
     server_config = ServerConfig()
     path = PurePath("/tmp/np_storage")
     storage_config = StorageConfig(fs_local_base_path=path)
@@ -106,6 +97,14 @@ def config(in_docker: bool, admin_token: str, cluster_name: str) -> Config:
         cors=CORSConfig(allowed_origins=["http://localhost:8000"]),
         cluster_name=cluster_name,
     )
+
+
+@pytest.fixture
+def multi_storage_config(config: Config) -> Config:
+    config = replace(config, storage=replace(config.storage, mode=StorageMode.MULTIPLE))
+    Path(config.storage.fs_local_base_path, "main").mkdir(parents=True, exist_ok=True)
+    Path(config.storage.fs_local_base_path, "extra").mkdir(parents=True, exist_ok=True)
+    return config
 
 
 @pytest.fixture
@@ -147,20 +146,23 @@ async def regular_user_factory(
 
 
 @pytest.fixture
-async def storage(local_fs: FileSystem, config: Config) -> Storage:
-    return Storage(
-        SingleStoragePathResolver(config.storage.fs_local_base_path), local_fs
-    )
-
-
-@pytest.fixture
-async def api(
-    config: Config, storage: Storage, in_docker: bool
-) -> AsyncIterator[ApiConfig]:
-    app = await create_app(config, storage)
+async def api(config: Config) -> AsyncIterator[ApiConfig]:
+    app = await create_app(config)
     runner = aiohttp.web.AppRunner(app)
     await runner.setup()
     api_config = ApiConfig(host="0.0.0.0", port=8080)
+    site = aiohttp.web.TCPSite(runner, api_config.host, api_config.port)
+    await site.start()
+    yield api_config
+    await runner.cleanup()
+
+
+@pytest.fixture
+async def multi_storage_api(multi_storage_config: Config) -> AsyncIterator[ApiConfig]:
+    app = await create_app(multi_storage_config)
+    runner = aiohttp.web.AppRunner(app)
+    await runner.setup()
+    api_config = ApiConfig(host="0.0.0.0", port=8081)
     site = aiohttp.web.TCPSite(runner, api_config.host, api_config.port)
     await site.start()
     yield api_config
