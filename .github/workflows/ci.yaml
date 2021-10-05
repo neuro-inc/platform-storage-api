@@ -67,6 +67,8 @@ jobs:
       run: make test_unit
     - name: Run integration tests
       run: make test_integration
+    - name: Build Docker image
+      run: make build
     - name: Upload image artifact
       uses: neuro-inc/upload-image-action@v21.9.2
       with:
