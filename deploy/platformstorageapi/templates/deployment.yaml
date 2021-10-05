@@ -48,6 +48,10 @@ spec:
         env:
         - name: NP_STORAGE_LOCAL_BASE_PATH
           value: /var/storage
+        {{- if gt len .Values.storages 1 }}
+        - name: NP_STORAGE_MODE
+          value: multiple
+        {{- end }}
         - name: NP_STORAGE_AUTH_URL
           value: {{ .Values.platform.authUrl }}
         - name: NP_STORAGE_AUTH_TOKEN
