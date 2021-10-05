@@ -1,21 +1,18 @@
-NP_STORAGE_NFS_SERVER: ''
-NP_STORAGE_NFS_PATH: ''
-NP_STORAGE_PVC_CLAIM_NAME: ''
-NP_STORAGE_AUTH_URL: http://platformauthapi:8080
-NP_PERMISSION_EXPIRATION_INTERVAL: "60"
-NP_PERMISSION_FORGETTING_INTERVAL: "600"
-NP_CLUSTER_NAME: ''
-NP_STORAGE_API_KEEP_ALIVE_TIMEOUT: "75"
+permissionExpirationInterval: 60
+permissionForgettingInterval: 600
+keepAliveTimeout: 75
 
 image:
-  repository: "$IMAGE_REPO"
-  tag: "$IMAGE_TAG"
+  repository: $IMAGE_REPO
+  tag: $IMAGE_TAG
 
 imagePullSecrets: []
 
 replicas: 2
 
 platform:
+  clusterName:
+  authUrl:
   token: {}
 
 resources:
@@ -31,6 +28,9 @@ secrets: []
 ingress:
   enabled: false
 
+storages: []
+
+cors: {}
 
 zipkin: {}
 
