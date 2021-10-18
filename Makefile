@@ -30,13 +30,16 @@ export CLOUD_IMAGE_REPO_BASE
 
 setup:
 	pip install -U pip
-	pip install -r requirements-dev.txt
+	pip install -e .[dev]
 	pre-commit install
 
 build:
-	python setup.py sdist
-	docker build -f Dockerfile -t $(IMAGE) \
-	--build-arg DIST_FILENAME=`python setup.py --fullname`.tar.gz .
+	rm -rf build dist
+	pip install -U build
+	python -m build
+	docker build \
+		--build-arg PYTHON_BASE=slim-buster \
+		-t $(IMAGE) .
 	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
 format:

@@ -1,3 +1,0 @@
--e .
--r requirements-test.txt
-pdbpp==0.10.3
