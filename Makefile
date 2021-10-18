@@ -34,9 +34,12 @@ setup:
 	pre-commit install
 
 build:
-	python -c "import setuptools; setuptools.setup()" sdist
-	docker build -f Dockerfile -t $(IMAGE) \
-		--build-arg DIST_FILENAME=`python -c "import setuptools; setuptools.setup()" --fullname`.tar.gz .
+	rm -rf build dist
+	pip install -U build
+	python -m build
+	docker build \
+		--build-arg PYTHON_BASE=slim-buster \
+		-t $(IMAGE) .
 	docker tag $(IMAGE) $(IMAGE_NAME):latest
 
 format:
