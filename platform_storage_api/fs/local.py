@@ -6,6 +6,7 @@ import errno
 import logging
 import os
 import shutil
+import stat as statmodule
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
@@ -206,9 +207,41 @@ class LocalFileSystem(FileSystem):
         if self._executor:
             self._executor.shutdown()
 
+    @contextlib.contextmanager
+    def _resolve_dir_fd(
+        self, path: PurePath, dirfd: Optional[int] = None
+    ) -> Iterator[int]:
+        try:
+            for name in path.parts:
+                assert name not in ("..", ".", "")
+                orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+                if statmodule.S_ISLNK(orig_st.st_mode):
+                    raise FileNotFoundError(
+                        errno.ENOENT, "No such file or directory", str(path)
+                    )
+                fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+                try:
+                    if not os.path.samestat(orig_st, os.stat(fd)):
+                        raise FileNotFoundError(
+                            errno.ENOENT, "No such file or directory", str(path)
+                        )
+                    if dirfd is not None:
+                        os.close(dirfd)
+                except:  # noqa: E722
+                    os.close(fd)
+                    raise
+                dirfd = fd
+            assert dirfd is not None
+            yield dirfd
+        finally:
+            if dirfd is not None:
+                os.close(dirfd)
+
     def _listdir(self, path: PurePath) -> List[PurePath]:
-        path = Path(path)
-        return list(path.iterdir())
+        with self._resolve_dir_fd(path) as dirfd:
+            with os.scandir(dirfd) as scandir_it:
+                entries = list(scandir_it)
+            return [path / entry.name for entry in entries]
 
     async def listdir(self, path: PurePath) -> List[PurePath]:
         return await self._loop.run_in_executor(self._executor, self._listdir, path)
@@ -216,35 +249,90 @@ class LocalFileSystem(FileSystem):
     # Actual return type is an async version of io.FileIO
     @contextlib.asynccontextmanager
     async def open(self, path: PurePath, mode: str = "r") -> Any:
+        def opener(filepath: str, flags: int) -> int:
+            # Possible flags values:
+            # "rb": os.O_RDONLY
+            # "rb+": os.O_RDWR
+            # "wb": os.O_CREAT | os.O_TRUNC | os.O_WRONLY
+            # "xb": os.O_EXCL | os.O_CREAT | os.O_WRONLY
+            with self._resolve_dir_fd(path.parent) as dirfd:
+                name = path.name
+                assert name not in ("..", ".", "")
+                try:
+                    orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+                except FileNotFoundError:
+                    if flags & os.O_CREAT == 0:
+                        raise
+                    flags &= ~os.O_TRUNC
+                    flags |= os.O_EXCL
+                    fd = os.open(name, flags, dir_fd=dirfd)
+                else:
+                    if statmodule.S_ISLNK(orig_st.st_mode):
+                        raise FileNotFoundError(
+                            errno.ENOENT, "No such file or directory", str(path)
+                        )
+                    fd = os.open(name, flags, dir_fd=dirfd)
+                    try:
+                        if not os.path.samestat(orig_st, os.stat(fd)):
+                            raise FileNotFoundError(
+                                errno.ENOENT, "No such file or directory", str(path)
+                            )
+                    except:  # noqa: E722
+                        os.close(fd)
+                        raise
+                return fd
+
         async with aiofiles.open(
             path,
             mode=mode,
+            opener=opener,
             executor=self._executor,
         ) as f:
             yield f
 
     def _mkdir(self, path: PurePath) -> None:
         # TODO (A Danshyn 04/23/18): consider setting mode
-        Path(path).mkdir(parents=True, exist_ok=True)
+        dirfd = None
+        try:
+            for name in path.parts:
+                try:
+                    orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+                except FileNotFoundError:
+                    os.mkdir(name, dir_fd=dirfd)
+                    orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+                if not statmodule.S_ISDIR(orig_st.st_mode):
+                    raise NotADirectoryError(
+                        errno.ENOTDIR, "Not a directory", str(path)
+                    )
+                fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+                try:
+                    if not os.path.samestat(orig_st, os.stat(fd)):
+                        raise NotADirectoryError(
+                            errno.ENOTDIR, "Not a directory", str(path)
+                        )
+                    if dirfd is not None:
+                        os.close(dirfd)
+                except:  # noqa: E722
+                    os.close(fd)
+                    raise
+                dirfd = fd
+        finally:
+            if dirfd is not None:
+                os.close(dirfd)
 
     async def mkdir(self, path: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._mkdir, path)
 
     @classmethod
     def _create_filestatus(
-        cls, path: PurePath, basename_only: Optional[bool] = False
+        cls, path: PurePath, stat: Any, is_dir: bool
     ) -> "FileStatus":
-        with Path(path) as real_path:
-            stat = real_path.stat()
-            mod_time = int(stat.st_mtime)  # converting float to int
-            path = PurePath(path.name) if basename_only else path
-            if real_path.is_dir():
-                return FileStatus.create_dir_status(path, modification_time=mod_time)
-            else:
-                size = stat.st_size
-                return FileStatus.create_file_status(
-                    path, size, modification_time=mod_time
-                )
+        mod_time = int(stat.st_mtime)  # converting float to int
+        if is_dir:
+            return FileStatus.create_dir_status(path, modification_time=mod_time)
+        else:
+            size = stat.st_size
+            return FileStatus.create_file_status(path, size, modification_time=mod_time)
 
     async def _iterate_in_chunks(
         self, it: Iterator[Any], chunk_size: int
@@ -259,23 +347,47 @@ class LocalFileSystem(FileSystem):
             done = len(chunk) < chunk_size
             yield chunk
 
-    async def _scandir_iter(self, dir_iter: Iterator[Any]) -> AsyncIterator[FileStatus]:
+    def _scandir_iter(self, path: PurePath) -> Iterator[FileStatus]:
+        with self._resolve_dir_fd(path) as dirfd:
+            with os.scandir(dirfd) as scandir_it:
+                for entry in scandir_it:
+                    yield self._create_filestatus(
+                        PurePath(entry.name),
+                        entry.stat(),
+                        entry.is_dir(),
+                    )
+
+    async def _iterstatus_iter(
+        self, dir_iter: Iterator[FileStatus]
+    ) -> AsyncIterator[FileStatus]:
         async for chunk in self._iterate_in_chunks(dir_iter, SCANDIR_CHUNK_SIZE):
-            for entry in chunk:
-                yield self._create_filestatus(PurePath(entry), basename_only=True)
+            for status in chunk:
+                yield status
 
     @asynccontextmanager
     async def iterstatus(
         self, path: PurePath
     ) -> AsyncIterator[AsyncIterator[FileStatus]]:
-        with await self._loop.run_in_executor(
-            self._executor, os.scandir, path
-        ) as dir_iter:
-            yield self._scandir_iter(dir_iter)
+        dir_iter = self._scandir_iter(path)
+        try:
+            yield self._iterstatus_iter(dir_iter)
+        finally:
+            await self._loop.run_in_executor(
+                self._executor, dir_iter.close  # type: ignore
+            )
 
-    @classmethod
-    def _get_file_or_dir_status(cls, path: PurePath) -> FileStatus:
-        return cls._create_filestatus(path, basename_only=False)
+    def _get_file_or_dir_status(self, path: PurePath) -> FileStatus:
+        with self._resolve_dir_fd(path.parent) as dirfd:
+            name = path.name
+            assert name not in ("..", ".", "")
+            orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+            if statmodule.S_ISLNK(orig_st.st_mode):
+                raise FileNotFoundError(
+                    errno.ENOENT, "No such file or directory", str(path)
+                )
+            return self._create_filestatus(
+                path, orig_st, statmodule.S_ISDIR(orig_st.st_mode)
+            )
 
     async def get_filestatus(self, path: PurePath) -> FileStatus:
         return await self._loop.run_in_executor(
@@ -318,76 +430,131 @@ class LocalFileSystem(FileSystem):
             errno.errorcode.get(e.errno, e.errno),
         )
 
-    def _iterremove(self, path: PurePath) -> Iterator[RemoveListing]:
-        with os.scandir(path) as scandir_it:
+    def _iterremovechildren(
+        self, dirfd: int, path: PurePath
+    ) -> Iterator[RemoveListing]:
+        with os.scandir(dirfd) as scandir_it:
             entries = list(scandir_it)
 
         for entry in entries:
-            entry_path = PurePath(entry.path)
-            if entry.is_dir():
-                yield from self._iterremove(entry_path)
-            else:
-                os.unlink(entry_path)
-                yield RemoveListing(entry_path, is_dir=False)
-        os.rmdir(path)
-        yield RemoveListing(path, is_dir=True)
+            name = entry.name
+            entry_path = path / name
+            is_dir = entry.is_dir()
+            if is_dir:
+                orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+                if statmodule.S_ISDIR(orig_st.st_mode):
+                    fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+                    try:
+                        if not os.path.samestat(orig_st, os.stat(fd)):
+                            raise NotADirectoryError(
+                                errno.ENOTDIR, "Not a directory", str(path)
+                            )
+                        yield from self._iterremovechildren(fd, entry_path)
+                    finally:
+                        os.close(fd)
+                    os.rmdir(name, dir_fd=dirfd)
+                    yield RemoveListing(entry_path, is_dir=True)
+                continue
+            os.unlink(name, dir_fd=dirfd)
+            yield RemoveListing(entry_path, is_dir=False)
+
+    def _iterremove(
+        self, path: PurePath, *, recursive: bool = False
+    ) -> Iterator[RemoveListing]:
+        with self._resolve_dir_fd(path.parent) as dirfd:
+            name = path.name
+            assert name not in ("..", ".", "")
+            orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+            if not statmodule.S_ISDIR(orig_st.st_mode):
+                os.unlink(name, dir_fd=dirfd)
+                yield RemoveListing(path, is_dir=False)
+                return
+
+            if not recursive:
+                raise IsADirectoryError(
+                    errno.EISDIR, "Is a directory, use recursive remove", str(path)
+                )
+            fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+            try:
+                if not os.path.samestat(orig_st, os.stat(fd)):
+                    os.unlink(name, dir_fd=dirfd)
+                    yield RemoveListing(path, is_dir=False)
+                    return
+
+                try:
+                    yield from self._iterremovechildren(fd, path)
+                    os.rmdir(name, dir_fd=dirfd)
+                    yield RemoveListing(path, is_dir=True)
+                except OSError as e:
+                    self._log_remove_error(e, path)
+                    raise e
+            finally:
+                os.close(fd)
 
     async def iterremove(
         self, path: PurePath, *, recursive: bool = False
     ) -> AsyncIterator[RemoveListing]:
-        if self._remove_as_dir(path):
-            if not recursive:
-                raise IsADirectoryError(
-                    errno.EISDIR, "Is a directory, use recursive remove", str(path)
-                )
-            try:
-                async for remove_entry in sync_iterator_to_async(
-                    self._loop, self._executor, self._iterremove(path)
-                ):
-                    yield remove_entry
-            except OSError as e:
-                await self._loop.run_in_executor(
-                    self._executor, self._log_remove_error, e, path
-                )
-                raise e
-        else:
-            await self._loop.run_in_executor(self._executor, os.unlink, path)
-            yield RemoveListing(path, is_dir=False)
+        async for remove_entry in sync_iterator_to_async(
+            self._loop, self._executor, self._iterremove(path, recursive=recursive)
+        ):
+            yield remove_entry
 
     def _remove(self, path: PurePath, recursive: bool) -> None:
-        if self._remove_as_dir(path):
+        with self._resolve_dir_fd(path.parent) as dirfd:
+            name = path.name
+            assert name not in ("..", ".", "")
+            orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+            if not statmodule.S_ISDIR(orig_st.st_mode):
+                os.unlink(name, dir_fd=dirfd)
+                return
+
             if not recursive:
                 raise IsADirectoryError(
                     errno.EISDIR, "Is a directory, use recursive remove", str(path)
                 )
+            fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
             try:
-                shutil.rmtree(path)
-            except OSError as e:
-                self._log_remove_error(e, path)
-                raise e
-        else:
-            os.unlink(path)
+                if not os.path.samestat(orig_st, os.stat(fd)):
+                    raise NotADirectoryError(
+                        errno.ENOTDIR, "Not a directory", str(path)
+                    )
+
+                def onerror(*args: Any) -> None:
+                    raise
+
+                try:
+                    shutil._rmtree_safe_fd(fd, "", onerror)  # type: ignore
+                    os.rmdir(name, dir_fd=dirfd)
+                except OSError as e:
+                    self._log_remove_error(e, path)
+                    raise e
+            finally:
+                os.close(fd)
 
     async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
         await self._loop.run_in_executor(self._executor, self._remove, path, recursive)
 
     def _rename(self, old: PurePath, new: PurePath) -> None:
-        concrete_old_path = Path(old)
-        concrete_new_path = Path(new)
-        concrete_old_path.rename(concrete_new_path)
+        with self._resolve_dir_fd(old.parent) as src_dir_fd:
+            with self._resolve_dir_fd(new.parent) as dst_dir_fd:
+                os.rename(
+                    old.name, new.name, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd
+                )
 
     async def rename(self, old: PurePath, new: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
 
+    def _disk_usage(self, path: PurePath) -> DiskUsageInfo:
+        with self._resolve_dir_fd(path) as fd:
+            total, used, free = shutil.disk_usage(fd)  # type: ignore
+            return DiskUsageInfo(
+                total=total,
+                used=used,
+                free=free,
+            )
+
     async def disk_usage(self, path: PurePath) -> DiskUsageInfo:
-        total, used, free = await self._loop.run_in_executor(
-            self._executor, shutil.disk_usage, Path(path)
-        )
-        return DiskUsageInfo(
-            total=total,
-            used=used,
-            free=free,
-        )
+        return await self._loop.run_in_executor(self._executor, self._disk_usage, path)
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
@@ -433,21 +600,30 @@ async def sync_iterator_to_async(
 
     chunk_size = max(queue_size / 20, 50)
 
-    queue: asyncio.Queue[Union[_T, EndMark]] = asyncio.Queue(queue_size)
+    queue: asyncio.Queue[Union[_T, EndMark, Exception]] = asyncio.Queue(queue_size)
 
-    async def put_to_queue(chunk: List[Union[_T, EndMark]]) -> None:
+    async def put_to_queue(chunk: List[Union[_T, EndMark, Exception]]) -> None:
         for item in chunk:
             await queue.put(item)
 
     def sync_runner() -> None:
-        chunk: List[Union[_T, EndMark]] = []
-        for item in iter:
-            chunk.append(item)
-            if len(chunk) == chunk_size:
-                asyncio.run_coroutine_threadsafe(put_to_queue(chunk), loop).done()
-                chunk = []
-        chunk.append(EndMark())
-        asyncio.run_coroutine_threadsafe(put_to_queue(chunk), loop).done()
+        chunk: List[Union[_T, EndMark, Exception]] = []
+        try:
+            try:
+                for item in iter:
+                    chunk.append(item)
+                    if len(chunk) == chunk_size:
+                        data = chunk
+                        chunk = []
+                        asyncio.run_coroutine_threadsafe(
+                            put_to_queue(data), loop
+                        ).done()
+            except Exception as e:
+                chunk.append(e)
+                return
+            chunk.append(EndMark())
+        finally:
+            asyncio.run_coroutine_threadsafe(put_to_queue(chunk), loop).done()
 
     loop.run_in_executor(executor, sync_runner)
 
@@ -455,4 +631,6 @@ async def sync_iterator_to_async(
         item = await queue.get()
         if isinstance(item, EndMark):
             return
+        if isinstance(item, Exception):
+            raise item
         yield item

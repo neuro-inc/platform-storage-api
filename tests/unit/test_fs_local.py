@@ -245,10 +245,9 @@ class TestLocalFileSystem:
     ) -> None:
         path = tmp_dir_path / "nested"
 
-        cm = fs.iterstatus(path)
-        with pytest.raises(FileNotFoundError):
-            async with cm:
-                pass
+        async with fs.iterstatus(path) as it:
+            with pytest.raises(FileNotFoundError):
+                await it.__anext__()
 
     @pytest.mark.asyncio
     async def test_iterstatus_broken_directory_link(
@@ -257,10 +256,9 @@ class TestLocalFileSystem:
         path = tmp_dir_path / "nested"
         os.symlink("nonexisting", path, target_is_directory=True)
 
-        cm = fs.iterstatus(path)
-        with pytest.raises(FileNotFoundError):
-            async with cm:
-                pass
+        async with fs.iterstatus(path) as it:
+            with pytest.raises(FileNotFoundError):
+                await it.__anext__()
 
     @pytest.mark.asyncio
     async def test_iterstatus_broken_entry_link(
