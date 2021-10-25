@@ -123,7 +123,7 @@ class TestLocalFileSystem:
         assert files == [path]
 
     @pytest.mark.asyncio
-    async def test_mkdir_existing(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+    async def test_mkdir_existing_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         dir_name = "new"
         path = tmp_dir_path / dir_name
         await fs.mkdir(path)
@@ -132,6 +132,20 @@ class TestLocalFileSystem:
 
         # should not fail
         await fs.mkdir(path)
+
+    @pytest.mark.asyncio
+    async def test_mkdir_existing_file(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        dir_name = "new"
+        path = tmp_dir_path / dir_name
+        async with fs.open(path, "wb"):
+            pass
+        files = await fs.listdir(tmp_dir_path)
+        assert files == [path]
+
+        with pytest.raises(FileExistsError):
+            await fs.mkdir(path)
 
     @pytest.mark.asyncio
     async def test_liststatus_single_empty_file(

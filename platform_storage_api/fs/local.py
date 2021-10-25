@@ -300,10 +300,6 @@ class LocalFileSystem(FileSystem):
                 except FileNotFoundError:
                     os.mkdir(name, dir_fd=dirfd)
                     orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
-                if not statmodule.S_ISDIR(orig_st.st_mode):
-                    raise NotADirectoryError(
-                        errno.ENOTDIR, "Not a directory", str(path)
-                    )
                 fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
                 try:
                     if not os.path.samestat(orig_st, os.stat(fd)):
@@ -316,6 +312,8 @@ class LocalFileSystem(FileSystem):
                     os.close(fd)
                     raise
                 dirfd = fd
+            if not statmodule.S_ISDIR(orig_st.st_mode):
+                raise FileExistsError(errno.EEXIST, "File exists", str(path))
         finally:
             if dirfd is not None:
                 os.close(dirfd)
