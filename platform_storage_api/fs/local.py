@@ -207,6 +207,22 @@ class LocalFileSystem(FileSystem):
         if self._executor:
             self._executor.shutdown()
 
+    def _open_safe_fd(
+        self,
+        name: str,
+        dirfd: Optional[int],
+        orig_st: os.stat_result,
+        flags: int = os.O_RDONLY,
+    ) -> int:
+        fd = os.open(name, flags, dir_fd=dirfd)
+        try:
+            if not os.path.samestat(orig_st, os.stat(fd)):
+                raise FileNotFoundError(errno.ENOENT, "No such file or directory")
+        except:  # noqa: E722
+            os.close(fd)
+            raise
+        return fd
+
     @contextlib.contextmanager
     def _resolve_dir_fd(
         self, path: PurePath, dirfd: Optional[int] = None
@@ -219,12 +235,8 @@ class LocalFileSystem(FileSystem):
                     raise FileNotFoundError(
                         errno.ENOENT, "No such file or directory", str(path)
                     )
-                fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+                fd = self._open_safe_fd(name, dirfd, orig_st)
                 try:
-                    if not os.path.samestat(orig_st, os.stat(fd)):
-                        raise FileNotFoundError(
-                            errno.ENOENT, "No such file or directory", str(path)
-                        )
                     if dirfd is not None:
                         os.close(dirfd)
                 except:  # noqa: E722
@@ -271,15 +283,7 @@ class LocalFileSystem(FileSystem):
                         raise FileNotFoundError(
                             errno.ENOENT, "No such file or directory", str(path)
                         )
-                    fd = os.open(name, flags, dir_fd=dirfd)
-                    try:
-                        if not os.path.samestat(orig_st, os.stat(fd)):
-                            raise FileNotFoundError(
-                                errno.ENOENT, "No such file or directory", str(path)
-                            )
-                    except:  # noqa: E722
-                        os.close(fd)
-                        raise
+                    fd = self._open_safe_fd(name, dirfd, orig_st, flags=flags)
                 return fd
 
         async with aiofiles.open(
@@ -294,26 +298,30 @@ class LocalFileSystem(FileSystem):
         # TODO (A Danshyn 04/23/18): consider setting mode
         dirfd = None
         try:
-            for name in path.parts:
+            for name in path.parts[:-1]:
+                assert name not in ("..", ".", "")
                 try:
                     orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
                 except FileNotFoundError:
                     os.mkdir(name, dir_fd=dirfd)
                     orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
-                fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+                fd = self._open_safe_fd(name, dirfd, orig_st)
                 try:
-                    if not os.path.samestat(orig_st, os.stat(fd)):
-                        raise NotADirectoryError(
-                            errno.ENOTDIR, "Not a directory", str(path)
-                        )
                     if dirfd is not None:
                         os.close(dirfd)
                 except:  # noqa: E722
                     os.close(fd)
                     raise
                 dirfd = fd
-            if not statmodule.S_ISDIR(orig_st.st_mode):
-                raise FileExistsError(errno.EEXIST, "File exists", str(path))
+
+            name = path.name
+            assert name not in ("..", ".", "")
+            try:
+                os.mkdir(name, dir_fd=dirfd)
+            except OSError:
+                orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+                if not statmodule.S_ISDIR(orig_st.st_mode):
+                    raise
         finally:
             if dirfd is not None:
                 os.close(dirfd)
@@ -441,12 +449,8 @@ class LocalFileSystem(FileSystem):
             if is_dir:
                 orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
                 if statmodule.S_ISDIR(orig_st.st_mode):
-                    fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+                    fd = self._open_safe_fd(name, dirfd, orig_st)
                     try:
-                        if not os.path.samestat(orig_st, os.stat(fd)):
-                            raise NotADirectoryError(
-                                errno.ENOTDIR, "Not a directory", str(path)
-                            )
                         yield from self._iterremovechildren(fd, entry_path)
                     finally:
                         os.close(fd)
@@ -510,16 +514,10 @@ class LocalFileSystem(FileSystem):
                     orig_st = entry.stat(follow_symlinks=False)
                     is_dir = statmodule.S_ISDIR(orig_st.st_mode)
             if is_dir:
-                dirfd = os.open(entry.name, os.O_RDONLY, dir_fd=topfd)
+                dirfd = self._open_safe_fd(entry.name, topfd, orig_st)
                 try:
-                    if os.path.samestat(orig_st, os.fstat(dirfd)):
-                        self._rmtree_safe_fd(dirfd)
-                        os.rmdir(entry.name, dir_fd=topfd)
-                    else:
-                        # This can only happen if someone replaces
-                        # a directory with a symlink after the call to
-                        # os.scandir or stat.S_ISDIR above.
-                        raise OSError("Cannot call rmtree on a symbolic " "link")
+                    self._rmtree_safe_fd(dirfd)
+                    os.rmdir(entry.name, dir_fd=topfd)
                 finally:
                     os.close(dirfd)
             else:
@@ -538,18 +536,13 @@ class LocalFileSystem(FileSystem):
                 raise IsADirectoryError(
                     errno.EISDIR, "Is a directory, use recursive remove", str(path)
                 )
-            fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+            fd = self._open_safe_fd(name, dirfd, orig_st)
             try:
-                if not os.path.samestat(orig_st, os.stat(fd)):
-                    raise NotADirectoryError(
-                        errno.ENOTDIR, "Not a directory", str(path)
-                    )
-                try:
-                    self._rmtree_safe_fd(fd)
-                    os.rmdir(name, dir_fd=dirfd)
-                except OSError as e:
-                    self._log_remove_error(e, path)
-                    raise e
+                self._rmtree_safe_fd(fd)
+                os.rmdir(name, dir_fd=dirfd)
+            except OSError as e:
+                self._log_remove_error(e, path)
+                raise e
             finally:
                 os.close(fd)
 

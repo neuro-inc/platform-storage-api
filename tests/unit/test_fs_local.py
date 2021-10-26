@@ -217,19 +217,19 @@ class TestLocalFileSystem:
 
     @pytest.mark.asyncio
     async def test_mkdir_symlink(self, fs: FileSystem, symlink_to_dir: Path) -> None:
-        with pytest.raises(NotADirectoryError):
+        with pytest.raises(FileExistsError):
             await fs.mkdir(symlink_to_dir)
 
     @pytest.mark.asyncio
     async def test_mkdir_free_symlink(self, fs: FileSystem, free_symlink: Path) -> None:
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(FileExistsError):
             await fs.mkdir(free_symlink)
 
     @pytest.mark.asyncio
     async def test_mkdir_path_with_symlink(
         self, fs: FileSystem, path_with_symlink: Path
     ) -> None:
-        with pytest.raises(NotADirectoryError):
+        with pytest.raises(FileNotFoundError):
             await fs.mkdir(path_with_symlink / "new")
 
     @pytest.mark.asyncio
