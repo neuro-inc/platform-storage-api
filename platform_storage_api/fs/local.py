@@ -235,14 +235,10 @@ class LocalFileSystem(FileSystem):
                     raise FileNotFoundError(
                         errno.ENOENT, "No such file or directory", str(path)
                     )
-                fd = self._open_safe_fd(name, dirfd, orig_st)
-                try:
-                    if dirfd is not None:
-                        os.close(dirfd)
-                except:  # noqa: E722
-                    os.close(fd)
-                    raise
-                dirfd = fd
+                oldfd = dirfd
+                dirfd = self._open_safe_fd(name, dirfd, orig_st)
+                if oldfd is not None:
+                    os.close(oldfd)
             assert dirfd is not None
             yield dirfd
         finally:
@@ -305,14 +301,10 @@ class LocalFileSystem(FileSystem):
                 except FileNotFoundError:
                     os.mkdir(name, dir_fd=dirfd)
                     orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
-                fd = self._open_safe_fd(name, dirfd, orig_st)
-                try:
-                    if dirfd is not None:
-                        os.close(dirfd)
-                except:  # noqa: E722
-                    os.close(fd)
-                    raise
-                dirfd = fd
+                oldfd = dirfd
+                dirfd = self._open_safe_fd(name, dirfd, orig_st)
+                if oldfd is not None:
+                    os.close(oldfd)
 
             name = path.name
             assert name not in ("..", ".", "")
@@ -331,7 +323,7 @@ class LocalFileSystem(FileSystem):
 
     @classmethod
     def _create_filestatus(
-        cls, path: PurePath, stat: Any, is_dir: bool
+        cls, path: PurePath, stat: os.stat_result, is_dir: bool
     ) -> "FileStatus":
         mod_time = int(stat.st_mtime)  # converting float to int
         if is_dir:
