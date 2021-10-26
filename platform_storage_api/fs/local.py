@@ -437,28 +437,33 @@ class LocalFileSystem(FileSystem):
         )
 
     def _iterremovechildren(
-        self, dirfd: int, path: PurePath
+        self, topfd: int, path: PurePath
     ) -> Iterator[RemoveListing]:
-        with os.scandir(dirfd) as scandir_it:
+        with os.scandir(topfd) as scandir_it:
             entries = list(scandir_it)
 
         for entry in entries:
             name = entry.name
             entry_path = path / name
-            is_dir = entry.is_dir()
+            try:
+                is_dir = entry.is_dir(follow_symlinks=False)
+            except OSError:
+                is_dir = False
+            else:
+                if is_dir:
+                    orig_st = entry.stat(follow_symlinks=False)
+                    is_dir = statmodule.S_ISDIR(orig_st.st_mode)
             if is_dir:
-                orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
-                if statmodule.S_ISDIR(orig_st.st_mode):
-                    fd = self._open_safe_fd(name, dirfd, orig_st)
-                    try:
-                        yield from self._iterremovechildren(fd, entry_path)
-                    finally:
-                        os.close(fd)
-                    os.rmdir(name, dir_fd=dirfd)
+                dirfd = self._open_safe_fd(name, topfd, orig_st)
+                try:
+                    yield from self._iterremovechildren(dirfd, entry_path)
+                    os.rmdir(name, dir_fd=topfd)
                     yield RemoveListing(entry_path, is_dir=True)
-                continue
-            os.unlink(name, dir_fd=dirfd)
-            yield RemoveListing(entry_path, is_dir=False)
+                finally:
+                    os.close(dirfd)
+            else:
+                os.unlink(name, dir_fd=topfd)
+                yield RemoveListing(entry_path, is_dir=False)
 
     def _iterremove(
         self, path: PurePath, *, recursive: bool = False
@@ -476,20 +481,14 @@ class LocalFileSystem(FileSystem):
                 raise IsADirectoryError(
                     errno.EISDIR, "Is a directory, use recursive remove", str(path)
                 )
-            fd = os.open(name, os.O_RDONLY, dir_fd=dirfd)
+            fd = self._open_safe_fd(name, dirfd, orig_st)
             try:
-                if not os.path.samestat(orig_st, os.stat(fd)):
-                    os.unlink(name, dir_fd=dirfd)
-                    yield RemoveListing(path, is_dir=False)
-                    return
-
-                try:
-                    yield from self._iterremovechildren(fd, path)
-                    os.rmdir(name, dir_fd=dirfd)
-                    yield RemoveListing(path, is_dir=True)
-                except OSError as e:
-                    self._log_remove_error(e, path)
-                    raise e
+                yield from self._iterremovechildren(fd, path)
+                os.rmdir(name, dir_fd=dirfd)
+                yield RemoveListing(path, is_dir=True)
+            except OSError as e:
+                self._log_remove_error(e, path)
+                raise e
             finally:
                 os.close(fd)
 
