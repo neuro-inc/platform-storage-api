@@ -497,6 +497,34 @@ class LocalFileSystem(FileSystem):
         ):
             yield remove_entry
 
+    def _rmtree_safe_fd(self, topfd: int) -> None:
+        with os.scandir(topfd) as scandir_it:
+            entries = list(scandir_it)
+        for entry in entries:
+            try:
+                is_dir = entry.is_dir(follow_symlinks=False)
+            except OSError:
+                is_dir = False
+            else:
+                if is_dir:
+                    orig_st = entry.stat(follow_symlinks=False)
+                    is_dir = statmodule.S_ISDIR(orig_st.st_mode)
+            if is_dir:
+                dirfd = os.open(entry.name, os.O_RDONLY, dir_fd=topfd)
+                try:
+                    if os.path.samestat(orig_st, os.fstat(dirfd)):
+                        self._rmtree_safe_fd(dirfd)
+                        os.rmdir(entry.name, dir_fd=topfd)
+                    else:
+                        # This can only happen if someone replaces
+                        # a directory with a symlink after the call to
+                        # os.scandir or stat.S_ISDIR above.
+                        raise OSError("Cannot call rmtree on a symbolic " "link")
+                finally:
+                    os.close(dirfd)
+            else:
+                os.unlink(entry.name, dir_fd=topfd)
+
     def _remove(self, path: PurePath, recursive: bool) -> None:
         with self._resolve_dir_fd(path.parent) as dirfd:
             name = path.name
@@ -516,12 +544,8 @@ class LocalFileSystem(FileSystem):
                     raise NotADirectoryError(
                         errno.ENOTDIR, "Not a directory", str(path)
                     )
-
-                def onerror(*args: Any) -> None:
-                    raise
-
                 try:
-                    shutil._rmtree_safe_fd(fd, "", onerror)  # type: ignore
+                    self._rmtree_safe_fd(fd)
                     os.rmdir(name, dir_fd=dirfd)
                 except OSError as e:
                     self._log_remove_error(e, path)
