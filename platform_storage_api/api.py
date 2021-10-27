@@ -600,8 +600,9 @@ class StorageHandler:
         handle_error = partial(handle_error_if_streamed, response)
         try:
             async with self._storage.iterstatus(storage_path) as statuses:
-                await response.prepare(request)
                 async for fstat in self._liststatus_filter(statuses, tree):
+                    if not response.prepared:
+                        await response.prepare(request)
                     stat_dict = {
                         "FileStatus": self._convert_filestatus_to_primitive(fstat)
                     }
