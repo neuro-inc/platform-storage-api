@@ -617,6 +617,8 @@ class StorageHandler:
             msg_str = _unknown_error_message(e, request)
             logging.exception(msg_str)
             await handle_error(msg_str, error_class=web.HTTPInternalServerError)
+        if not response.prepared:
+            await response.prepare(request)
         await response.write_eof()
         return response
 
