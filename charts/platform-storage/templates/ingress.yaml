@@ -2,7 +2,9 @@
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-  name: platformstorageapi
+  name: {{ include "platformStorage.fullname" . }}
+  labels: {{ include "platformStorage.labels.standard" . | nindent 4 }}
+    service: storage
   annotations:
     kubernetes.io/ingress.class: traefik
     traefik.frontend.rule.type: PathPrefix
@@ -17,7 +19,7 @@ spec:
       paths:
       - path: /api/v1/storage
         backend:
-          serviceName: platformstorageapi
+          serviceName: {{ include "platformStorage.fullname" $ }}
           servicePort: http
   {{- end }}
 {{- end }}
