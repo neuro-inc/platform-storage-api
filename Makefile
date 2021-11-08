@@ -65,8 +65,7 @@ docker_build:
 	python -m build
 	docker build \
 		--build-arg PYTHON_BASE=slim-buster \
-		-t $(IMAGE) .
-	docker tag $(IMAGE) $(IMAGE_NAME):latest
+		-t $(IMAGE_NAME):latest .
 
 docker_push: docker_build
 	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):$(TAG)
