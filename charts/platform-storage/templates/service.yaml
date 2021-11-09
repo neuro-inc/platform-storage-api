@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: {{ include "platformStorage.fullname" . }}
   labels: {{ include "platformStorage.labels.standard" . | nindent 4 }}
-    service: storage
+    service: platform-storage
   annotations:
     traefik.ingress.kubernetes.io/affinity: "true"
     traefik.ingress.kubernetes.io/session-cookie-name: NEURO_STORAGEAPI_SESSION
@@ -16,4 +16,4 @@ spec:
   selector:
     app: {{ include "platformStorage.name" . }}
     release: {{ .Release.Name }}
-    service: storage
+    service: platform-storage

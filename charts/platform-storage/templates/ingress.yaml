@@ -4,7 +4,7 @@ kind: Ingress
 metadata:
   name: {{ include "platformStorage.fullname" . }}
   labels: {{ include "platformStorage.labels.standard" . | nindent 4 }}
-    service: storage
+    service: platform-storage
   annotations:
     kubernetes.io/ingress.class: traefik
     traefik.frontend.rule.type: PathPrefix

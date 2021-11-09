@@ -3,14 +3,14 @@ kind: Deployment
 metadata:
   name: {{ include "platformStorage.fullname" . }}
   labels: {{ include "platformStorage.labels.standard" . | nindent 4 }}
-    service: storage
+    service: platform-storage
 spec:
   replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
       app: {{ include "platformStorage.name" . }}
       release: {{ .Release.Name }}
-      service: storage
+      service: platform-storage
   strategy:
     rollingUpdate:
       maxSurge: 1
@@ -21,14 +21,14 @@ spec:
       labels:
         app: {{ include "platformStorage.name" . }}
         release: {{ .Release.Name }}
-        service: storage
+        service: platform-storage
       {{- if .Values.secrets }}
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
       {{- end }}
     spec:
       containers:
-      - name: platformstorageapi
+      - name: platform-storage
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: Always
         livenessProbe:
