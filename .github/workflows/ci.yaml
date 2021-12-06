@@ -15,10 +15,8 @@ jobs:
     name: Run tests
     runs-on: ubuntu-latest
     env:
-      CLOUD_PROVIDER: ${{ secrets.CLOUD_PROVIDER_DEV }}
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AZURE_ACR_NAME: ${{ secrets.AZURE_DEV_ACR_NAME }}
+      AWS_REGION: us-east-1
     steps:
     - name: Checkout commit
       uses: actions/checkout@v2
@@ -30,7 +28,7 @@ jobs:
       with:
         python-version: 3.8.10
     - name: Cache packages
-      uses: actions/cache@v2.1.6
+      uses: actions/cache@v2.1.7
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-py-3.8.10-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg')
@@ -38,27 +36,13 @@ jobs:
     - name: Install dependencies
       run: make setup
     - name: Configure AWS credentials
-      if: env.CLOUD_PROVIDER == 'aws'
       uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-region: ${{ env.AWS_REGION }}
     - name: Login to AWS ECR
-      if: env.CLOUD_PROVIDER == 'aws'
       uses: aws-actions/amazon-ecr-login@v1
-    - name: Configure Azure credentials
-      if: env.CLOUD_PROVIDER == 'azure'
-      uses: azure/login@v1.4.0
-      with:
-        creds: ${{secrets.AZURE_CREDENTIALS}}
-    - name: Login to Azure ACR
-      if: env.CLOUD_PROVIDER == 'azure'
-      uses: azure/docker-login@v1
-      with:
-        login-server: ${{ secrets.AZURE_DEV_ACR_SERVER }}
-        username: ${{ secrets.AZURE_DEV_ACR_USERNAME }}
-        password: ${{ secrets.AZURE_DEV_ACR_PASSWORD }}
     - name: Lint
       run: |
         echo "::add-matcher::.github/actionlint-matcher.json"
@@ -70,28 +54,24 @@ jobs:
     - name: Run integration tests
       run: make test_integration
     - name: Build Docker image
-      run: make build
+      run: make docker_build
     - name: Upload image artifact
       uses: neuro-inc/upload-image-action@v21.9.2
       with:
         image: platformstorageapi
         token: ${{ secrets.GITHUB_TOKEN }}
-
   deploy_dev:
     name: Deploy on dev
+    environment: dev
     runs-on: ubuntu-latest
     needs: test
+    concurrency: deploy_dev
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     env:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AZURE_ACR_NAME: ${{ secrets.AZURE_DEV_ACR_NAME }}
-      AZURE_REGION: ${{ secrets.AZURE_DEV_REGION }}
-      AZURE_RG_NAME: ${{ secrets.AZURE_DEV_RG_NAME }}
-      CLUSTER_NAME: ${{ secrets.DEV_CLUSTER_NAME }}
+      AWS_REGION: us-east-1
+      CLUSTER_NAME: aws-dev
       HELM_ENV: dev
-      HELM_VERSION: ${{ secrets.HELM_VERSION }}
-      CLOUD_PROVIDER: ${{ secrets.CLOUD_PROVIDER_DEV }}
     steps:
     - name: Checkout commit
       uses: actions/checkout@v2
@@ -101,71 +81,23 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.8.10
+    - name: Install Helm
+      uses: azure/setup-helm@v1
+      with:
+        version: v3.7.0
     - name: Configure AWS credentials
-      if: env.CLOUD_PROVIDER == 'aws'
       uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-region: ${{ env.AWS_REGION }}
     - name: Login to AWS ECR
-      if: env.CLOUD_PROVIDER == 'aws'
       uses: aws-actions/amazon-ecr-login@v1
-    - name: Configure Azure credentials
-      if: env.CLOUD_PROVIDER == 'azure'
-      uses: azure/login@v1.4.0
-      with:
-        creds: ${{secrets.AZURE_CREDENTIALS}}
-    - name: Login to Azure ACR
-      if: env.CLOUD_PROVIDER == 'azure'
-      uses: azure/docker-login@v1
-      with:
-        login-server: ${{ secrets.AZURE_DEV_ACR_SERVER }}
-        username: ${{ secrets.AZURE_DEV_ACR_USERNAME }}
-        password: ${{ secrets.AZURE_DEV_ACR_PASSWORD }}
-    - name: Set tag
-      run: echo "TAG=$GITHUB_SHA" >> $GITHUB_ENV
+    - name: Set image tag
+      run: echo "IMAGE_TAG=$GITHUB_SHA" >> $GITHUB_ENV
     - name: Push image to registry
       run: make docker_push
     - name: Update kube config
-      run: make ${{ env.CLOUD_PROVIDER }}_k8s_login
-    - name: Install helm
-      run: make helm_install
+      run: aws eks --region $AWS_REGION update-kubeconfig --name $CLUSTER_NAME
     - name: Deploy to kubernetes
       run: make helm_deploy
-
-    concurrency: deploy_dev
-  release:
-    name: Release package
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    env:
-      ARTIFACTORY_DOCKER_REPO: ${{ secrets.ARTIFACTORY_DOCKER_REPO }}
-      ARTIFACTORY_HELM_REPO: ${{ secrets.ARTIFACTORY_HELM_REPO }}
-      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
-      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
-      HELM_VERSION: ${{ secrets.HELM_VERSION }}
-    steps:
-    - name: Checkout commit
-      uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-    - name: Install python
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.8.10
-    - name: Login to Artifactory docker registry
-      uses: docker/login-action@v1
-      with:
-        registry: ${{ secrets.ARTIFACTORY_DOCKER_REPO }}
-        username: ${{ secrets.ARTIFACTORY_USERNAME }}
-        password: ${{ secrets.ARTIFACTORY_PASSWORD }}
-    - name: Set tag
-      run: echo "TAG=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-    - name: Push image to Artifactory
-      run: make artifactory_docker_push
-    - name: Install helm
-      run: make helm_install
-    - name: Push chart to Artifactory
-      run: make artifactory_helm_push

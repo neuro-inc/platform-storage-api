@@ -448,6 +448,31 @@ class TestStorage:
             assert file_status["modificationTime"] >= mtime_min
 
     @pytest.mark.asyncio
+    async def test_iterstatus_empty_dir(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: _UserFactory,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"{user.name}/path/to/emptydir"
+        dir_url = f"{server_url}/{dir_path}"
+
+        params = {"op": "MKDIRS"}
+        async with client.put(dir_url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        params = {"op": "LISTSTATUS"}
+        headers["Accept"] = "application/x-ndjson"
+        async with client.get(dir_url, headers=headers, params=params) as response:
+            assert response.status == 200
+            assert response.headers["Content-Type"] == "application/x-ndjson"
+            statuses = await status_iter_response_to_list(response.content)
+            assert statuses == []
+
+    @pytest.mark.asyncio
     async def test_iterstatus_no_op_param_no_equals(
         self,
         server_url: str,
@@ -584,6 +609,29 @@ class TestStorage:
             }
             assert file_status["path"] == file_name
             assert file_status["modificationTime"] >= mtime_min
+
+    @pytest.mark.asyncio
+    async def test_liststatus_empty_dir(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        regular_user_factory: _UserFactory,
+    ) -> None:
+        user = await regular_user_factory()
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"{user.name}/path/to/emptydir"
+        dir_url = f"{server_url}/{dir_path}"
+
+        params = {"op": "MKDIRS"}
+        async with client.put(dir_url, headers=headers, params=params) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
+        params = {"op": "LISTSTATUS"}
+        async with client.get(dir_url, headers=headers, params=params) as response:
+            assert response.status == 200
+            statuses = get_liststatus_dict(await response.json())
+            assert statuses == []
 
     @pytest.mark.asyncio
     async def test_liststatus_no_op_param_no_equals(
