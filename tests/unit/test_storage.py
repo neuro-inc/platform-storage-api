@@ -16,10 +16,10 @@ from platform_storage_api.storage import (
 
 class AsyncBytesIO(BytesIO):
     async def read(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore
-        return super().read(*args, **kwargs)  # type: ignore
+        return super().read(*args, **kwargs)
 
     async def write(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore
-        return super().write(*args, **kwargs)  # type: ignore
+        return super().write(*args, **kwargs)
 
 
 class TestMultipleStoragePathResolver:
