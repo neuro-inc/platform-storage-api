@@ -100,7 +100,7 @@ class TestConfig:
     def test_from_environ_defaults(self) -> None:
         environ = {
             "NP_STORAGE_LOCAL_BASE_PATH": "/path/to/dir",
-            "NP_STORAGE_AUTH_URL": "http://127.0.0.1/",
+            "NP_STORAGE_AUTH_URL": "-",
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
             "NP_CLUSTER_NAME": "test-cluster",
         }
@@ -110,7 +110,7 @@ class TestConfig:
         assert config.storage.mode == StorageMode.SINGLE
         assert config.storage.fs_local_base_path == PurePath("/path/to/dir")
         assert config.storage.fs_local_thread_pool_size == 100
-        assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
+        assert config.auth.server_endpoint_url is None
         assert config.auth.service_token == "hello-token"
         assert config.zipkin is None
         assert config.sentry is None

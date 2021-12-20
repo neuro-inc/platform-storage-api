@@ -36,7 +36,7 @@ class SentryConfig:
 
 @dataclass(frozen=True)
 class AuthConfig:
-    server_endpoint_url: URL
+    server_endpoint_url: Optional[URL]
     service_token: str = field(repr=False)
 
 
@@ -84,6 +84,13 @@ class EnvironConfigFactory:
     def __init__(self, environ: Optional[Dict[str, str]] = None) -> None:
         self._environ = environ or os.environ
 
+    def _get_url(self, name: str) -> Optional[URL]:
+        value = self._environ[name]
+        if value == "-":
+            return None
+        else:
+            return URL(value)
+
     def create_storage(self) -> StorageConfig:
         fs_local_base_path = self._environ["NP_STORAGE_LOCAL_BASE_PATH"]
         fs_local_thread_pool_size = int(
@@ -110,7 +117,7 @@ class EnvironConfigFactory:
         return ServerConfig(port=port, keep_alive_timeout_s=keep_alive_timeout_s)
 
     def create_auth(self) -> AuthConfig:
-        url = URL(self._environ["NP_STORAGE_AUTH_URL"])
+        url = self._get_url("NP_STORAGE_AUTH_URL")
         token = self._environ["NP_STORAGE_AUTH_TOKEN"]
         return AuthConfig(server_endpoint_url=url, service_token=token)
 
