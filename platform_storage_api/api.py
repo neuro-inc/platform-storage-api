@@ -9,13 +9,13 @@ from contextlib import AsyncExitStack
 from enum import Enum
 from errno import errorcode
 from functools import partial
+from importlib.metadata import version
 from pathlib import PurePath
 from typing import Any, Optional
 
 import aiohttp
 import aiohttp_cors
 import cbor
-import pkg_resources
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
@@ -850,7 +850,7 @@ def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> CorsConfig:
     return cors
 
 
-package_version = pkg_resources.get_distribution("platform-storage-api").version
+package_version = version(__package__)
 
 
 async def add_version_to_header(request: Request, response: web.StreamResponse) -> None:
