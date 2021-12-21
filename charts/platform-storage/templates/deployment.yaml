@@ -59,7 +59,7 @@ spec:
           value: multiple
         {{- end }}
         - name: NP_STORAGE_AUTH_URL
-          value: {{ .Values.platform.authUrl }}
+          value: {{ .Values.platform.authUrl | quote }}
         - name: NP_STORAGE_AUTH_TOKEN
 {{- if .Values.platform.token }}
 {{ toYaml .Values.platform.token | indent 10 }}
