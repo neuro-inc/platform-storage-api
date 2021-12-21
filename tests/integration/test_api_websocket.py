@@ -2,8 +2,9 @@ import errno
 import os
 import struct
 import uuid
+from collections.abc import Awaitable, Callable
 from time import time as current_time
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Optional
 from unittest import mock
 
 import aiohttp
@@ -31,7 +32,7 @@ def ws_request(
     return struct.pack("!I", len(header) + 4) + header
 
 
-def parse_ws_response(resp: bytes) -> Dict[str, Any]:
+def parse_ws_response(resp: bytes) -> dict[str, Any]:
     (hsize,) = struct.unpack("!I", resp[:4])
     return cbor.loads(resp[4:hsize])
 

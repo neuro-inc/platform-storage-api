@@ -2,17 +2,11 @@ import calendar
 import json
 import time
 import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import AbstractAsyncContextManager
 from pathlib import Path, PurePath
 from time import time as current_time
-from typing import (
-    Any,
-    AsyncContextManager,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Dict,
-    Tuple,
-)
+from typing import Any
 from unittest import mock
 
 import aiohttp
@@ -219,7 +213,7 @@ class TestStorage:
         client: aiohttp.ClientSession,
         regular_user_factory: _UserFactory,
         api: ApiConfig,
-    ) -> AsyncIterator[Tuple[str, Dict[str, str]]]:
+    ) -> AsyncIterator[tuple[str, dict[str, str]]]:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         url = f"{server_url}/{user.name}/path/to/file"
@@ -234,7 +228,7 @@ class TestStorage:
     async def test_patch(
         self,
         client: aiohttp.ClientSession,
-        put_test_file: Tuple[str, Dict[str, str]],
+        put_test_file: tuple[str, dict[str, str]],
     ) -> None:
         url, headers = put_test_file
 
@@ -253,7 +247,7 @@ class TestStorage:
     async def test_patch_unknown_size(
         self,
         client: aiohttp.ClientSession,
-        put_test_file: Tuple[str, Dict[str, str]],
+        put_test_file: tuple[str, dict[str, str]],
     ) -> None:
         url, headers = put_test_file
 
@@ -272,7 +266,7 @@ class TestStorage:
     async def test_patch_past_the_end(
         self,
         client: aiohttp.ClientSession,
-        put_test_file: Tuple[str, Dict[str, str]],
+        put_test_file: tuple[str, dict[str, str]],
     ) -> None:
         url, headers = put_test_file
 
@@ -291,7 +285,7 @@ class TestStorage:
     async def test_patch_invalid_headers(
         self,
         client: aiohttp.ClientSession,
-        put_test_file: Tuple[str, Dict[str, str]],
+        put_test_file: tuple[str, dict[str, str]],
     ) -> None:
         url, headers = put_test_file
 
@@ -1109,7 +1103,7 @@ class TestGetFileStatus:
         server_url: str,
         client: aiohttp.ClientSession,
         file_owner: _User,
-    ) -> AsyncContextManager[aiohttp.ClientResponse]:
+    ) -> AbstractAsyncContextManager[aiohttp.ClientResponse]:
         headers = {"Authorization": "Bearer " + user.token}
         params = {"op": "GETFILESTATUS"}
         url = make_url(server_url, file_owner, path)

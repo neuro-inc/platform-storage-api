@@ -1,7 +1,7 @@
 import asyncio
 import tempfile
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
-from typing import AsyncIterator, Iterator
 
 import pytest
 

@@ -1,7 +1,8 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 from io import BytesIO
 from time import time as current_time
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any
 from unittest import mock
 
 import aiohttp
@@ -15,7 +16,7 @@ from .conftest import _User, _UserFactory
 
 
 class TestStorageListAndResourceSharing:
-    def file_status_sort(self, file_status: Dict[str, Any]) -> Any:
+    def file_status_sort(self, file_status: dict[str, Any]) -> Any:
         return file_status["path"]
 
     @pytest.mark.asyncio

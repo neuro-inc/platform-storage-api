@@ -2,8 +2,9 @@ import os
 import shutil
 import tempfile
 import uuid
+from collections.abc import AsyncIterator, Iterable, Iterator
 from pathlib import Path, PurePath
-from typing import Any, AsyncIterator, Callable, Coroutine, Iterable, Iterator, Set
+from typing import Any, Callable, Coroutine
 
 import pytest
 
@@ -720,20 +721,20 @@ class TestLocalFileSystem:
 
     @classmethod
     def statuses_add(
-        cls, statuses: Set[FileStatus], status: FileStatus
-    ) -> Set[FileStatus]:
+        cls, statuses: set[FileStatus], status: FileStatus
+    ) -> set[FileStatus]:
         return statuses | {status}
 
     @classmethod
     def statuses_drop(
         cls, statuses: Iterable[FileStatus], path: PurePath
-    ) -> Set[FileStatus]:
+    ) -> set[FileStatus]:
         return set(filter(lambda st: st.path != path, statuses))
 
     @classmethod
     def statuses_rename(
         cls, statuses: Iterable[FileStatus], old_path: PurePath, new_path: PurePath
-    ) -> Set[FileStatus]:
+    ) -> set[FileStatus]:
         def rename(status: FileStatus) -> FileStatus:
             if status.path == old_path:
                 return FileStatus(

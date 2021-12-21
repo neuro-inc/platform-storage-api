@@ -1,8 +1,9 @@
 import enum
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import PurePath
-from typing import Dict, Optional, Sequence
+from typing import Optional
 
 from yarl import URL
 
@@ -15,7 +16,7 @@ class ServerConfig:
     keep_alive_timeout_s: float = 75
 
     @classmethod
-    def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "ServerConfig":
+    def from_environ(cls, environ: Optional[dict[str, str]] = None) -> "ServerConfig":
         return EnvironConfigFactory(environ).create_server()
 
 
@@ -53,7 +54,7 @@ class StorageConfig:
     mode: StorageMode = StorageMode.SINGLE
 
     @classmethod
-    def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "StorageConfig":
+    def from_environ(cls, environ: Optional[dict[str, str]] = None) -> "StorageConfig":
         return EnvironConfigFactory(environ).create_storage()
 
 
@@ -76,12 +77,12 @@ class Config:
     sentry: Optional[SentryConfig] = None
 
     @classmethod
-    def from_environ(cls, environ: Optional[Dict[str, str]] = None) -> "Config":
+    def from_environ(cls, environ: Optional[dict[str, str]] = None) -> "Config":
         return EnvironConfigFactory(environ).create()
 
 
 class EnvironConfigFactory:
-    def __init__(self, environ: Optional[Dict[str, str]] = None) -> None:
+    def __init__(self, environ: Optional[dict[str, str]] = None) -> None:
         self._environ = environ or os.environ
 
     def _get_url(self, name: str) -> Optional[URL]:

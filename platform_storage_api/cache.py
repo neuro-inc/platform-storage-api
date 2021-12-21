@@ -3,7 +3,7 @@ import collections
 import time
 from dataclasses import dataclass, field
 from pathlib import PurePath
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 
 from aiohttp import web
 from aiohttp_security.api import IDENTITY_KEY
@@ -13,7 +13,7 @@ from .security import AbstractPermissionChecker
 
 
 TimeFactory = Callable[[], float]
-PermissionsCacheKey = Tuple[str, str]  # identity, path
+PermissionsCacheKey = tuple[str, str]  # identity, path
 
 
 @dataclass
