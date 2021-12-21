@@ -7,24 +7,14 @@ import logging
 import os
 import shutil
 import stat as statmodule
+from collections.abc import AsyncIterator, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
 from itertools import islice
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import (
-    Any,
-    AsyncContextManager,
-    AsyncIterator,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import Any, Optional, TypeVar, Union
 
 import aiofiles
 
@@ -131,7 +121,7 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
 
     async def __aexit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> Optional[bool]:
@@ -152,7 +142,7 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
-    async def listdir(self, path: PurePath) -> List[PurePath]:
+    async def listdir(self, path: PurePath) -> list[PurePath]:
         pass
 
     @abc.abstractmethod
@@ -162,10 +152,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
     @abc.abstractmethod
     def iterstatus(
         self, path: PurePath
-    ) -> AsyncContextManager[AsyncIterator[FileStatus]]:
+    ) -> AbstractAsyncContextManager[AsyncIterator[FileStatus]]:
         pass
 
-    async def liststatus(self, path: PurePath) -> List[FileStatus]:
+    async def liststatus(self, path: PurePath) -> list[FileStatus]:
         # TODO (A Danshyn 05/03/18): the listing size is disregarded for now
         async with self.iterstatus(path) as dir_iter:
             return [status async for status in dir_iter]
@@ -262,13 +252,13 @@ class LocalFileSystem(FileSystem):
             if dirfd is not None:
                 os.close(dirfd)
 
-    def _listdir(self, path: PurePath) -> List[PurePath]:
+    def _listdir(self, path: PurePath) -> list[PurePath]:
         with self._resolve_dir_fd(path) as dirfd:
             with os.scandir(dirfd) as scandir_it:
                 entries = list(scandir_it)
             return [path / entry.name for entry in entries]
 
-    async def listdir(self, path: PurePath) -> List[PurePath]:
+    async def listdir(self, path: PurePath) -> list[PurePath]:
         return await self._loop.run_in_executor(self._executor, self._listdir, path)
 
     # Actual return type is an async version of io.FileIO
@@ -362,7 +352,7 @@ class LocalFileSystem(FileSystem):
 
     async def _iterate_in_chunks(
         self, it: Iterator[Any], chunk_size: int
-    ) -> AsyncIterator[List[Any]]:
+    ) -> AsyncIterator[list[Any]]:
         done = False
         while not done:
             chunk = await self._loop.run_in_executor(
@@ -644,12 +634,12 @@ async def sync_iterator_to_async(
 
     queue: asyncio.Queue[Union[_T, EndMark, Exception]] = asyncio.Queue(queue_size)
 
-    async def put_to_queue(chunk: List[Union[_T, EndMark, Exception]]) -> None:
+    async def put_to_queue(chunk: list[Union[_T, EndMark, Exception]]) -> None:
         for item in chunk:
             await queue.put(item)
 
     def sync_runner() -> None:
-        chunk: List[Union[_T, EndMark, Exception]] = []
+        chunk: list[Union[_T, EndMark, Exception]] = []
         try:
             try:
                 for item in iter:

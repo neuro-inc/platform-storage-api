@@ -1,9 +1,10 @@
 import abc
 import dataclasses
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path, PurePath
-from typing import Any, AsyncIterator, List, Optional, Union
+from typing import Any, Optional, Union
 
 from neuro_logging import trace, trace_cm
 
@@ -130,7 +131,7 @@ class Storage:
                 yield it
 
     @trace
-    async def liststatus(self, path: Union[PurePath, str]) -> List[FileStatus]:
+    async def liststatus(self, path: Union[PurePath, str]) -> list[FileStatus]:
         real_path = await self._path_resolver.resolve_path(PurePath(path))
         return await self._fs.liststatus(real_path)
 

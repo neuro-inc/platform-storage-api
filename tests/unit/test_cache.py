@@ -1,7 +1,7 @@
 import asyncio
 import copy
 from pathlib import PurePath
-from typing import Any, List
+from typing import Any
 
 import pytest
 from aiohttp.test_utils import make_mocked_request
@@ -23,7 +23,7 @@ P = PurePath
 class MockPermissionChecker(AbstractPermissionChecker):
     def __init__(
         self,
-        call_log: List[Any],
+        call_log: list[Any],
         permission_tree: ClientAccessSubTreeView,
         delay: float = 0.0,
     ) -> None:
@@ -89,7 +89,7 @@ def permission_tree() -> ClientAccessSubTreeView:
 
 
 @pytest.fixture
-def call_log() -> List[Any]:
+def call_log() -> list[Any]:
     return []
 
 
@@ -104,7 +104,7 @@ def mock_time() -> TimeFactory:
 
 @pytest.fixture
 def cache(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: TimeFactory,
 ) -> PermissionsCache:
@@ -118,7 +118,7 @@ def cache(
 
 @pytest.fixture
 def slow_cache(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: TimeFactory,
 ) -> PermissionsCache:
@@ -141,7 +141,7 @@ def webrequest() -> Request:
 
 @pytest.mark.asyncio
 async def test_cached_permissions(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
     cache: PermissionsCache,
@@ -177,7 +177,7 @@ async def test_cached_permissions(
 
 @pytest.mark.asyncio
 async def test_cached_parent_permissions(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
     cache: PermissionsCache,
@@ -214,7 +214,7 @@ async def test_cached_parent_permissions(
 
 @pytest.mark.asyncio
 async def test_expired_permissions_check(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
     cache: PermissionsCache,
@@ -248,7 +248,7 @@ async def test_expired_permissions_check(
 
 @pytest.mark.asyncio
 async def test_expired_permissions_tree(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
     cache: PermissionsCache,
@@ -283,7 +283,7 @@ async def test_expired_permissions_tree(
 
 @pytest.mark.asyncio
 async def test_expired_permissions_tree_concurrent(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
     slow_cache: PermissionsCache,
@@ -324,7 +324,7 @@ async def test_expired_permissions_tree_concurrent(
 
 @pytest.mark.asyncio
 async def test_forget_path(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
     cache: PermissionsCache,
@@ -362,7 +362,7 @@ async def test_forget_path(
 
 @pytest.mark.asyncio
 async def test_forbidden_permissions_tree(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
     cache: PermissionsCache,
@@ -389,7 +389,7 @@ async def test_forbidden_permissions_tree(
 
 @pytest.mark.asyncio
 async def test_cached_path(
-    call_log: List[Any], mock_time: Any, cache: PermissionsCache, webrequest: Request
+    call_log: list[Any], mock_time: Any, cache: PermissionsCache, webrequest: Request
 ) -> None:
     # Warm up the cache
     tree = await cache.get_user_permissions_tree(webrequest, P("/bob/folder"))
@@ -412,7 +412,7 @@ async def test_cached_path(
 
 @pytest.mark.asyncio
 async def test_access_denied(
-    call_log: List[Any],
+    call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
     mock_time: Any,
     cache: PermissionsCache,

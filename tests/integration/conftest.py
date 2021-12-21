@@ -1,18 +1,9 @@
 import json
 import uuid
+from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePath
-from typing import (
-    Any,
-    AsyncIterable,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
-    NamedTuple,
-    Optional,
-)
+from typing import Any, NamedTuple, Optional
 
 import aiohttp
 import pytest
@@ -194,13 +185,13 @@ def cluster_name() -> str:
 
 async def status_iter_response_to_list(
     response_lines: AsyncIterable[bytes],
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     return [json.loads(line)["FileStatus"] async for line in response_lines]
 
 
-def get_liststatus_dict(response_json: Dict[str, Any]) -> List[Any]:
+def get_liststatus_dict(response_json: dict[str, Any]) -> list[Any]:
     return response_json["FileStatuses"]["FileStatus"]
 
 
-def get_filestatus_dict(response_json: Dict[str, Any]) -> Dict[str, Any]:
+def get_filestatus_dict(response_json: dict[str, Any]) -> dict[str, Any]:
     return response_json["FileStatus"]

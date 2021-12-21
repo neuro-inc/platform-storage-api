@@ -4,28 +4,18 @@ import logging
 import re
 import struct
 import time
+from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable
 from contextlib import AsyncExitStack
 from enum import Enum
 from errno import errorcode
 from functools import partial
+from importlib.metadata import version
 from pathlib import PurePath
-from typing import (
-    Any,
-    AsyncIterable,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Type,
-)
+from typing import Any, Optional
 
 import aiohttp
 import aiohttp_cors
 import cbor
-import pkg_resources
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
@@ -74,7 +64,7 @@ MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2 ** 16 + 100
 
 
 class ApiHandler:
-    def register(self, app: web.Application) -> List[AbstractRoute]:
+    def register(self, app: web.Application) -> list[AbstractRoute]:
         return app.add_routes((web.get("/ping", self.handle_ping),))
 
     @notrace
@@ -113,7 +103,7 @@ class StorageOperation(str, Enum):
     WEBSOCKET_WRITE = "WEBSOCKET_WRITE"
 
     @classmethod
-    def values(cls) -> List[str]:
+    def values(cls) -> list[str]:
         return [item.value for item in cls]
 
 
@@ -446,7 +436,7 @@ class StorageHandler:
         op: str,
         reqid: int,
         path: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         data: bytes,
     ) -> None:
         if op == WSStorageOperation.READ:
@@ -498,7 +488,7 @@ class StorageHandler:
         self,
         ws: web.WebSocketResponse,
         op: WSStorageOperation,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         data: bytes = b"",
     ) -> None:
         payload = {"op": op.value, **payload}
@@ -511,7 +501,7 @@ class StorageHandler:
         op: str,
         reqid: int,
         *,
-        result: Dict[str, Any] = {},
+        result: dict[str, Any] = {},
         data: bytes = b"",
     ) -> None:
         payload = {"rop": op, "rid": reqid, "timestamp": int(time.time()), **result}
@@ -738,7 +728,7 @@ class StorageHandler:
         raise web.HTTPNoContent
 
     @classmethod
-    def _convert_filestatus_to_primitive(cls, status: FileStatus) -> Dict[str, Any]:
+    def _convert_filestatus_to_primitive(cls, status: FileStatus) -> dict[str, Any]:
         return {
             "path": str(status.path),
             "length": status.size,
@@ -748,7 +738,7 @@ class StorageHandler:
         }
 
     @classmethod
-    def _convert_disk_usage_to_primitive(cls, status: DiskUsageInfo) -> Dict[str, Any]:
+    def _convert_disk_usage_to_primitive(cls, status: DiskUsageInfo) -> dict[str, Any]:
         return {
             "total": status.total,
             "used": status.used,
@@ -772,7 +762,7 @@ async def handle_error_if_streamed(
     response: web.StreamResponse,
     str_error: str,
     errno: Optional[int] = None,
-    error_class: Type[web.HTTPError] = web.HTTPBadRequest,
+    error_class: type[web.HTTPError] = web.HTTPBadRequest,
 ) -> None:
     if response.prepared:
         error_dict = dict(
@@ -787,12 +777,12 @@ async def handle_error_if_streamed(
 
 
 def _http_exception(
-    error_class: Type[web.HTTPError],
+    error_class: type[web.HTTPError],
     message: str,
     errno: Optional[int] = None,
     **kwargs: Any,
 ) -> web.HTTPError:
-    error_payload: Dict[str, Any] = {"error": message, **kwargs}
+    error_payload: dict[str, Any] = {"error": message, **kwargs}
     if errno is not None:
         if errno in errorcode:
             error_payload["errno"] = errorcode[errno]
@@ -860,14 +850,14 @@ def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> CorsConfig:
     return cors
 
 
-package_version = pkg_resources.get_distribution("platform-storage-api").version
+package_version = version(__package__)
 
 
 async def add_version_to_header(request: Request, response: web.StreamResponse) -> None:
     response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
 
 
-def make_tracing_trace_configs(config: Config) -> List[aiohttp.TraceConfig]:
+def make_tracing_trace_configs(config: Config) -> list[aiohttp.TraceConfig]:
     trace_configs = []
 
     if config.zipkin:
