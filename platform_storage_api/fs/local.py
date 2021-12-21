@@ -33,6 +33,7 @@ class StorageType(str, enum.Enum):
 class FileStatusType(str, enum.Enum):
     DIRECTORY = "DIRECTORY"
     FILE = "FILE"
+    SYMLINK = "SYMLINK"
 
     def __str__(self) -> str:
         return self.value
@@ -51,6 +52,7 @@ class FileStatus:
     size: int
     modification_time: Optional[int] = None
     permission: FileStatusPermission = FileStatusPermission.READ
+    target: Optional[str] = None
 
     @classmethod
     def create_file_status(
@@ -72,6 +74,21 @@ class FileStatus:
             type=FileStatusType.DIRECTORY,
             size=0,
             modification_time=modification_time,
+        )
+
+    @classmethod
+    def create_link_status(
+        cls,
+        path: PurePath,
+        modification_time: Optional[int] = None,
+        target: Optional[str] = None,
+    ) -> "FileStatus":
+        return cls(
+            path=path,
+            type=FileStatusType.SYMLINK,
+            size=1,
+            modification_time=modification_time,
+            target=target,
         )
 
     def with_permission(self, permission: FileStatusPermission) -> "FileStatus":
@@ -322,6 +339,17 @@ class LocalFileSystem(FileSystem):
             size = stat.st_size
             return FileStatus.create_file_status(path, size, modification_time=mod_time)
 
+    def _create_linkstatus(
+        cls,
+        path: PurePath,
+        stat: os.stat_result,
+        target: Optional[str] = None,
+    ) -> "FileStatus":
+        mod_time = int(stat.st_mtime)  # converting float to int
+        return FileStatus.create_link_status(
+            path, modification_time=mod_time, target=target
+        )
+
     async def _iterate_in_chunks(
         self, it: Iterator[Any], chunk_size: int
     ) -> AsyncIterator[list[Any]]:
@@ -339,11 +367,19 @@ class LocalFileSystem(FileSystem):
         with self._resolve_dir_fd(path) as dirfd:
             with os.scandir(dirfd) as scandir_it:
                 for entry in scandir_it:
-                    yield self._create_filestatus(
-                        PurePath(entry.name),
-                        entry.stat(),
-                        entry.is_dir(),
-                    )
+                    if entry.is_symlink():
+                        target = os.readlink(entry.name, dir_fd=dirfd)
+                        yield self._create_linkstatus(
+                            PurePath(entry.name),
+                            entry.stat(follow_symlinks=False),
+                            target=target,
+                        )
+                    else:
+                        yield self._create_filestatus(
+                            PurePath(entry.name),
+                            entry.stat(follow_symlinks=False),
+                            entry.is_dir(follow_symlinks=False),
+                        )
 
     async def _iterstatus_iter(
         self, dir_iter: Iterator[FileStatus]
@@ -370,12 +406,12 @@ class LocalFileSystem(FileSystem):
             assert name not in ("..", ".", "")
             orig_st = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
             if statmodule.S_ISLNK(orig_st.st_mode):
-                raise FileNotFoundError(
-                    errno.ENOENT, "No such file or directory", str(path)
+                target = os.readlink(name, dir_fd=dirfd)
+                return self._create_linkstatus(path, orig_st, target)
+            else:
+                return self._create_filestatus(
+                    path, orig_st, statmodule.S_ISDIR(orig_st.st_mode)
                 )
-            return self._create_filestatus(
-                path, orig_st, statmodule.S_ISDIR(orig_st.st_mode)
-            )
 
     async def get_filestatus(self, path: PurePath) -> FileStatus:
         return await self._loop.run_in_executor(
