@@ -4,6 +4,8 @@ on:
   push:
     branches: [master]
     tags: [v*.*, v*.*.*]
+  pull_request:
+    branches: [master]
   pull_request_target:
     branches: [master]
   schedule:
@@ -14,6 +16,9 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-latest
+    if: |
+      (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]') ||
+      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
     env:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: us-east-1
