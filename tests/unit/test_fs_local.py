@@ -4,6 +4,7 @@ import tempfile
 import uuid
 from pathlib import Path, PurePath
 from typing import Any, AsyncIterator, Callable, Coroutine, Iterable, Iterator, Set
+from unittest import mock
 
 import pytest
 
@@ -386,7 +387,7 @@ class TestLocalFileSystem:
                 await it.__anext__()
 
     @pytest.mark.asyncio
-    async def test_iterstatus_with_broken_directory_link(
+    async def test_iterstatus_broken_directory_link(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
         path = tmp_dir_path / "nested"
@@ -404,8 +405,16 @@ class TestLocalFileSystem:
         os.symlink("nonexisting", path)
 
         async with fs.iterstatus(tmp_dir_path) as it:
-            with pytest.raises(FileNotFoundError):
-                await it.__anext__()
+            statuses = [status async for status in it]
+        actual = [status.path for status in statuses]
+        assert actual == [PurePath("nested")]
+        assert statuses[0] == FileStatus(
+            PurePath("nested"),
+            type=FileStatusType.SYMLINK,
+            size=1,
+            modification_time=mock.ANY,
+            target="nonexisting",
+        )
 
     @pytest.mark.parametrize("recursive", [True, False])
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
@@ -550,6 +559,8 @@ class TestLocalFileSystem:
 
         stat = os.stat(dir_path)
         expected_mtime = int(stat.st_mtime)
+        lstat = os.lstat(link_path)
+        expected_link_mtime = int(lstat.st_mtime)
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert sorted(statuses, key=lambda s: s.path) == [
@@ -561,9 +572,10 @@ class TestLocalFileSystem:
             ),
             FileStatus(
                 Path("link"),
-                size=0,
-                type=FileStatusType.DIRECTORY,
-                modification_time=expected_mtime,
+                size=1,
+                type=FileStatusType.SYMLINK,
+                modification_time=expected_link_mtime,
+                target="dir",
             ),
         ]
 
@@ -659,22 +671,49 @@ class TestLocalFileSystem:
     async def test_get_filestatus_symlink_to_file(
         self, fs: FileSystem, symlink_to_file: Path
     ) -> None:
-        with pytest.raises(FileNotFoundError):
-            await fs.get_filestatus(symlink_to_file)
+        stat = os.lstat(symlink_to_file)
+        expected_mtime = int(stat.st_mtime)
+
+        status = await fs.get_filestatus(symlink_to_file)
+        assert status == FileStatus(
+            path=symlink_to_file,
+            size=1,
+            type=FileStatusType.SYMLINK,
+            modification_time=expected_mtime,
+            target="file",
+        )
 
     @pytest.mark.asyncio
     async def test_get_filestatus_symlink_to_dir(
         self, fs: FileSystem, symlink_to_dir: Path
     ) -> None:
-        with pytest.raises(FileNotFoundError):
-            await fs.get_filestatus(symlink_to_dir)
+        stat = os.lstat(symlink_to_dir)
+        expected_mtime = int(stat.st_mtime)
+
+        status = await fs.get_filestatus(symlink_to_dir)
+        assert status == FileStatus(
+            path=symlink_to_dir,
+            size=1,
+            type=FileStatusType.SYMLINK,
+            modification_time=expected_mtime,
+            target="dir",
+        )
 
     @pytest.mark.asyncio
     async def test_get_filestatus_free_symlink(
         self, fs: FileSystem, free_symlink: Path
     ) -> None:
-        with pytest.raises(FileNotFoundError):
-            await fs.get_filestatus(free_symlink)
+        stat = os.lstat(free_symlink)
+        expected_mtime = int(stat.st_mtime)
+
+        status = await fs.get_filestatus(free_symlink)
+        assert status == FileStatus(
+            path=free_symlink,
+            size=1,
+            type=FileStatusType.SYMLINK,
+            modification_time=expected_mtime,
+            target="nonexistent",
+        )
 
     @pytest.mark.asyncio
     async def test_get_filestatus_path_with_symlink(
