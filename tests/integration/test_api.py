@@ -15,14 +15,14 @@ import pytest
 
 from platform_storage_api.config import Config
 from platform_storage_api.fs.local import FileStatusType
+
+from .conftest import _User, _UserFactory
 from tests.integration.conftest import (
     ApiConfig,
     get_filestatus_dict,
     get_liststatus_dict,
     status_iter_response_to_list,
 )
-
-from .conftest import _User, _UserFactory
 
 
 def make_url(server_url: str, user: _User, path: str) -> str:

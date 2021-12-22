@@ -11,7 +11,6 @@ from neuro_auth_client.client import ClientAccessSubTreeView
 
 from .security import AbstractPermissionChecker
 
-
 TimeFactory = Callable[[], float]
 PermissionsCacheKey = tuple[str, str]  # identity, path
 
