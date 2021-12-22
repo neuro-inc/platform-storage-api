@@ -18,7 +18,6 @@ from typing import Any, Optional, TypeVar, Union
 
 import aiofiles
 
-
 SCANDIR_CHUNK_SIZE = 100
 
 logger = logging.getLogger()

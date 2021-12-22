@@ -11,7 +11,6 @@ from neuro_logging import trace
 
 from .config import Config
 
-
 logger = logging.getLogger(__name__)
 
 
