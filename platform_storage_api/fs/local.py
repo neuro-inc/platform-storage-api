@@ -577,7 +577,7 @@ class LocalFileSystem(FileSystem):
 
     def _disk_usage(self, path: PurePath) -> DiskUsageInfo:
         with self._resolve_dir_fd(path) as fd:
-            total, used, free = shutil.disk_usage(fd)  # type: ignore
+            total, used, free = shutil.disk_usage(fd)
             return DiskUsageInfo(
                 total=total,
                 used=used,
