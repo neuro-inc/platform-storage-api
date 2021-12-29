@@ -8,6 +8,7 @@ from aiohttp_security import check_authorized, check_permission
 from neuro_auth_client import AuthClient, Permission
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_logging import trace
+from yarl import URL
 
 from .config import Config
 
@@ -49,7 +50,11 @@ class PermissionChecker(AbstractPermissionChecker):
     def _path_to_uri(self, target_path: PurePath) -> str:
         assert str(target_path)[0] == "/"
         assert self._config.cluster_name
-        return f"storage://{self._config.cluster_name}{target_path!s}"
+        return str(
+            URL.build(
+                scheme="storage", host=self._config.cluster_name, path=str(target_path)
+            )
+        )
 
     @trace
     async def get_user_permissions_tree(
