@@ -8,6 +8,7 @@ from typing import Any, Callable, Coroutine
 from unittest import mock
 
 import pytest
+import pytest_asyncio
 
 from platform_storage_api.fs.local import (
     FileStatus,
@@ -88,7 +89,7 @@ class TestLocalFileSystem:
         os.symlink("nonexistent", path)
         yield path
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def fs(self) -> AsyncIterator[FileSystem]:
         async with FileSystem.create(StorageType.LOCAL) as fs:
             yield fs

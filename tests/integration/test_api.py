@@ -12,6 +12,7 @@ from unittest import mock
 import aiohttp
 import aiohttp.web
 import pytest
+import pytest_asyncio
 
 from platform_storage_api.config import Config
 from platform_storage_api.fs.local import FileStatusType
@@ -29,12 +30,12 @@ def make_url(server_url: str, user: _User, path: str) -> str:
     return f"{server_url}/{user.name}/{path}"
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def alice(regular_user_factory: _UserFactory) -> _User:
     return await regular_user_factory()
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def bob(regular_user_factory: _UserFactory) -> _User:
     return await regular_user_factory()
 
@@ -206,7 +207,7 @@ class TestStorage:
         async with client.get(url, headers=headers) as response:
             assert response.status == 416, await response.text()
 
-    @pytest.fixture()
+    @pytest_asyncio.fixture()
     async def put_test_file(
         self,
         server_url: str,

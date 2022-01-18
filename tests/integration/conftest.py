@@ -7,6 +7,7 @@ from typing import Any, NamedTuple, Optional
 
 import aiohttp
 import pytest
+import pytest_asyncio
 from jose import jwt
 from neuro_auth_client import AuthClient, User
 from neuro_auth_client.client import Cluster
@@ -98,7 +99,7 @@ def multi_storage_config(config: Config) -> Config:
     return config
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def auth_client(config: Config, admin_token: str) -> AsyncIterator[AuthClient]:
     async with AuthClient(
         url=config.auth.server_endpoint_url, token=admin_token
@@ -109,7 +110,7 @@ async def auth_client(config: Config, admin_token: str) -> AsyncIterator[AuthCli
 _UserFactory = Callable[..., Awaitable[_User]]
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def regular_user_factory(
     auth_client: AuthClient,
     token_factory: _TokenFactory,
@@ -136,7 +137,7 @@ async def regular_user_factory(
     return _factory
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def api(config: Config) -> AsyncIterator[ApiConfig]:
     app = await create_app(config)
     runner = aiohttp.web.AppRunner(app)
@@ -148,7 +149,7 @@ async def api(config: Config) -> AsyncIterator[ApiConfig]:
     await runner.cleanup()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def multi_storage_api(multi_storage_config: Config) -> AsyncIterator[ApiConfig]:
     app = await create_app(multi_storage_config)
     runner = aiohttp.web.AppRunner(app)
@@ -160,13 +161,13 @@ async def multi_storage_api(multi_storage_config: Config) -> AsyncIterator[ApiCo
     await runner.cleanup()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client() -> AsyncIterator[aiohttp.ClientSession]:
     async with aiohttp.ClientSession() as session:
         yield session
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def granter(auth_client: AuthClient, admin_token: str) -> Any:
     async def f(whom: Any, what: Any, sourcer: Any) -> None:
         headers = auth_client._generate_headers(sourcer.token)

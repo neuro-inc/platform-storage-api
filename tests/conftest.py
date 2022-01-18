@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from platform_storage_api.fs.local import FileSystem, LocalFileSystem
 
@@ -17,7 +18,7 @@ def event_loop() -> Iterator[asyncio.AbstractEventLoop]:
     loop.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def local_fs() -> AsyncIterator[FileSystem]:
     async with LocalFileSystem() as fs:
         yield fs
