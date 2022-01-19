@@ -138,7 +138,6 @@ def webrequest() -> Request:
     return webrequest
 
 
-@pytest.mark.asyncio
 async def test_cached_permissions(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -174,7 +173,6 @@ async def test_cached_permissions(
     assert call_log == []
 
 
-@pytest.mark.asyncio
 async def test_cached_parent_permissions(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -211,7 +209,6 @@ async def test_cached_parent_permissions(
     assert call_log == []
 
 
-@pytest.mark.asyncio
 async def test_expired_permissions_check(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -245,7 +242,6 @@ async def test_expired_permissions_check(
     assert call_log == []
 
 
-@pytest.mark.asyncio
 async def test_expired_permissions_tree(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -280,7 +276,6 @@ async def test_expired_permissions_tree(
     assert call_log == []
 
 
-@pytest.mark.asyncio
 async def test_expired_permissions_tree_concurrent(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -321,7 +316,6 @@ async def test_expired_permissions_tree_concurrent(
     assert call_log == [("tree", P("/bob/folder"))]
 
 
-@pytest.mark.asyncio
 async def test_forget_path(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -359,7 +353,6 @@ async def test_forget_path(
     call_log.clear()
 
 
-@pytest.mark.asyncio
 async def test_forbidden_permissions_tree(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -386,7 +379,6 @@ async def test_forbidden_permissions_tree(
     assert call_log == [("tree", P("/bob/folder"))]
 
 
-@pytest.mark.asyncio
 async def test_cached_path(
     call_log: list[Any], mock_time: Any, cache: PermissionsCache, webrequest: Request
 ) -> None:
@@ -409,7 +401,6 @@ async def test_cached_path(
     assert mock_time.time > 1000.0
 
 
-@pytest.mark.asyncio
 async def test_access_denied(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,

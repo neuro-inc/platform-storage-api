@@ -72,7 +72,6 @@ def assert_ws_error(
 
 
 class TestStorageWebSocket:
-    @pytest.mark.asyncio
     async def test_create_write(
         self,
         server_url: str,
@@ -145,7 +144,6 @@ class TestStorageWebSocket:
             assert_ws_ack(resp, WSStorageOperation.READ, 200_002)
             assert get_ws_response_data(resp) == data
 
-    @pytest.mark.asyncio
     async def test_write_create(
         self,
         server_url: str,
@@ -235,7 +233,6 @@ class TestStorageWebSocket:
             assert_ws_ack(resp, WSStorageOperation.READ, 200_002)
             assert get_ws_response_data(resp) == data
 
-    @pytest.mark.asyncio
     async def test_mkdirs(
         self,
         server_url: str,
@@ -314,7 +311,6 @@ class TestStorageWebSocket:
             ]
             assert statuses[0]["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     async def test_stat_list(
         self,
         server_url: str,
@@ -467,7 +463,6 @@ class TestStorageWebSocket:
                 errno="ENOTDIR",
             )
 
-    @pytest.mark.asyncio
     async def test_shared(
         self,
         server_url: str,

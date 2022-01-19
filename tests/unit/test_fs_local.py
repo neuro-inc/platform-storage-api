@@ -21,7 +21,6 @@ from platform_storage_api.fs.local import (
 
 
 class TestFileSystem:
-    @pytest.mark.asyncio
     async def test_create_local(self) -> None:
         fs = FileSystem.create(StorageType.LOCAL)
         try:
@@ -94,7 +93,6 @@ class TestLocalFileSystem:
         async with FileSystem.create(StorageType.LOCAL) as fs:
             yield fs
 
-    @pytest.mark.asyncio
     async def test_open_empty_file_for_reading(
         self, fs: FileSystem, tmp_file_path: Path
     ) -> None:
@@ -102,7 +100,6 @@ class TestLocalFileSystem:
             payload = await f.read()
             assert not payload
 
-    @pytest.mark.asyncio
     async def test_open_for_writing(self, fs: FileSystem, tmp_file_path: Path) -> None:
         expected_payload = b"test"
 
@@ -114,7 +111,6 @@ class TestLocalFileSystem:
             payload = await f.read()
             assert payload == expected_payload
 
-    @pytest.mark.asyncio
     async def test_copy_streams(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         expected_payload = b"test"
         chunk_size = 1
@@ -134,14 +130,12 @@ class TestLocalFileSystem:
             payload = await f.read()
             assert payload == expected_payload
 
-    @pytest.mark.asyncio
     async def test_open_symlink(self, fs: FileSystem, symlink_to_file: Path) -> None:
         for mode in "rb", "rb+", "wb", "xb":
             with pytest.raises(FileNotFoundError):
                 async with fs.open(symlink_to_file, mode):
                     pass
 
-    @pytest.mark.asyncio
     async def test_open_free_symlink(self, fs: FileSystem, free_symlink: Path) -> None:
         for mode in "rb", "rb+", "wb", "xb":
             with pytest.raises(FileNotFoundError):
@@ -149,7 +143,6 @@ class TestLocalFileSystem:
                     pass
             assert not free_symlink.exists()
 
-    @pytest.mark.asyncio
     async def test_open_path_with_symlink(
         self, fs: FileSystem, path_with_symlink: Path
     ) -> None:
@@ -161,31 +154,26 @@ class TestLocalFileSystem:
                 async with fs.open(path, mode):
                     pass
 
-    @pytest.mark.asyncio
     async def test_listdir(
         self, fs: FileSystem, tmp_dir_path: Path, tmp_file_path: Path
     ) -> None:
         files = await fs.listdir(tmp_dir_path)
         assert files == [tmp_file_path]
 
-    @pytest.mark.asyncio
     async def test_listdir_empty_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         files = await fs.listdir(tmp_dir_path)
         assert not files
 
-    @pytest.mark.asyncio
     async def test_listdir_symlink(self, fs: FileSystem, symlink_to_dir: Path) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.listdir(symlink_to_dir)
 
-    @pytest.mark.asyncio
     async def test_listdir_path_with_symlink(
         self, fs: FileSystem, path_with_symlink: Path
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.listdir(path_with_symlink)
 
-    @pytest.mark.asyncio
     async def test_mkdir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         dir_name = "new"
         path = tmp_dir_path / dir_name
@@ -193,7 +181,6 @@ class TestLocalFileSystem:
         files = await fs.listdir(tmp_dir_path)
         assert files == [path]
 
-    @pytest.mark.asyncio
     async def test_mkdir_existing_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         dir_name = "new"
         path = tmp_dir_path / dir_name
@@ -204,7 +191,6 @@ class TestLocalFileSystem:
         # should not fail
         await fs.mkdir(path)
 
-    @pytest.mark.asyncio
     async def test_mkdir_existing_file(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -218,24 +204,20 @@ class TestLocalFileSystem:
         with pytest.raises(FileExistsError):
             await fs.mkdir(path)
 
-    @pytest.mark.asyncio
     async def test_mkdir_symlink(self, fs: FileSystem, symlink_to_dir: Path) -> None:
         with pytest.raises(FileExistsError):
             await fs.mkdir(symlink_to_dir)
 
-    @pytest.mark.asyncio
     async def test_mkdir_free_symlink(self, fs: FileSystem, free_symlink: Path) -> None:
         with pytest.raises(FileExistsError):
             await fs.mkdir(free_symlink)
 
-    @pytest.mark.asyncio
     async def test_mkdir_path_with_symlink(
         self, fs: FileSystem, path_with_symlink: Path
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.mkdir(path_with_symlink / "new")
 
-    @pytest.mark.asyncio
     async def test_liststatus_with_single_empty_file(
         self, fs: FileSystem, tmp_dir_path: Path, tmp_file_path: Path
     ) -> None:
@@ -253,7 +235,6 @@ class TestLocalFileSystem:
             )
         ]
 
-    @pytest.mark.asyncio
     async def test_liststatus_with_single_file(
         self, fs: FileSystem, tmp_dir_path: Path, tmp_file_path: Path
     ) -> None:
@@ -276,7 +257,6 @@ class TestLocalFileSystem:
             )
         ]
 
-    @pytest.mark.asyncio
     async def test_liststatus_with_single_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -296,7 +276,6 @@ class TestLocalFileSystem:
             )
         ]
 
-    @pytest.mark.asyncio
     async def test_liststatus_with_many_files(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -310,7 +289,6 @@ class TestLocalFileSystem:
         actual = [status.path for status in statuses]
         assert sorted(actual) == sorted(expected)
 
-    @pytest.mark.asyncio
     async def test_iterstatus_with_many_files(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -325,7 +303,6 @@ class TestLocalFileSystem:
         actual = [status.path for status in statuses]
         assert sorted(actual) == sorted(expected)
 
-    @pytest.mark.asyncio
     async def test_liststatus_non_existent_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -334,35 +311,30 @@ class TestLocalFileSystem:
         with pytest.raises(FileNotFoundError):
             await fs.liststatus(path)
 
-    @pytest.mark.asyncio
     async def test_liststatus_empty_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
 
-    @pytest.mark.asyncio
     async def test_liststatus_symlink(
         self, fs: FileSystem, symlink_to_dir: Path
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.liststatus(symlink_to_dir)
 
-    @pytest.mark.asyncio
     async def test_liststatus_free_symlink(
         self, fs: FileSystem, free_symlink: Path
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.liststatus(free_symlink)
 
-    @pytest.mark.asyncio
     async def test_liststatus_path_with_symlink(
         self, fs: FileSystem, path_with_symlink: Path
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.liststatus(path_with_symlink)
 
-    @pytest.mark.asyncio
     async def test_iterstatus_non_existent_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -372,7 +344,6 @@ class TestLocalFileSystem:
             with pytest.raises(FileNotFoundError):
                 await it.__anext__()
 
-    @pytest.mark.asyncio
     async def test_iterstatus_symlink(
         self, fs: FileSystem, symlink_to_dir: Path
     ) -> None:
@@ -380,7 +351,6 @@ class TestLocalFileSystem:
             with pytest.raises(FileNotFoundError):
                 await it.__anext__()
 
-    @pytest.mark.asyncio
     async def test_iterstatus_free_symlink(
         self, fs: FileSystem, free_symlink: Path
     ) -> None:
@@ -388,7 +358,6 @@ class TestLocalFileSystem:
             with pytest.raises(FileNotFoundError):
                 await it.__anext__()
 
-    @pytest.mark.asyncio
     async def test_iterstatus_broken_directory_link(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -399,7 +368,6 @@ class TestLocalFileSystem:
             with pytest.raises(FileNotFoundError):
                 await it.__anext__()
 
-    @pytest.mark.asyncio
     async def test_iterstatus_with_broken_entry_link(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -420,7 +388,6 @@ class TestLocalFileSystem:
 
     @pytest.mark.parametrize("recursive", [True, False])
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
-    @pytest.mark.asyncio
     async def test_rm_non_existent(
         self,
         fs: FileSystem,
@@ -434,7 +401,6 @@ class TestLocalFileSystem:
 
     @pytest.mark.parametrize("recursive", [True, False])
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
-    @pytest.mark.asyncio
     async def test_rm_path_with_symlink(
         self,
         fs: FileSystem,
@@ -449,7 +415,6 @@ class TestLocalFileSystem:
             await remove_method(fs, path, recursive)
 
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
-    @pytest.mark.asyncio
     async def test_rm_empty_dir(
         self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod
     ) -> None:
@@ -475,7 +440,6 @@ class TestLocalFileSystem:
         assert statuses == []
 
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
-    @pytest.mark.asyncio
     async def test_rm_dir(
         self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod
     ) -> None:
@@ -500,7 +464,6 @@ class TestLocalFileSystem:
         assert statuses == []
 
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
-    @pytest.mark.asyncio
     async def test_rm_dir_non_recursive_fails(
         self, fs: FileSystem, tmp_dir_path: Path, remove_method: RemoveMethod
     ) -> None:
@@ -512,7 +475,6 @@ class TestLocalFileSystem:
 
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.parametrize("recursive", [True, False])
-    @pytest.mark.asyncio
     async def test_rm_file(
         self,
         fs: FileSystem,
@@ -546,7 +508,6 @@ class TestLocalFileSystem:
 
     @pytest.mark.parametrize("recursive", [True, False])
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
-    @pytest.mark.asyncio
     async def test_rm_symlink_to_dir(
         self,
         fs: FileSystem,
@@ -593,7 +554,6 @@ class TestLocalFileSystem:
             )
         ]
 
-    @pytest.mark.asyncio
     async def test_iterremove_with_many_files(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -623,7 +583,6 @@ class TestLocalFileSystem:
         ]
         assert sorted(actual) == sorted(expected)
 
-    @pytest.mark.asyncio
     async def test_get_filestatus_file(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -647,7 +606,6 @@ class TestLocalFileSystem:
 
         await fs.remove(expected_file_path)
 
-    @pytest.mark.asyncio
     async def test_get_filestatus_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
@@ -669,7 +627,6 @@ class TestLocalFileSystem:
 
         await fs.remove(expected_file_path)
 
-    @pytest.mark.asyncio
     async def test_get_filestatus_symlink_to_file(
         self, fs: FileSystem, symlink_to_file: Path
     ) -> None:
@@ -685,7 +642,6 @@ class TestLocalFileSystem:
             target="file",
         )
 
-    @pytest.mark.asyncio
     async def test_get_filestatus_symlink_to_dir(
         self, fs: FileSystem, symlink_to_dir: Path
     ) -> None:
@@ -701,7 +657,6 @@ class TestLocalFileSystem:
             target="dir",
         )
 
-    @pytest.mark.asyncio
     async def test_get_filestatus_free_symlink(
         self, fs: FileSystem, free_symlink: Path
     ) -> None:
@@ -717,14 +672,12 @@ class TestLocalFileSystem:
             target="nonexistent",
         )
 
-    @pytest.mark.asyncio
     async def test_get_filestatus_path_with_symlink(
         self, fs: FileSystem, path_with_symlink: Path
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.get_filestatus(path_with_symlink)
 
-    @pytest.mark.asyncio
     async def test_exists_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
@@ -737,7 +690,6 @@ class TestLocalFileSystem:
         assert await fs.exists(expected_file_path)
         await fs.remove(expected_file_path)
 
-    @pytest.mark.asyncio
     async def test_exists_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         file_relative = Path("nested")
         expected_file_path = tmp_dir_path / file_relative
@@ -750,7 +702,6 @@ class TestLocalFileSystem:
         assert await fs.exists(tmp_dir_path)
         await fs.remove(expected_file_path)
 
-    @pytest.mark.asyncio
     async def test_exists_unknown(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         assert not await fs.exists(Path("unknown-name"))
 
@@ -789,7 +740,6 @@ class TestLocalFileSystem:
 
         return set(map(rename, statuses))
 
-    @pytest.mark.asyncio
     async def test_rename_file_same_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -817,7 +767,6 @@ class TestLocalFileSystem:
 
         await fs.remove(new_path)
 
-    @pytest.mark.asyncio
     async def test_rename_file_different_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -859,7 +808,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_file_nonexistent_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -887,7 +835,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_file_to_dir(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         old_name = PurePath("old")
         subdir = PurePath("nested")
@@ -917,7 +864,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_file_no_file(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -943,7 +889,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_file_self(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         name = PurePath("file")
         payload = b"test"
@@ -964,7 +909,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_file_to_existing_file(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -996,7 +940,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == old_payload
 
-    @pytest.mark.asyncio
     async def test_rename_symlink_to_file(
         self, fs: FileSystem, tmp_dir_path: Path, symlink_to_file: Path
     ) -> None:
@@ -1009,7 +952,6 @@ class TestLocalFileSystem:
         assert new_path.read_bytes() == b"test"
         assert set(tmp_dir_path.iterdir()) == {new_path, new_path.resolve()}
 
-    @pytest.mark.asyncio
     async def test_rename_file_to_symlink_to_file(
         self, fs: FileSystem, tmp_dir_path: Path, symlink_to_file: Path
     ) -> None:
@@ -1024,7 +966,6 @@ class TestLocalFileSystem:
         assert new_path.read_bytes() == b"test"
         assert set(tmp_dir_path.iterdir()) == {new_path, orig_path}
 
-    @pytest.mark.asyncio
     async def test_rename_file_to_symlink_to_dir(
         self, fs: FileSystem, tmp_dir_path: Path, symlink_to_dir: Path
     ) -> None:
@@ -1039,7 +980,6 @@ class TestLocalFileSystem:
         assert new_path.read_bytes() == b"test"
         assert set(tmp_dir_path.iterdir()) == {new_path, orig_path}
 
-    @pytest.mark.asyncio
     async def test_rename_file_to_free_symlink(
         self, fs: FileSystem, tmp_dir_path: Path, free_symlink: Path
     ) -> None:
@@ -1053,7 +993,6 @@ class TestLocalFileSystem:
         assert new_path.read_bytes() == b"test"
         assert list(tmp_dir_path.iterdir()) == [new_path]
 
-    @pytest.mark.asyncio
     async def test_rename_file_src_path_with_symlink(
         self, fs: FileSystem, tmp_dir_path: Path, path_with_symlink: Path
     ) -> None:
@@ -1064,7 +1003,6 @@ class TestLocalFileSystem:
         with pytest.raises(FileNotFoundError):
             await fs.rename(old_path, new_path)
 
-    @pytest.mark.asyncio
     async def test_rename_file_dst_path_with_symlink(
         self, fs: FileSystem, tmp_dir_path: Path, path_with_symlink: Path
     ) -> None:
@@ -1075,7 +1013,6 @@ class TestLocalFileSystem:
         with pytest.raises(FileNotFoundError):
             await fs.rename(old_path, new_path)
 
-    @pytest.mark.asyncio
     async def test_rename_dir_same_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -1109,7 +1046,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_dir_different_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -1160,7 +1096,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_dir_nonexistent_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -1196,7 +1131,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_dir_to_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         old_dir = PurePath("old")
         new_file = PurePath("new")
@@ -1226,7 +1160,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_dir_to_empty_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -1263,7 +1196,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_dir_to_nonempty_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -1313,7 +1245,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == new_payload
 
-    @pytest.mark.asyncio
     async def test_rename_dir_to_ancestor_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -1356,7 +1287,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == new_payload
 
-    @pytest.mark.asyncio
     async def test_rename_dir_to_descended_dir(
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
@@ -1390,7 +1320,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_rename_dir_to_dot(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         file_name = PurePath("file")
         old_dir = PurePath("old")
@@ -1429,7 +1358,6 @@ class TestLocalFileSystem:
             real_payload = await f.read()
             assert real_payload == payload
 
-    @pytest.mark.asyncio
     async def test_disk_usage(self, fs: FileSystem, tmp_dir_path: Path) -> None:
         res = await fs.disk_usage(tmp_dir_path)
         total, used, free = shutil.disk_usage(tmp_dir_path)
@@ -1437,21 +1365,18 @@ class TestLocalFileSystem:
         assert res.used == used
         assert res.free == free
 
-    @pytest.mark.asyncio
     async def test_disk_usage_symlink_to_file(
         self, fs: FileSystem, symlink_to_file: Path
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.disk_usage(symlink_to_file)
 
-    @pytest.mark.asyncio
     async def test_disk_usage_free_symlink(
         self, fs: FileSystem, free_symlink: Path
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.disk_usage(free_symlink)
 
-    @pytest.mark.asyncio
     async def test_disk_usage_path_with_symlink(
         self, fs: FileSystem, path_with_symlink: Path
     ) -> None:
