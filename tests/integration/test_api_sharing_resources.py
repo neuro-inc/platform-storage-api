@@ -19,7 +19,6 @@ class TestStorageListAndResourceSharing:
     def file_status_sort(self, file_status: dict[str, Any]) -> Any:
         return file_status["path"]
 
-    @pytest.mark.asyncio
     async def test_ls_other_user_data_no_permission(
         self,
         server_url: str,
@@ -44,7 +43,6 @@ class TestStorageListAndResourceSharing:
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 404
 
-    @pytest.mark.asyncio
     async def test_ls_other_user_data_no_permission_issue(
         self,
         server_url: str,
@@ -86,7 +84,6 @@ class TestStorageListAndResourceSharing:
             assert user1.name not in resp_text
             assert user2.name in resp_text
 
-    @pytest.mark.asyncio
     async def test_ls_other_user_data_shared_with_files(
         self,
         server_url: str,
@@ -153,7 +150,6 @@ class TestStorageListAndResourceSharing:
             for status in statuses:
                 assert status["modificationTime"] >= min_mtime_first
 
-    @pytest.mark.asyncio
     async def test_ls_other_user_data_exclude_files(
         self,
         server_url: str,
@@ -212,7 +208,6 @@ class TestStorageListAndResourceSharing:
             for status in statuses:
                 assert status["modificationTime"] >= min_mtime_first
 
-    @pytest.mark.asyncio
     async def test_liststatus_other_user_data_two_subdirs(
         self,
         server_url: str,
@@ -298,7 +293,6 @@ class TestStorageListAndResourceSharing:
             assert statuses[0]["modificationTime"] >= min_mtime_second
             assert statuses[1]["modificationTime"] >= min_mtime_third
 
-    @pytest.mark.asyncio
     async def test_liststatus_permissions(
         self,
         server_url: str,

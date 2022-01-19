@@ -23,7 +23,6 @@ class AsyncBytesIO(BytesIO):
 
 
 class TestMultipleStoragePathResolver:
-    @pytest.mark.asyncio
     async def test_resolve_base_path(
         self, local_fs: FileSystem, local_tmp_dir_path: Path
     ) -> None:
@@ -55,7 +54,6 @@ class TestStorage:
         assert PurePath("/path") == storage.sanitize_path("/super/../path/")
         assert PurePath("/") == storage.sanitize_path("/super/../path/../..")
 
-    @pytest.mark.asyncio
     async def test_store(
         self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
@@ -75,7 +73,6 @@ class TestStorage:
             payload = await f.read()
             assert payload == expected_payload
 
-    @pytest.mark.asyncio
     async def test_store_dont_create(
         self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
@@ -94,7 +91,6 @@ class TestStorage:
         files = await local_fs.listdir(local_tmp_dir_path)
         assert files == []
 
-    @pytest.mark.asyncio
     async def test_store_range(
         self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
@@ -116,7 +112,6 @@ class TestStorage:
             payload = await f.read()
             assert payload == b"test spament\0\0\0ham"
 
-    @pytest.mark.asyncio
     async def test_retrieve(
         self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
@@ -133,7 +128,6 @@ class TestStorage:
         payload = await instream.read()
         assert payload == expected_payload
 
-    @pytest.mark.asyncio
     async def test_retrieve_range(
         self, storage: Storage, local_fs: FileSystem, local_tmp_dir_path: PurePath
     ) -> None:
@@ -154,7 +148,6 @@ class TestStorage:
         payload = await instream.read()
         assert payload == b"cont"
 
-    @pytest.mark.asyncio
     async def test_filestatus_file(
         self, storage: Storage, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
     ) -> None:
@@ -172,7 +165,6 @@ class TestStorage:
         assert storage_stat.size == real_stat.st_size
         assert storage_stat.modification_time == int(real_stat.st_mtime)
 
-    @pytest.mark.asyncio
     async def test_filestatus_dir(
         self, storage: Storage, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
     ) -> None:
@@ -189,7 +181,6 @@ class TestStorage:
         assert storage_stat.size == 0
         assert storage_stat.modification_time == int(real_stat.st_mtime)
 
-    @pytest.mark.asyncio
     async def test_iterremove_returns_proper_path(
         self, storage: Storage, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
     ) -> None:
@@ -206,7 +197,6 @@ class TestStorage:
 
         assert remove_listing.path == PurePath(f"/{dir_name}")
 
-    @pytest.mark.asyncio
     async def test_disk_usage(
         self, storage: Storage, local_tmp_dir_path: PurePath
     ) -> None:

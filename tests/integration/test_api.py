@@ -41,7 +41,6 @@ async def bob(regular_user_factory: _UserFactory) -> _User:
 
 
 class TestApi:
-    @pytest.mark.asyncio
     async def test_ping(self, api: ApiConfig, client: aiohttp.ClientSession) -> None:
         async with client.head(api.ping_url) as response:
             assert response.status == 200
@@ -49,7 +48,6 @@ class TestApi:
         async with client.get(api.ping_url) as response:
             assert response.status == 200
 
-    @pytest.mark.asyncio
     async def test_ping_includes_version(
         self, api: ApiConfig, client: aiohttp.ClientSession
     ) -> None:
@@ -59,7 +57,6 @@ class TestApi:
 
 
 class TestStorage:
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("method", ["GET", "PUT", "POST", "DELETE", "HEAD"])
     async def test_options_allowed(
         self, server_url: str, client: aiohttp.ClientSession, method: str
@@ -72,7 +69,6 @@ class TestStorage:
         async with client.options(f"{server_url}/user", headers=headers) as response:
             assert response.status == 200, await response.text()
 
-    @pytest.mark.asyncio
     async def test_options_forbidden(
         self,
         server_url: str,
@@ -86,7 +82,6 @@ class TestStorage:
         async with client.options(f"{server_url}/user", headers=headers) as response:
             assert response.status == 403, await response.text()
 
-    @pytest.mark.asyncio
     async def test_put_head_get(
         self,
         server_url: str,
@@ -130,7 +125,6 @@ class TestStorage:
             result_payload = await response.read()
             assert result_payload == payload
 
-    @pytest.mark.asyncio
     async def test_get_partial(
         self,
         server_url: str,
@@ -179,7 +173,6 @@ class TestStorage:
             result_payload = await response.read()
             assert result_payload == b"tent"
 
-    @pytest.mark.asyncio
     async def test_get_partial_invalid_range(
         self,
         server_url: str,
@@ -225,7 +218,6 @@ class TestStorage:
 
         yield (url, headers)
 
-    @pytest.mark.asyncio
     async def test_patch(
         self,
         client: aiohttp.ClientSession,
@@ -244,7 +236,6 @@ class TestStorage:
             result_payload = await response.read()
             assert result_payload == b"test spament"
 
-    @pytest.mark.asyncio
     async def test_patch_unknown_size(
         self,
         client: aiohttp.ClientSession,
@@ -263,7 +254,6 @@ class TestStorage:
             result_payload = await response.read()
             assert result_payload == b"test spament"
 
-    @pytest.mark.asyncio
     async def test_patch_past_the_end(
         self,
         client: aiohttp.ClientSession,
@@ -282,7 +272,6 @@ class TestStorage:
             assert response.headers["X-File-Length"] == "18"
             assert result_payload == b"test content\0\0\0ham"
 
-    @pytest.mark.asyncio
     async def test_patch_invalid_headers(
         self,
         client: aiohttp.ClientSession,
@@ -320,7 +309,6 @@ class TestStorage:
         async with client.patch(url, headers=headers2, data=b"spam") as response:
             assert response.status == 400, await response.text()
 
-    @pytest.mark.asyncio
     async def test_head_non_existent(
         self,
         server_url: str,
@@ -335,7 +323,6 @@ class TestStorage:
         async with client.head(url, headers=headers) as response:
             assert response.status == 404
 
-    @pytest.mark.asyncio
     async def test_get_non_existent(
         self,
         server_url: str,
@@ -350,7 +337,6 @@ class TestStorage:
         async with client.get(url, headers=headers) as response:
             assert response.status == 404
 
-    @pytest.mark.asyncio
     async def test_patch_non_existent(
         self,
         server_url: str,
@@ -368,7 +354,6 @@ class TestStorage:
         async with client.patch(url, headers=headers, data=b"spam") as response:
             assert response.status == 404
 
-    @pytest.mark.asyncio
     async def test_put_illegal_op(
         self,
         server_url: str,
@@ -386,7 +371,6 @@ class TestStorage:
             expected_error = "Illegal operation: OPEN"
             assert payload["error"] == expected_error
 
-    @pytest.mark.asyncio
     async def test_get_illegal_op(
         self,
         server_url: str,
@@ -404,7 +388,6 @@ class TestStorage:
             expected_error = "Illegal operation: CREATE"
             assert payload["error"] == expected_error
 
-    @pytest.mark.asyncio
     async def test_iterstatus(
         self,
         server_url: str,
@@ -442,7 +425,6 @@ class TestStorage:
             assert file_status["path"] == file_name
             assert file_status["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     async def test_iterstatus_empty_dir(
         self,
         server_url: str,
@@ -467,7 +449,6 @@ class TestStorage:
             statuses = await status_iter_response_to_list(response.content)
             assert statuses == []
 
-    @pytest.mark.asyncio
     async def test_iterstatus_no_op_param_no_equals(
         self,
         server_url: str,
@@ -504,7 +485,6 @@ class TestStorage:
             assert file_status["path"] == file_name
             assert file_status["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     async def test_iterstatus_non_existent_dir(
         self,
         server_url: str,
@@ -523,7 +503,6 @@ class TestStorage:
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 404
 
-    @pytest.mark.asyncio
     async def test_iterstatus_file(
         self,
         server_url: str,
@@ -545,7 +524,6 @@ class TestStorage:
             payload = await response.json()
             assert payload["error"] == "Not a directory"
 
-    @pytest.mark.asyncio
     async def test_disk_usage(
         self,
         server_url: str,
@@ -569,7 +547,6 @@ class TestStorage:
             assert "used" in res
             assert "free" in res
 
-    @pytest.mark.asyncio
     async def test_liststatus(
         self,
         server_url: str,
@@ -605,7 +582,6 @@ class TestStorage:
             assert file_status["path"] == file_name
             assert file_status["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     async def test_liststatus_empty_dir(
         self,
         server_url: str,
@@ -628,7 +604,6 @@ class TestStorage:
             statuses = get_liststatus_dict(await response.json())
             assert statuses == []
 
-    @pytest.mark.asyncio
     async def test_liststatus_no_op_param_no_equals(
         self,
         server_url: str,
@@ -662,7 +637,6 @@ class TestStorage:
             assert file_status["path"] == file_name
             assert file_status["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     async def test_ambiguous_operations_with_op(
         self,
         server_url: str,
@@ -680,7 +654,6 @@ class TestStorage:
             payload = await response.json()
             assert "Ambiguous operations" in payload["error"]
 
-    @pytest.mark.asyncio
     async def test_ambiguous_operations(
         self,
         server_url: str,
@@ -698,7 +671,6 @@ class TestStorage:
             payload = await response.json()
             assert "Ambiguous operations" in payload["error"]
 
-    @pytest.mark.asyncio
     async def test_unknown_operation(
         self,
         server_url: str,
@@ -715,7 +687,6 @@ class TestStorage:
             expected_error = "'UNKNOWN' is not a valid StorageOperation"
             assert payload["error"] == expected_error
 
-    @pytest.mark.asyncio
     async def test_liststatus_non_existent_dir(
         self,
         server_url: str,
@@ -731,7 +702,6 @@ class TestStorage:
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == 404
 
-    @pytest.mark.asyncio
     async def test_liststatus_file(
         self,
         server_url: str,
@@ -753,7 +723,6 @@ class TestStorage:
             assert payload["error"] == "Not a directory"
             assert payload["errno"] == "ENOTDIR"
 
-    @pytest.mark.asyncio
     async def test_mkdirs(
         self,
         server_url: str,
@@ -778,7 +747,6 @@ class TestStorage:
         async with client.get(dir_url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPOk.status_code
 
-    @pytest.mark.asyncio
     async def test_mkdirs_existent_dir(
         self,
         server_url: str,
@@ -797,7 +765,6 @@ class TestStorage:
         async with client.put(dir_url, headers=headers, params=params) as response:
             assert response.status == aiohttp.web.HTTPCreated.status_code
 
-    @pytest.mark.asyncio
     async def test_mkdirs_existent_file(
         self,
         server_url: str,
@@ -819,7 +786,6 @@ class TestStorage:
             assert payload["error"] == "File exists"
             assert payload["errno"] == "EEXIST"
 
-    @pytest.mark.asyncio
     async def test_mkdirs_existent_parent_file(
         self,
         server_url: str,
@@ -842,7 +808,6 @@ class TestStorage:
             assert payload["error"] == "Predecessor is not a directory"
             assert payload["errno"] == "ENOTDIR"
 
-    @pytest.mark.asyncio
     async def test_put_target_is_directory(
         self,
         server_url: str,
@@ -863,7 +828,6 @@ class TestStorage:
             assert payload["error"] == "Destination is a directory"
             assert payload["errno"] == "EISDIR"
 
-    @pytest.mark.asyncio
     async def test_head_target_is_directory(
         self,
         server_url: str,
@@ -886,7 +850,6 @@ class TestStorage:
             assert "X-File-Length" not in response.headers
             assert "Accept-Range" not in response.headers
 
-    @pytest.mark.asyncio
     async def test_get_target_is_directory(
         self,
         server_url: str,
@@ -911,7 +874,6 @@ class TestStorage:
             payload = await response.read()
             assert payload == b""
 
-    @pytest.mark.asyncio
     async def test_delete_non_existent(
         self,
         server_url: str,
@@ -926,7 +888,6 @@ class TestStorage:
         async with client.delete(url, headers=headers) as response:
             assert response.status == aiohttp.web.HTTPNotFound.status_code
 
-    @pytest.mark.asyncio
     async def test_delete_file(
         self,
         server_url: str,
@@ -946,7 +907,6 @@ class TestStorage:
         async with client.delete(url, headers=headers) as response:
             assert response.status == aiohttp.web.HTTPNoContent.status_code
 
-    @pytest.mark.asyncio
     async def test_iterdelete_file(
         self,
         server_url: str,
@@ -975,7 +935,6 @@ class TestStorage:
                 "is_dir": False,
             }
 
-    @pytest.mark.asyncio
     async def test_iterdelete_dir_with_file(
         self,
         server_url: str,
@@ -1012,7 +971,6 @@ class TestStorage:
                 "is_dir": True,
             }
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("use_stream_response", [False, True])
     async def test_cant_delete_folder_without_non_recursive(
         self,
@@ -1043,7 +1001,6 @@ class TestStorage:
             assert payload["error"] == "Target is a directory"
             assert payload["errno"] == "EISDIR"
 
-    @pytest.mark.asyncio
     async def test_can_delete_folder_with_recursive_set(
         self,
         server_url: str,
@@ -1123,7 +1080,6 @@ class TestGetFileStatus:
         await self.put_dir(server_url, client, alice, self.dir3_dir4)
         return expected_mtime_min
 
-    @pytest.mark.asyncio
     async def test_filestatus_alice_checks_her_own_files(
         self,
         server_url: str,
@@ -1182,7 +1138,6 @@ class TestGetFileStatus:
             assert payload["path"].endswith(self.dir3_file3)  # relative path
             assert payload["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     async def test_filestatus_check_non_existing_file(
         self,
         server_url: str,
@@ -1200,7 +1155,6 @@ class TestGetFileStatus:
         ) as response:
             assert response.status == aiohttp.web.HTTPNotFound.status_code
 
-    @pytest.mark.asyncio
     async def test_filestatus_bob_checks_alices_files(
         self,
         server_url: str,
@@ -1235,7 +1189,6 @@ class TestGetFileStatus:
         ) as response:
             assert response.status == aiohttp.web.HTTPNotFound.status_code
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
     async def test_filestatus_share_file_then_check_it(
         self,
@@ -1278,7 +1231,6 @@ class TestGetFileStatus:
             assert payload["path"].endswith(self.file1)  # relative path
             assert payload["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
     async def test_filestatus_share_dir_then_check_it(
         self,
@@ -1336,7 +1288,6 @@ class TestGetFileStatus:
             assert payload["path"].endswith(self.dir3_file3)  # relative path
             assert payload["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "perm_file,perm_parent_dir",
         [("read", "read"), ("write", "read"), ("manage", "read")],
@@ -1384,7 +1335,6 @@ class TestGetFileStatus:
             assert payload["path"].endswith(self.dir3)  # relative path
             assert payload["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "perm_dir,perm_parent_dir",
         [("read", "read"), ("write", "read"), ("manage", "read")],
@@ -1447,7 +1397,6 @@ class TestGetFileStatus:
             assert payload["path"].endswith(self.dir3)  # relative path
             assert payload["modificationTime"] >= mtime_min
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "perm_dir,perm_child_dir",
         [("read", "read"), ("write", "write"), ("manage", "manage")],
@@ -1615,7 +1564,6 @@ class TestRename:
         )
         assert response_status.status == aiohttp.web.HTTPNotFound.status_code
 
-    @pytest.mark.asyncio
     async def test_rename_file_same_dir(
         self,
         server_url: str,
@@ -1637,7 +1585,6 @@ class TestRename:
         await self.assert_filestatus_equal(new_status, old_status)
         await self.assert_no_file(server_url, client, alice, alice, self.file1)
 
-    @pytest.mark.asyncio
     async def test_rename_file_same_dir_relative(
         self,
         server_url: str,
@@ -1659,7 +1606,6 @@ class TestRename:
         await self.assert_filestatus_equal(new_status, old_status)
         await self.assert_no_file(server_url, client, alice, alice, self.file1)
 
-    @pytest.mark.asyncio
     async def test_rename_file_to_existing_file(
         self,
         server_url: str,
@@ -1679,7 +1625,6 @@ class TestRename:
         await self.assert_filestatus_equal(status, new_status)
         await self.assert_no_file(server_url, client, alice, alice, self.file1)
 
-    @pytest.mark.asyncio
     async def test_alice_rename_file_to_bobs_folder(
         self,
         server_url: str,
@@ -1699,7 +1644,6 @@ class TestRename:
         )
         await self.assert_filestatus_equal(status, new_status)
 
-    @pytest.mark.asyncio
     async def test_alice_rename_file_to_bobs_relative(
         self,
         server_url: str,
@@ -1719,7 +1663,6 @@ class TestRename:
         )
         await self.assert_filestatus_equal(status, new_status)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
     async def test_alice_rename_file_to_bobs_folder_shared(
         self,
@@ -1758,7 +1701,6 @@ class TestRename:
             await self.assert_filestatus_equal(status, new_status)
             await self.assert_no_file(server_url, client, alice, alice, self.file1)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("permission", ["read", "write", "manage"])
     async def test_alice_rename_bobs_files_shared(
         self,
@@ -1799,7 +1741,6 @@ class TestRename:
 
 
 class TestMultiStorage:
-    @pytest.mark.asyncio
     async def test_put_main_storage(
         self,
         multi_storage_config: Config,
@@ -1824,7 +1765,6 @@ class TestMultiStorage:
             file_name,
         ).exists()
 
-    @pytest.mark.asyncio
     async def test_put_extra_storage(
         self,
         multi_storage_config: Config,
