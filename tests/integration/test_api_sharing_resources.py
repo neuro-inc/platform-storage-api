@@ -6,7 +6,6 @@ from typing import Any
 from unittest import mock
 
 import aiohttp
-import pytest
 import yarl
 
 from platform_storage_api.fs.local import FileStatusType
