@@ -58,8 +58,8 @@ uvloop.install()
 
 logger = logging.getLogger(__name__)
 
-MAX_WS_READ_SIZE = 16 * 2 ** 20  # 16 MiB
-MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2 ** 16 + 100
+MAX_WS_READ_SIZE = 16 * 2**20  # 16 MiB
+MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2**16 + 100
 
 
 class ApiHandler:
