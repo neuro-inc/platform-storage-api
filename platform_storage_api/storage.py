@@ -183,7 +183,7 @@ class Storage:
 
     @trace
     async def disk_usage(
-        self,
+        self, path: Optional[Union[PurePath, str]] = None
     ) -> DiskUsageInfo:
-        base_path = await self._path_resolver.resolve_base_path()
-        return await self._fs.disk_usage(base_path)
+        real_path = await self._path_resolver.resolve_path(PurePath(path or "/"))
+        return await self._fs.disk_usage(real_path)

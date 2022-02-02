@@ -216,7 +216,7 @@ class StorageHandler:
             await self._check_user_permissions(
                 request, storage_path, AuthAction.READ.value
             )
-            return await self._handle_getdiskusage()
+            return await self._handle_getdiskusage(storage_path)
         elif operation == StorageOperation.WEBSOCKET:
             storage_path = self._get_fs_path_from_request(request)
             tree = await self._permission_checker.get_user_permissions_tree(
@@ -642,11 +642,9 @@ class StorageHandler:
         stat_dict = {"FileStatus": self._convert_filestatus_to_primitive(fstat)}
         return web.json_response(stat_dict)
 
-    async def _handle_getdiskusage(
-        self,
-    ) -> web.StreamResponse:
+    async def _handle_getdiskusage(self, storage_path: PurePath) -> web.StreamResponse:
         try:
-            usage = await self._storage.disk_usage()
+            usage = await self._storage.disk_usage(storage_path)
         except FileNotFoundError:
             raise web.HTTPNotFound
 

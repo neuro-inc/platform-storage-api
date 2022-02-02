@@ -198,9 +198,18 @@ class TestStorage:
         assert remove_listing.path == PurePath(f"/{dir_name}")
 
     async def test_disk_usage(
-        self, storage: Storage, local_tmp_dir_path: PurePath
+        self, storage: Storage, local_fs: LocalFileSystem, local_tmp_dir_path: PurePath
     ) -> None:
         res = await storage.disk_usage()
+        total, used, free = shutil.disk_usage(local_tmp_dir_path)
+        assert res.total == total
+        assert res.used == used
+        assert res.free == free
+
+        dir_name = "dir"
+        real_dir_path = local_tmp_dir_path / dir_name
+        await local_fs.mkdir(real_dir_path)
+        res = await storage.disk_usage("/dir")
         total, used, free = shutil.disk_usage(local_tmp_dir_path)
         assert res.total == total
         assert res.used == used
