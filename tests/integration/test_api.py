@@ -535,6 +535,12 @@ class TestStorage:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
 
+        params = {"op": "MKDIRS"}
+        async with client.put(
+            server_url + f"/{user.name}/", headers=headers, params=params
+        ) as response:
+            assert response.status == aiohttp.web.HTTPCreated.status_code
+
         params = {"op": "GETDISKUSAGE"}
         async with client.get(
             server_url + f"/{user.name}/", headers=headers, params=params
