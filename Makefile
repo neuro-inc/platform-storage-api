@@ -26,7 +26,7 @@ setup:
 	pre-commit install
 
 format:
-ifdef CI_LINT_RUN
+ifdef CI
 	pre-commit run --all-files --show-diff-on-failure
 else
 	pre-commit run --all-files
@@ -51,32 +51,10 @@ run:
 		-p 8080:8080 \
 		-v /tmp/np_storage:/tmp/np_storage \
 		-e NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage \
-		$(IMAGE_NAME):latest
+		platformstorageapi:latest
 
 docker_build:
 	rm -rf build dist
 	pip install -U build
 	python -m build
 	docker build -t $(IMAGE_NAME):latest .
-
-docker_push: docker_build
-	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):$(IMAGE_TAG)
-	docker push $(IMAGE_REPO):$(IMAGE_TAG)
-
-	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):latest
-	docker push $(IMAGE_REPO):latest
-
-helm_create_chart:
-	export IMAGE_REPO=$(IMAGE_REPO); \
-	export IMAGE_TAG=$(IMAGE_TAG); \
-	export CHART_VERSION=$(HELM_CHART_VERSION); \
-	export APP_VERSION=$(HELM_APP_VERSION); \
-	VALUES=$$(cat charts/$(HELM_CHART)/values.yaml | envsubst); \
-	echo "$$VALUES" > charts/$(HELM_CHART)/values.yaml; \
-	CHART=$$(cat charts/$(HELM_CHART)/Chart.yaml | envsubst); \
-	echo "$$CHART" > charts/$(HELM_CHART)/Chart.yaml
-
-helm_deploy: helm_create_chart
-	helm upgrade $(HELM_CHART) charts/$(HELM_CHART) \
-		-f charts/$(HELM_CHART)/values-$(HELM_ENV).yaml \
-		--namespace platform --install --wait --timeout 600s
