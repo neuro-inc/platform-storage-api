@@ -29,7 +29,10 @@ class TestMultipleStoragePathResolver:
         resolver = MultipleStoragePathResolver(local_fs, local_tmp_dir_path)
 
         path = await resolver.resolve_base_path()
-        assert path == local_tmp_dir_path
+        assert path == local_tmp_dir_path / "main"
+
+        path = await resolver.resolve_base_path(PurePath("/"))
+        assert path == local_tmp_dir_path / "main"
 
         path = await resolver.resolve_base_path(PurePath("/dir"))
         assert path == local_tmp_dir_path / "main"
