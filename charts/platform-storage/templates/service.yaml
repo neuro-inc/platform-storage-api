@@ -4,9 +4,9 @@ metadata:
   name: {{ include "platformStorage.fullname" . }}
   labels: {{ include "platformStorage.labels.standard" . | nindent 4 }}
     service: platform-storage
-  annotations:
-    traefik.ingress.kubernetes.io/affinity: "true"
-    traefik.ingress.kubernetes.io/session-cookie-name: NEURO_STORAGEAPI_SESSION
+{{- with .Values.service.annotations }}
+  annotations: {{ toYaml . | nindent 4 }}
+{{- end }}
 spec:
   type: ClusterIP
   ports:

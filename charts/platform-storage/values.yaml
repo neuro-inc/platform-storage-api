@@ -27,6 +27,10 @@ secrets: []
 
 ingress:
   enabled: false
+  # annotations:
+
+service:
+  # annotations:
 
 storages: []
 
