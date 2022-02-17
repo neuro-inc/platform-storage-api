@@ -39,12 +39,7 @@ test_unit:
 	pytest -vv tests/unit
 
 test_integration:
-	docker-compose -f tests/docker/e2e.compose.yml up -d
-	pytest -vv tests/integration; \
-	exit_code=$$?; \
-	docker-compose -f tests/docker/e2e.compose.yml kill; \
-	docker-compose -f tests/docker/e2e.compose.yml rm -f; \
-	exit $$exit_code
+	pytest -vv tests/integration
 
 run:
 	docker run -it --rm --name platformstorageapi \

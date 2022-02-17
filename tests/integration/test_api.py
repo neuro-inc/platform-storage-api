@@ -17,7 +17,7 @@ import pytest_asyncio
 from platform_storage_api.config import Config
 from platform_storage_api.fs.local import FileStatusType
 
-from .conftest import _User, _UserFactory
+from .auth import _User, _UserFactory
 from tests.integration.conftest import (
     ApiConfig,
     get_filestatus_dict,
@@ -96,7 +96,7 @@ class TestStorage:
         mtime_min = int(current_time())
 
         async with client.put(url, headers=headers, data=payload) as response:
-            assert response.status == 201
+            assert response.status == 201, await response.text()
 
         async with client.head(url, headers=headers) as response:
             assert response.status == 200
