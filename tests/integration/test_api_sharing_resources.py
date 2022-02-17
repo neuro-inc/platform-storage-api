@@ -10,7 +10,7 @@ import yarl
 
 from platform_storage_api.fs.local import FileStatusType
 
-from .conftest import _User, _UserFactory
+from .auth import _User, _UserFactory
 from tests.integration.conftest import ApiConfig, status_iter_response_to_list
 
 
