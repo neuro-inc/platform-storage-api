@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, replace
@@ -77,7 +78,7 @@ def multi_storage_server_url(multi_storage_api: ApiConfig) -> str:
 @pytest.fixture
 def config(admin_token: str, cluster_name: str) -> Config:
     server_config = ServerConfig()
-    path = PurePath("/tmp/np_storage")
+    path = PurePath(os.path.realpath("/tmp/np_storage"))
     storage_config = StorageConfig(fs_local_base_path=path)
     auth = AuthConfig(
         server_endpoint_url=URL("http://localhost:5003"), service_token=admin_token

@@ -1,4 +1,5 @@
 import asyncio
+import os.path
 import tempfile
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -27,4 +28,4 @@ async def local_fs() -> AsyncIterator[FileSystem]:
 @pytest.fixture
 def local_tmp_dir_path() -> Iterator[Path]:
     with tempfile.TemporaryDirectory() as d:
-        yield Path(d)
+        yield Path(os.path.realpath(d))

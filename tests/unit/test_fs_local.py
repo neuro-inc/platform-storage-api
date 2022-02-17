@@ -50,7 +50,7 @@ class TestLocalFileSystem:
     def tmp_dir_path(self) -> Iterator[Path]:
         # although blocking, this is fine for tests
         with tempfile.TemporaryDirectory() as d:
-            yield Path(d)
+            yield Path(os.path.realpath(d))
 
     @pytest.fixture
     def tmp_file_path(self, tmp_dir_path: Path) -> Iterator[Path]:
