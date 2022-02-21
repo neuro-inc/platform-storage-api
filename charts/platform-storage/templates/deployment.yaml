@@ -64,6 +64,10 @@ spec:
 {{- if .Values.platform.token }}
 {{ toYaml .Values.platform.token | indent 10 }}
 {{- end }}
+        - name: NP_STORAGE_PLATFORM_CONFIG_URL
+          value: {{ .Values.platform.configUrl | quote }}
+        - name: NP_STORAGE_ADMIN_URL
+          value: { { .Values.platform.adminUrl | quote } }
         - name: NP_PERMISSION_EXPIRATION_INTERVAL
           value: {{ .Values.permissionExpirationInterval | quote }}
         - name: NP_PERMISSION_FORGETTING_INTERVAL

@@ -1800,3 +1800,66 @@ class TestMultiStorage:
             dir_path,
             file_name,
         ).exists()
+
+
+class TestMaintenanceCheckerIntegration:
+    async def test_put_main_storage_not_ready(
+        self,
+        on_maintenance_cluster_api: ApiConfig,
+        on_maintenance_cluster_name: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: _UserFactory,
+    ) -> None:
+        user = await regular_user_factory(
+            override_cluster_name=on_maintenance_cluster_name
+        )
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"{user.name}/path/to"
+        dir_url = f"{on_maintenance_cluster_api.storage_base_url}/{dir_path}"
+        file_name = "file.txt"
+        url = f"{dir_url}/{file_name}"
+
+        async with client.put(url, headers=headers, data=b"test") as response:
+            assert response.status == 503
+            data = await response.json()
+            assert "maintenance" in data["error"]
+
+    async def test_put_org_storage_not_ready(
+        self,
+        on_maintenance_org_cluster_api: ApiConfig,
+        on_maintenance_org_cluster_name: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: _UserFactory,
+    ) -> None:
+        user = await regular_user_factory(
+            override_cluster_name=on_maintenance_org_cluster_name
+        )
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"org/{user.name}/path/to"
+        dir_url = f"{on_maintenance_org_cluster_api.storage_base_url}/{dir_path}"
+        file_name = "file.txt"
+        url = f"{dir_url}/{file_name}"
+
+        async with client.put(url, headers=headers, data=b"test") as response:
+            assert response.status == 503, await response.text()
+            data = await response.json()
+            assert "maintenance" in data["error"]
+
+    async def test_put_main_ok_if_org_storage_not_ready(
+        self,
+        on_maintenance_org_cluster_api: ApiConfig,
+        on_maintenance_org_cluster_name: str,
+        client: aiohttp.ClientSession,
+        regular_user_factory: _UserFactory,
+    ) -> None:
+        user = await regular_user_factory(
+            override_cluster_name=on_maintenance_org_cluster_name
+        )
+        headers = {"Authorization": "Bearer " + user.token}
+        dir_path = f"{user.name}/path/to"
+        dir_url = f"{on_maintenance_org_cluster_api.storage_base_url}/{dir_path}"
+        file_name = "file.txt"
+        url = f"{dir_url}/{file_name}"
+
+        async with client.put(url, headers=headers, data=b"test") as response:
+            assert response.status == 201

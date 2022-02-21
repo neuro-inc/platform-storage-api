@@ -21,9 +21,11 @@ from aiohttp import web
 from aiohttp.web_request import Request
 from aiohttp.web_urldispatcher import AbstractRoute
 from aiohttp_cors import CorsConfig
+from neuro_admin_client import AdminClient
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
+from neuro_config_client import ConfigClient
 from neuro_logging import (
     init_logging,
     make_sentry_trace_config,
@@ -33,6 +35,7 @@ from neuro_logging import (
     setup_zipkin,
     setup_zipkin_tracer,
 )
+from neuro_maintenance_checker import MaintenanceChecker, UnknownClusterError
 
 from .cache import PermissionsCache
 from .config import Config, CORSConfig, StorageMode
@@ -145,14 +148,22 @@ class StorageHandler:
     def _storage(self) -> Storage:
         return self._app["storage"]
 
+    @property
+    def _maintenance_checker(self) -> MaintenanceChecker:
+        return self._app["maintenance_checker"]
+
+    @property
+    def _cluster_name(self) -> str:
+        return self._app["cluster_name"]
+
     async def handle_put(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_put_operation(request)
         if operation == StorageOperation.CREATE:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, storage_path)
             return await self._handle_create(request, storage_path)
         elif operation == StorageOperation.MKDIRS:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, storage_path)
             return await self._handle_mkdirs(storage_path)
         raise ValueError(f"Illegal operation: {operation}")
@@ -160,7 +171,7 @@ class StorageHandler:
     async def handle_patch(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_patch_operation(request)
         if operation == StorageOperation.WRITE:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, storage_path)
             return await self._handle_write(request, storage_path)
         raise ValueError(f"Illegal operation: {operation}")
@@ -177,7 +188,7 @@ class StorageHandler:
         return response
 
     async def handle_head(self, request: web.Request) -> web.StreamResponse:
-        storage_path = self._get_fs_path_from_request(request)
+        storage_path = await self._get_fs_path_from_request(request)
         await self._check_user_permissions(request, storage_path)
         try:
             fstat = await self._storage.get_filestatus(storage_path)
@@ -193,11 +204,11 @@ class StorageHandler:
     async def handle_get(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_get_operation(request)
         if operation == StorageOperation.OPEN:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, storage_path)
             return await self._handle_open(request, storage_path)
         elif operation == StorageOperation.LISTSTATUS:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             tree = await self._permission_checker.get_user_permissions_tree(
                 request, storage_path
             )
@@ -206,25 +217,25 @@ class StorageHandler:
             else:
                 return await self._handle_liststatus(storage_path, tree)
         elif operation == StorageOperation.GETFILESTATUS:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             action = await self._permission_checker.get_user_permissions(
                 request, storage_path
             )
             return await self._handle_getfilestatus(storage_path, action)
         elif operation == StorageOperation.GETDISKUSAGE:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             await self._check_user_permissions(
                 request, storage_path, AuthAction.READ.value
             )
             return await self._handle_getdiskusage(storage_path)
         elif operation == StorageOperation.WEBSOCKET:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             tree = await self._permission_checker.get_user_permissions_tree(
                 request, storage_path
             )
             return await self._handle_websocket(request, storage_path, tree)
         elif operation == StorageOperation.WEBSOCKET_READ:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             await self._check_user_permissions(
                 request, storage_path, action=AuthAction.READ.value
             )
@@ -234,7 +245,7 @@ class StorageHandler:
                 ClientAccessSubTreeView(action=AuthAction.READ.value, children={}),
             )
         elif operation == StorageOperation.WEBSOCKET_WRITE:
-            storage_path = self._get_fs_path_from_request(request)
+            storage_path = await self._get_fs_path_from_request(request)
             await self._check_user_permissions(
                 request, storage_path, action=AuthAction.WRITE.value
             )
@@ -248,7 +259,7 @@ class StorageHandler:
     async def handle_delete(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_delete_operation(request)
         if operation == StorageOperation.DELETE:
-            storage_path: PurePath = self._get_fs_path_from_request(request)
+            storage_path: PurePath = await self._get_fs_path_from_request(request)
             # Microoptimization: non-existing items return 404 regardless of
             # object permissions,
             # no need to wait for user permission checks.
@@ -264,14 +275,40 @@ class StorageHandler:
     async def handle_post(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_post_operation(request)
         if operation == StorageOperation.RENAME:
-            storage_path: PurePath = self._get_fs_path_from_request(request)
+            storage_path: PurePath = await self._get_fs_path_from_request(request)
             await self._check_user_permissions(request, storage_path)
             return await self._handle_rename(storage_path, request)
         raise ValueError(f"Illegal operation: {operation}")
 
-    def _get_fs_path_from_request(self, request: web.Request) -> PurePath:
+    async def _check_path_for_maintenance(self, path: PurePath) -> None:
+        if len(path.parts) > 1:
+            org_name = path.parts[1]
+        else:
+            org_name = None
+        try:
+            await self._maintenance_checker.check_for_maintenance(
+                self._cluster_name, org_name
+            )
+        except UnknownClusterError:
+            # This is either user dir and not an org,
+            # or org was just created. In second case
+            # we rely on platform-admin not to create
+            # users before storage is ready
+            #
+            # Let check that main storage is available:
+            if org_name:
+                try:
+                    await self._maintenance_checker.check_for_maintenance(
+                        self._cluster_name, None
+                    )
+                except UnknownClusterError:
+                    pass
+
+    async def _get_fs_path_from_request(self, request: web.Request) -> PurePath:
         user_provided_path = request.match_info.get("path", "")
-        return self._storage.sanitize_path(user_provided_path)
+        path = self._storage.sanitize_path(user_provided_path)
+        await self._check_path_for_maintenance(path)
+        return path
 
     async def _handle_create(
         self, request: web.Request, storage_path: PurePath
@@ -887,11 +924,31 @@ async def create_app(config: Config) -> web.Application:
                 )
             )
 
+            admin_client = await exit_stack.enter_async_context(
+                AdminClient(
+                    base_url=config.admin.server_endpoint_url,
+                    service_token=config.admin.service_token,
+                )
+            )
+
+            config_client = await exit_stack.enter_async_context(
+                ConfigClient(
+                    url=config.platform_config.server_endpoint_url,
+                    token=config.platform_config.service_token,
+                )
+            )
+
+            maintenance_checker = MaintenanceChecker(admin_client, config_client)
+
+            await exit_stack.enter_async_context(maintenance_checker.run_poller())
+
             await setup_security(
                 app=app, auth_client=auth_client, auth_scheme=AuthScheme.BEARER
             )
 
             app["api_v1"]["auth_client"] = auth_client
+            app["api_v1"]["maintenance_checker"] = maintenance_checker
+            app["api_v1"]["cluster_name"] = config.cluster_name
 
             logger.info(
                 f"Auth Client for Storage API Initialized. "

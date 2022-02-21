@@ -41,6 +41,18 @@ class AuthConfig:
     service_token: str = field(repr=False)
 
 
+@dataclass(frozen=True)
+class AdminConfig:
+    server_endpoint_url: URL
+    service_token: str = field(repr=False)
+
+
+@dataclass(frozen=True)
+class PlatformConfigConfig:
+    server_endpoint_url: URL
+    service_token: str = field(repr=False)
+
+
 class StorageMode(str, enum.Enum):
     SINGLE = "single"
     MULTIPLE = "multiple"
@@ -68,6 +80,8 @@ class Config:
     server: ServerConfig
     storage: StorageConfig
     auth: AuthConfig
+    admin: AdminConfig
+    platform_config: PlatformConfigConfig
     cors: CORSConfig
     cluster_name: str
     permission_expiration_interval_s: float = 0
@@ -122,6 +136,18 @@ class EnvironConfigFactory:
         token = self._environ["NP_STORAGE_AUTH_TOKEN"]
         return AuthConfig(server_endpoint_url=url, service_token=token)
 
+    def create_admin(self) -> AdminConfig:
+        url = self._get_url("NP_STORAGE_ADMIN_URL")
+        assert url
+        token = self._environ["NP_STORAGE_AUTH_TOKEN"]
+        return AdminConfig(server_endpoint_url=url, service_token=token)
+
+    def create_platform_config(self) -> PlatformConfigConfig:
+        url = self._get_url("NP_STORAGE_PLATFORM_CONFIG_URL")
+        assert url
+        token = self._environ["NP_STORAGE_AUTH_TOKEN"]
+        return PlatformConfigConfig(server_endpoint_url=url, service_token=token)
+
     def create_zipkin(self) -> Optional[ZipkinConfig]:
         if "NP_ZIPKIN_URL" not in self._environ:
             return None
@@ -157,6 +183,8 @@ class EnvironConfigFactory:
         server_config = self.create_server()
         storage_config = self.create_storage()
         auth_config = self.create_auth()
+        admin_config = self.create_admin()
+        platform_config_config = self.create_platform_config()
         zipkin_config = self.create_zipkin()
         sentry_config = self.create_sentry()
         cors_config = self.create_cors()
@@ -178,6 +206,8 @@ class EnvironConfigFactory:
             server=server_config,
             storage=storage_config,
             auth=auth_config,
+            admin=admin_config,
+            platform_config=platform_config_config,
             zipkin=zipkin_config,
             sentry=sentry_config,
             cors=cors_config,
