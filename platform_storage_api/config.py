@@ -43,7 +43,7 @@ class AuthConfig:
 
 @dataclass(frozen=True)
 class AdminConfig:
-    server_endpoint_url: URL
+    server_endpoint_url: Optional[URL]
     service_token: str = field(repr=False)
 
 
@@ -138,7 +138,6 @@ class EnvironConfigFactory:
 
     def create_admin(self) -> AdminConfig:
         url = self._get_url("NP_STORAGE_ADMIN_URL")
-        assert url
         token = self._environ["NP_STORAGE_AUTH_TOKEN"]
         return AdminConfig(server_endpoint_url=url, service_token=token)
 

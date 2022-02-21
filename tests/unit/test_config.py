@@ -101,7 +101,7 @@ class TestConfig:
             "NP_STORAGE_LOCAL_BASE_PATH": "/path/to/dir",
             "NP_STORAGE_AUTH_URL": "-",
             "NP_STORAGE_PLATFORM_CONFIG_URL": "http://config",
-            "NP_STORAGE_ADMIN_URL": "http://admin",
+            "NP_STORAGE_ADMIN_URL": "-",
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
             "NP_CLUSTER_NAME": "test-cluster",
         }
@@ -113,7 +113,7 @@ class TestConfig:
         assert config.storage.fs_local_thread_pool_size == 100
         assert config.auth.server_endpoint_url is None
         assert config.auth.service_token == "hello-token"
-        assert config.admin.server_endpoint_url == URL("http://admin")
+        assert config.admin.server_endpoint_url is None
         assert config.admin.service_token == "hello-token"
         assert config.platform_config.server_endpoint_url == URL("http://config")
         assert config.platform_config.service_token == "hello-token"
