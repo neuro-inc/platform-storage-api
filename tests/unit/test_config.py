@@ -100,6 +100,8 @@ class TestConfig:
         environ = {
             "NP_STORAGE_LOCAL_BASE_PATH": "/path/to/dir",
             "NP_STORAGE_AUTH_URL": "-",
+            "NP_STORAGE_PLATFORM_CONFIG_URL": "http://config",
+            "NP_STORAGE_ADMIN_URL": "http://admin",
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
             "NP_CLUSTER_NAME": "test-cluster",
         }
@@ -111,6 +113,10 @@ class TestConfig:
         assert config.storage.fs_local_thread_pool_size == 100
         assert config.auth.server_endpoint_url is None
         assert config.auth.service_token == "hello-token"
+        assert config.admin.server_endpoint_url == URL("http://admin")
+        assert config.admin.service_token == "hello-token"
+        assert config.platform_config.server_endpoint_url == URL("http://config")
+        assert config.platform_config.service_token == "hello-token"
         assert config.zipkin is None
         assert config.sentry is None
         assert config.cluster_name == "test-cluster"
@@ -123,6 +129,8 @@ class TestConfig:
             "NP_STORAGE_LOCAL_THREAD_POOL_SIZE": "123",
             "NP_STORAGE_AUTH_URL": "http://127.0.0.1/",
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
+            "NP_STORAGE_PLATFORM_CONFIG_URL": "http://config",
+            "NP_STORAGE_ADMIN_URL": "http://admin",
             "NP_CLUSTER_NAME": "test-cluster",
             "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT": "900",
             "NP_CORS_ORIGINS": "https://domain1.com,http://do.main",
@@ -137,6 +145,10 @@ class TestConfig:
         assert config.storage.fs_local_thread_pool_size == 123
         assert config.auth.server_endpoint_url == URL("http://127.0.0.1/")
         assert config.auth.service_token == "hello-token"
+        assert config.admin.server_endpoint_url == URL("http://admin")
+        assert config.admin.service_token == "hello-token"
+        assert config.platform_config.server_endpoint_url == URL("http://config")
+        assert config.platform_config.service_token == "hello-token"
         assert config.zipkin
         assert config.zipkin.url == URL("https://zipkin.io:9411/")
         assert config.sentry
