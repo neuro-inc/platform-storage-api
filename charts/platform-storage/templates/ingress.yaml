@@ -1,22 +1,40 @@
 {{- if .Values.ingress.enabled }}
-apiVersion: networking.k8s.io/v1beta1
+{{- $ingressApiIsStable := eq (include "k8s.ingress.isStable" .) "true" -}}
+apiVersion: {{ include "k8s.ingress.apiVersion" . }}
 kind: Ingress
 metadata:
   name: {{ include "platformStorage.fullname" . }}
   labels: {{ include "platformStorage.labels.standard" . | nindent 4 }}
     service: platform-storage
+  annotations:
+    {{- if and (not $ingressApiIsStable) .Values.ingress.ingressClassName }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.ingressClassName }}
+    {{- end }}
 {{- with .Values.ingress.annotations }}
-  annotations: {{ toYaml . | nindent 4 }}
+{{ toYaml . | indent 4 }}
 {{- end }}
 spec:
+  {{- if and $ingressApiIsStable .Values.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- end }}
   rules:
   {{- range .Values.ingress.hosts }}
   - host: {{ . | quote }}
     http:
       paths:
       - path: /api/v1/storage
+        {{- if $ingressApiIsStable }}
+        pathType: Prefix
+        {{- end }}
         backend:
+          {{- if $ingressApiIsStable }}
+          service:
+            name: {{ include "platformStorage.fullname" $ }}
+            port:
+              name: http
+          {{- else }}
           serviceName: {{ include "platformStorage.fullname" $ }}
           servicePort: http
+          {{- end }}
   {{- end }}
 {{- end }}
