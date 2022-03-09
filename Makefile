@@ -20,6 +20,8 @@ HELM_APP_VERSION   ?= 1.0.0
 
 export IMAGE_REPO_BASE
 
+PLATFORMAUTHAPI_IMAGE = $(shell cat AUTH_SERVER_IMAGE_NAME)
+
 setup:
 	pip install -U pip
 	pip install -e .[dev]
@@ -53,3 +55,7 @@ docker_build:
 	pip install -U build
 	python -m build
 	docker build -t $(IMAGE_NAME):latest .
+
+docker_pull_test_images:
+	docker pull $(PLATFORMAUTHAPI_IMAGE)
+	docker tag $(PLATFORMAUTHAPI_IMAGE) platformauthapi:latest

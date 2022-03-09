@@ -54,15 +54,14 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ github.token }}
-    - name: Pull auth image
-      run: |
-        docker pull ghcr.io/neuro-inc/platformauthapi:latest
     - name: Lint
       run: |
         echo "::add-matcher::.github/actionlint-matcher.json"
         make lint
     - name: Run unit tests
       run: make test_unit
+    - name: Pull test images
+      run: make docker_pull_test_images
     - name: Run integration tests
       run: make test_integration
     - name: Build Docker image
