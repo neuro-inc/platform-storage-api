@@ -48,6 +48,12 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
     - name: Login to AWS ECR
       uses: aws-actions/amazon-ecr-login@v1
+    - name: Login to ghcr.io
+      uses: docker/login-action@v1.12.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     - name: Lint
       run: |
         echo "::add-matcher::.github/actionlint-matcher.json"
