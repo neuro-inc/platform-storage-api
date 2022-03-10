@@ -1747,12 +1747,13 @@ class TestRename:
 
 
 class TestMultiStorage:
-    async def test_put_main_storage(
+    async def test_put_cluster_storage(
         self,
         multi_storage_config: Config,
         multi_storage_server_url: str,
         client: aiohttp.ClientSession,
         regular_user_factory: _UserFactory,
+        cluster_name: str,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -1766,7 +1767,7 @@ class TestMultiStorage:
 
         assert Path(
             multi_storage_config.storage.fs_local_base_path,
-            "main",
+            cluster_name,
             dir_path,
             file_name,
         ).exists()
@@ -1785,7 +1786,9 @@ class TestMultiStorage:
         file_name = "file.txt"
         url = f"{dir_url}/{file_name}"
 
-        Path(multi_storage_config.storage.fs_local_base_path, "org").mkdir()
+        Path(multi_storage_config.storage.fs_local_base_path, "org").mkdir(
+            exist_ok=True
+        )
 
         async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == 201

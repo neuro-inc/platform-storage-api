@@ -197,6 +197,7 @@ async def regular_user_factory(
         headers = auth_client._generate_headers(admin_token)
         payload = [
             {"uri": f"storage://{cluster_name}/{name}", "action": "manage"},
+            {"uri": f"storage://{cluster_name}/org", "action": "manage"},
         ]
         async with auth_client._request(
             "POST", f"/api/v1/users/{name}/permissions", headers=headers, json=payload
