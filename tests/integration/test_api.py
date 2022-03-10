@@ -1780,23 +1780,19 @@ class TestMultiStorage:
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
-        dir_path = f"{user.name}/path/to"
+        dir_path = f"org/dir"
         dir_url = f"{multi_storage_server_url}/{dir_path}"
         file_name = "file.txt"
         url = f"{dir_url}/{file_name}"
 
-        Path(
-            multi_storage_config.storage.fs_local_base_path,
-            "extra",
-            user.name,
-        ).mkdir(parents=True)
+        Path(multi_storage_config.storage.fs_local_base_path, "org").mkdir()
 
         async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == 201
 
         assert Path(
             multi_storage_config.storage.fs_local_base_path,
-            "extra",
+            "org",
             dir_path,
             file_name,
         ).exists()
