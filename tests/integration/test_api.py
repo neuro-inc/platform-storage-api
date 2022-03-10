@@ -1791,8 +1791,5 @@ class TestMultiStorage:
             assert response.status == 201
 
         assert Path(
-            multi_storage_config.storage.fs_local_base_path,
-            "org",
-            dir_path,
-            file_name,
+            multi_storage_config.storage.fs_local_base_path, dir_path, file_name
         ).exists()
