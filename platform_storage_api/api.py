@@ -909,7 +909,9 @@ async def create_app(config: Config) -> web.Application:
                 )
             else:
                 path_resolver = MultipleStoragePathResolver(
-                    fs, config.storage.fs_local_base_path
+                    fs,
+                    config.storage.fs_local_base_path,
+                    config.storage.fs_local_base_path / config.cluster_name,
                 )
             storage = Storage(path_resolver, fs)
             app["api_v1"]["storage"] = storage

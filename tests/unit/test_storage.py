@@ -26,20 +26,22 @@ class TestMultipleStoragePathResolver:
     async def test_resolve_base_path(
         self, local_fs: FileSystem, local_tmp_dir_path: Path
     ) -> None:
-        resolver = MultipleStoragePathResolver(local_fs, local_tmp_dir_path)
+        resolver = MultipleStoragePathResolver(
+            local_fs, local_tmp_dir_path, local_tmp_dir_path / "default"
+        )
 
         path = await resolver.resolve_base_path()
-        assert path == local_tmp_dir_path / "main"
+        assert path == local_tmp_dir_path
 
         path = await resolver.resolve_base_path(PurePath("/"))
-        assert path == local_tmp_dir_path / "main"
+        assert path == local_tmp_dir_path
 
-        path = await resolver.resolve_base_path(PurePath("/dir"))
-        assert path == local_tmp_dir_path / "main"
+        path = await resolver.resolve_base_path(PurePath("/user"))
+        assert path == local_tmp_dir_path / "default"
 
-        await local_fs.mkdir(local_tmp_dir_path / "extra/isolated")
-        path = await resolver.resolve_base_path(PurePath("/isolated/dir"))
-        assert path == local_tmp_dir_path / "extra"
+        await local_fs.mkdir(local_tmp_dir_path / "org")
+        path = await resolver.resolve_base_path(PurePath("/org/dir"))
+        assert path == local_tmp_dir_path
 
 
 class TestStorage:

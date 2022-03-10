@@ -96,9 +96,9 @@ spec:
         {{- range $index, $storage := .Values.storages }}
         - name: storage-{{ $index }}
           {{- if $storage.path }}
-          mountPath: /var/storage/extra{{ $storage.path }}
+          mountPath: /var/storage{{ $storage.path }}
           {{- else }}
-          mountPath: /var/storage/main
+          mountPath: /var/storage/{{ $.Values.platform.clusterName }}
           {{- end }}
         {{- end }}
         {{- else }}
@@ -107,7 +107,7 @@ spec:
         {{- end }}
         {{- end }}
       {{- if .Values.imagePullSecrets }}
-      imagePullSecrets: {{ .toYaml .Values.imagePullSecrets | nindent 8 }}
+      imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 8 }}
       {{- end }}
       {{- if .Values.storages }}
       volumes:
