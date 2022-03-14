@@ -41,7 +41,7 @@ test_unit:
 	pytest -vv tests/unit
 
 test_integration:
-	pytest -vv tests/integration
+	pytest -vv --maxfail=1 tests/integration
 
 run:
 	docker run -it --rm --name platformstorageapi \
