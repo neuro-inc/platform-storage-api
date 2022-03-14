@@ -24,6 +24,8 @@ async def mock_config_server() -> MockConfigServer:
     server.clusters = [
         {
             "name": "cluster-on-maintenance",
+            "status": "deployed",
+            "created_at": "2022-03-14T11:22:59.869249",
             "cloud_provider": {
                 "type": "AWS",
                 "region": "us-east-1",
@@ -44,6 +46,8 @@ async def mock_config_server() -> MockConfigServer:
         },
         {
             "name": "cluster-with-org-on-maintenance",
+            "status": "deployed",
+            "created_at": "2022-03-14T11:22:59.869249",
             "cloud_provider": {
                 "type": "AWS",
                 "region": "us-east-1",

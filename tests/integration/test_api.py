@@ -17,7 +17,7 @@ import pytest_asyncio
 from platform_storage_api.config import Config
 from platform_storage_api.fs.local import FileStatusType
 
-from .auth import _User, _UserFactory
+from tests.integration.auth import _User, _UserFactory
 from tests.integration.conftest import (
     ApiConfig,
     get_filestatus_dict,
