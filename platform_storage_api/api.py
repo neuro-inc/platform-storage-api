@@ -291,9 +291,9 @@ class StorageHandler:
             )
         except UnknownClusterError:
             # This is either user dir and not an org,
-            # or org was just created. In second case
-            # we rely on platform-admin not to create
-            # users before storage is ready
+            # or org is not created yet. In second case
+            # only cluster level admin can access such folder,
+            # so it is OK.
             #
             # Let check that main storage is available:
             if org_name:
