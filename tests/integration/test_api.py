@@ -1831,7 +1831,6 @@ class TestMaintenanceCheckerIntegration:
         client: aiohttp.ClientSession,
         regular_user_factory: _UserFactory,
     ) -> None:
-        raise ValueError("foo")
         user = await regular_user_factory(
             override_cluster_name=on_maintenance_org_cluster_name
         )
@@ -1853,7 +1852,6 @@ class TestMaintenanceCheckerIntegration:
         client: aiohttp.ClientSession,
         regular_user_factory: _UserFactory,
     ) -> None:
-        raise ValueError("foo")
         user = await regular_user_factory(
             override_cluster_name=on_maintenance_org_cluster_name
         )
