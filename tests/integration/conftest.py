@@ -199,7 +199,7 @@ async def on_maintenance_org_cluster_api(
     on_maintenance_cluster_config: Config,
 ) -> AsyncIterator[ApiConfig]:
     app = await create_app(on_maintenance_cluster_config)
-    runner = ApiRunner(app, 8084)
+    runner = ApiRunner(app, 8097)
     api_address = await runner.run()
     yield ApiConfig(api_address.host, api_address.port)
     await runner.close()
