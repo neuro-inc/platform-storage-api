@@ -18,7 +18,7 @@ from platform_storage_api.config import Config
 from platform_storage_api.fs.local import FileStatusType
 
 from .auth import _User, _UserFactory
-from tests.integration.conftest import (
+from .conftest import (
     ApiConfig,
     get_filestatus_dict,
     get_liststatus_dict,
@@ -1747,12 +1747,13 @@ class TestRename:
 
 
 class TestMultiStorage:
-    async def test_put_main_storage(
+    async def test_put_cluster_storage(
         self,
         multi_storage_config: Config,
         multi_storage_server_url: str,
         client: aiohttp.ClientSession,
         regular_user_factory: _UserFactory,
+        cluster_name: str,
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
@@ -1766,7 +1767,7 @@ class TestMultiStorage:
 
         assert Path(
             multi_storage_config.storage.fs_local_base_path,
-            "main",
+            cluster_name,
             dir_path,
             file_name,
         ).exists()
@@ -1780,23 +1781,18 @@ class TestMultiStorage:
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
-        dir_path = f"{user.name}/path/to"
+        dir_path = f"org/dir"
         dir_url = f"{multi_storage_server_url}/{dir_path}"
         file_name = "file.txt"
         url = f"{dir_url}/{file_name}"
 
-        Path(
-            multi_storage_config.storage.fs_local_base_path,
-            "extra",
-            user.name,
-        ).mkdir(parents=True)
+        Path(multi_storage_config.storage.fs_local_base_path, "org").mkdir(
+            exist_ok=True
+        )
 
         async with client.put(url, headers=headers, data=b"test") as response:
             assert response.status == 201
 
         assert Path(
-            multi_storage_config.storage.fs_local_base_path,
-            "extra",
-            dir_path,
-            file_name,
+            multi_storage_config.storage.fs_local_base_path, dir_path, file_name
         ).exists()

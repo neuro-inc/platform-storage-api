@@ -31,17 +31,23 @@ class SingleStoragePathResolver(StoragePathResolver):
 
 
 class MultipleStoragePathResolver(StoragePathResolver):
-    def __init__(self, fs: FileSystem, base_path: Union[PurePath, str]) -> None:
+    def __init__(
+        self,
+        fs: FileSystem,
+        base_path: Union[PurePath, str],
+        default_path: Union[PurePath, str],
+    ) -> None:
         self._fs = fs
         self._base_path = PurePath(base_path)
+        self._default_path = PurePath(default_path)
 
     async def resolve_base_path(self, path: Optional[PurePath] = None) -> PurePath:
         if path is None or path == PurePath("/"):
-            return PurePath(self._base_path, "main")
-        isolated_folder = Path(self._base_path, "extra", path.relative_to("/").parts[0])
-        if await self._fs.exists(isolated_folder):
-            return Path(self._base_path, "extra")
-        return PurePath(self._base_path, "main")
+            return self._base_path
+        storage_folder = Path(self._base_path, path.relative_to("/").parts[0])
+        if await self._fs.exists(storage_folder):
+            return self._base_path
+        return self._default_path
 
 
 class Storage:

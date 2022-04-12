@@ -69,8 +69,9 @@ def config(admin_token: str, cluster_name: str, auth_config: AuthConfig) -> Conf
 @pytest.fixture
 def multi_storage_config(config: Config) -> Config:
     config = replace(config, storage=replace(config.storage, mode=StorageMode.MULTIPLE))
-    Path(config.storage.fs_local_base_path, "main").mkdir(parents=True, exist_ok=True)
-    Path(config.storage.fs_local_base_path, "extra").mkdir(parents=True, exist_ok=True)
+    Path(config.storage.fs_local_base_path, config.cluster_name).mkdir(
+        parents=True, exist_ok=True
+    )
     return config
 
 
