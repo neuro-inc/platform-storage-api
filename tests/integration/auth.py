@@ -188,7 +188,7 @@ async def regular_user_factory(
     admin_token: str,
     cluster_name: str,
 ) -> _UserFactory:
-    async def _factory(name: None | str = None) -> _User:
+    async def _factory(name: str | None = None) -> _User:
         if not name:
             name = str(uuid.uuid4())
         user = User(name=name, clusters=[Cluster(name=cluster_name)])
