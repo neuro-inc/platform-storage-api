@@ -15,7 +15,7 @@ from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
 from jose import jwt
-from neuro_auth_client import AuthClient, Cluster, User
+from neuro_auth_client import AuthClient, User
 from yarl import URL
 
 from platform_storage_api.config import AuthConfig
@@ -191,7 +191,7 @@ async def regular_user_factory(
     async def _factory(name: str | None = None) -> _User:
         if not name:
             name = str(uuid.uuid4())
-        user = User(name=name, clusters=[Cluster(name=cluster_name)])
+        user = User(name=name)
         await auth_client.add_user(user)
         # Grant permissions to the user home directory
         headers = auth_client._generate_headers(admin_token)
