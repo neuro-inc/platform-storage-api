@@ -1,9 +1,10 @@
 import asyncio
 import collections
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import PurePath
-from typing import Callable, Optional
+from typing import Optional
 
 from aiohttp import web
 from aiohttp_security.api import IDENTITY_KEY
