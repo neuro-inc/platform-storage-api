@@ -79,7 +79,7 @@ class TestStorageListAndResourceSharing:
         ) as response:
             assert response.status == 200
             assert response.headers["Content-Type"] == "application/x-ndjson"
-            resp_text = await response.text()
+            resp_text = await response.text("utf-8")
             assert user1.name not in resp_text
             assert user2.name in resp_text
 
