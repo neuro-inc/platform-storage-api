@@ -14,6 +14,7 @@ from pathlib import PurePath
 from typing import Any, Optional
 
 import aiohttp
+import aiohttp.web
 import cbor
 import uvloop
 from aiohttp import web
@@ -58,6 +59,12 @@ logger = logging.getLogger(__name__)
 
 MAX_WS_READ_SIZE = 16 * 2**20  # 16 MiB
 MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2**16 + 100
+
+
+API_V1_KEY = aiohttp.web.AppKey("api_v1", aiohttp.web.Application)
+CONFIG_KEY = aiohttp.web.AppKey("config", Config)
+AUTH_CLIENT_KEY = aiohttp.web.AppKey("auth_client", AuthClient)
+STORAGE_KEY = aiohttp.web.AppKey("storage", Storage)
 
 
 class ApiHandler:
@@ -135,7 +142,7 @@ class StorageHandler:
 
     @property
     def _storage(self) -> Storage:
-        return self._app["storage"]
+        return self._app[STORAGE_KEY]
 
     async def handle_put(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_put_operation(request)
@@ -847,7 +854,7 @@ async def create_app(config: Config) -> web.Application:
         middlewares=[handle_exceptions],
         handler_args=dict(keepalive_timeout=config.server.keep_alive_timeout_s),
     )
-    app["config"] = config
+    app[CONFIG_KEY] = config
 
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
@@ -865,7 +872,7 @@ async def create_app(config: Config) -> web.Application:
                 app=app, auth_client=auth_client, auth_scheme=AuthScheme.BEARER
             )
 
-            app["api_v1"]["auth_client"] = auth_client
+            app[API_V1_KEY][AUTH_CLIENT_KEY] = auth_client
 
             logger.info(
                 f"Auth Client for Storage API Initialized. "
@@ -888,7 +895,7 @@ async def create_app(config: Config) -> web.Application:
                     config.storage.fs_local_base_path / config.cluster_name,
                 )
             storage = Storage(path_resolver, fs)
-            app["api_v1"]["storage"] = storage
+            app[API_V1_KEY][STORAGE_KEY] = storage
 
             # TODO (Rafa Zubairov): configured service shall ensure that
             # pre-requisites are up and running
@@ -904,7 +911,7 @@ async def create_app(config: Config) -> web.Application:
     api_v1_app = web.Application()
     api_v1_handler = ApiHandler()
     probes_routes = api_v1_handler.register(api_v1_app)
-    app["api_v1"] = api_v1_app
+    app[API_V1_KEY] = api_v1_app
 
     storage_app = web.Application()
     storage_handler = StorageHandler(api_v1_app, config)
