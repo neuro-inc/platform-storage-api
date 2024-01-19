@@ -13,7 +13,6 @@ from platform_storage_api.api import create_app
 from platform_storage_api.config import (
     AuthConfig,
     Config,
-    CORSConfig,
     ServerConfig,
     StorageConfig,
     StorageMode,
@@ -61,7 +60,6 @@ def config(admin_token: str, cluster_name: str, auth_config: AuthConfig) -> Conf
         server=server_config,
         storage=storage_config,
         auth=auth_config,
-        cors=CORSConfig(allowed_origins=["http://localhost:8000"]),
         cluster_name=cluster_name,
     )
 

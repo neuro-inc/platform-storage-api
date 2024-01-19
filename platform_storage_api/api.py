@@ -14,13 +14,11 @@ from pathlib import PurePath
 from typing import Any, Optional
 
 import aiohttp
-import aiohttp_cors
 import cbor
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
 from aiohttp.web_urldispatcher import AbstractRoute
-from aiohttp_cors import CorsConfig
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
@@ -35,7 +33,7 @@ from neuro_logging import (
 )
 
 from .cache import PermissionsCache
-from .config import Config, CORSConfig, StorageMode
+from .config import Config, StorageMode
 from .fs.local import (
     DiskUsageInfo,
     FileStatus,
@@ -131,15 +129,9 @@ class StorageHandler:
                 forgetting_interval_s=config.permission_forgetting_interval_s,
             )
 
-    def register(self, app: web.Application, cors: CorsConfig) -> None:
+    def register(self, app: web.Application) -> None:
         # TODO (A Danshyn 04/23/18): add some unit test for path matching
-        path_resource = app.router.add_resource(r"/{path:.*}")
-        cors.add(path_resource.add_route("PUT", self.handle_put))
-        cors.add(path_resource.add_route("POST", self.handle_post))
-        cors.add(path_resource.add_route("HEAD", self.handle_head))
-        cors.add(path_resource.add_route("GET", self.handle_get))
-        cors.add(path_resource.add_route("DELETE", self.handle_delete))
-        cors.add(path_resource.add_route("PATCH", self.handle_patch))
+        app.router.add_resource(r"/{path:.*}")
 
     @property
     def _storage(self) -> Storage:
@@ -831,22 +823,6 @@ def _get_bool_param(request: Request, name: str, default: bool = False) -> bool:
     raise ValueError(f'"{name}" request parameter can be "true"/"1" or "false"/"0"')
 
 
-def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> CorsConfig:
-    if not config.allowed_origins:
-        return aiohttp_cors.setup(app)
-
-    logger.info(f"Setting up CORS with allowed origins: {config.allowed_origins}")
-    default_options = aiohttp_cors.ResourceOptions(
-        allow_credentials=True,
-        expose_headers="*",
-        allow_headers="*",
-    )
-    cors = aiohttp_cors.setup(
-        app, defaults={origin: default_options for origin in config.allowed_origins}
-    )
-    return cors
-
-
 package_version = version(__package__)
 
 
@@ -872,8 +848,6 @@ async def create_app(config: Config) -> web.Application:
         handler_args=dict(keepalive_timeout=config.server.keep_alive_timeout_s),
     )
     app["config"] = config
-
-    cors = _setup_cors(app, config.cors)
 
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
@@ -934,7 +908,7 @@ async def create_app(config: Config) -> web.Application:
 
     storage_app = web.Application()
     storage_handler = StorageHandler(api_v1_app, config)
-    storage_handler.register(storage_app, cors)
+    storage_handler.register(storage_app)
 
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)

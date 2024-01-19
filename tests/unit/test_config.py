@@ -114,7 +114,6 @@ class TestConfig:
         assert config.zipkin is None
         assert config.sentry is None
         assert config.cluster_name == "test-cluster"
-        assert config.cors.allowed_origins == ()
 
     def test_from_environ_custom(self) -> None:
         environ = {
@@ -125,7 +124,6 @@ class TestConfig:
             "NP_STORAGE_AUTH_TOKEN": "hello-token",
             "NP_CLUSTER_NAME": "test-cluster",
             "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT": "900",
-            "NP_CORS_ORIGINS": "https://domain1.com,http://do.main",
             "NP_ZIPKIN_URL": "https://zipkin.io:9411/",
             "NP_SENTRY_DSN": "https://sentry",
             "NP_SENTRY_CLUSTER_NAME": "test",
@@ -143,4 +141,3 @@ class TestConfig:
         assert config.sentry.dsn == URL("https://sentry")
         assert config.sentry.cluster_name == "test"
         assert config.cluster_name == "test-cluster"
-        assert config.cors.allowed_origins == ["https://domain1.com", "http://do.main"]

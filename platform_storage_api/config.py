@@ -1,6 +1,5 @@
 import enum
 import os
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import PurePath
 from typing import Optional
@@ -59,16 +58,10 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
-class CORSConfig:
-    allowed_origins: Sequence[str] = ()
-
-
-@dataclass(frozen=True)
 class Config:
     server: ServerConfig
     storage: StorageConfig
     auth: AuthConfig
-    cors: CORSConfig
     cluster_name: str
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
@@ -146,20 +139,12 @@ class EnvironConfigFactory:
             ),
         )
 
-    def create_cors(self) -> CORSConfig:
-        origins: Sequence[str] = CORSConfig.allowed_origins
-        origins_str = self._environ.get("NP_CORS_ORIGINS", "").strip()
-        if origins_str:
-            origins = origins_str.split(",")
-        return CORSConfig(allowed_origins=origins)
-
     def create(self) -> Config:
         server_config = self.create_server()
         storage_config = self.create_storage()
         auth_config = self.create_auth()
         zipkin_config = self.create_zipkin()
         sentry_config = self.create_sentry()
-        cors_config = self.create_cors()
         cluster_name = self._environ["NP_CLUSTER_NAME"]
         assert cluster_name
         permission_expiration_interval_s: float = float(
@@ -180,7 +165,6 @@ class EnvironConfigFactory:
             auth=auth_config,
             zipkin=zipkin_config,
             sentry=sentry_config,
-            cors=cors_config,
             cluster_name=cluster_name,
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
