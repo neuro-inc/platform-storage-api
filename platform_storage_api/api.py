@@ -42,7 +42,12 @@ from .fs.local import (
     FileStatusType,
     LocalFileSystem,
 )
-from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
+from .security import (
+    AUTH_CLIENT_KEY,
+    AbstractPermissionChecker,
+    AuthAction,
+    PermissionChecker,
+)
 from .storage import (
     MultipleStoragePathResolver,
     SingleStoragePathResolver,
@@ -63,7 +68,6 @@ MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2**16 + 100
 
 API_V1_KEY = aiohttp.web.AppKey("api_v1", aiohttp.web.Application)
 CONFIG_KEY = aiohttp.web.AppKey("config", Config)
-AUTH_CLIENT_KEY = aiohttp.web.AppKey("auth_client", AuthClient)
 STORAGE_KEY = aiohttp.web.AppKey("storage", Storage)
 
 
@@ -138,7 +142,13 @@ class StorageHandler:
 
     def register(self, app: web.Application) -> None:
         # TODO (A Danshyn 04/23/18): add some unit test for path matching
-        app.router.add_resource(r"/{path:.*}")
+        path_resource = app.router.add_resource(r"/{path:.*}")
+        path_resource.add_route("PUT", self.handle_put)
+        path_resource.add_route("POST", self.handle_post)
+        path_resource.add_route("HEAD", self.handle_head)
+        path_resource.add_route("GET", self.handle_get)
+        path_resource.add_route("DELETE", self.handle_delete)
+        path_resource.add_route("PATCH", self.handle_patch)
 
     @property
     def _storage(self) -> Storage:
