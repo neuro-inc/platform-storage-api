@@ -354,7 +354,7 @@ class LocalFileSystem(FileSystem):
     ) -> AsyncIterator[list[Any]]:
         done = False
         while not done:
-            chunk = await self._loop.run_in_executor(
+            chunk: list[Any] = await self._loop.run_in_executor(
                 self._executor, list, islice(it, 0, chunk_size)
             )
             if not chunk:

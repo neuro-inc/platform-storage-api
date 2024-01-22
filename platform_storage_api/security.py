@@ -13,6 +13,8 @@ from .config import Config
 
 logger = logging.getLogger(__name__)
 
+AUTH_CLIENT_KEY = web.AppKey("auth_client", AuthClient)
+
 
 class AuthAction(str, Enum):
     DENY = "deny"
@@ -95,4 +97,4 @@ class PermissionChecker(AbstractPermissionChecker):
         return user_name
 
     def _get_auth_client(self) -> AuthClient:
-        return self._app["auth_client"]
+        return self._app[AUTH_CLIENT_KEY]

@@ -14,13 +14,12 @@ from pathlib import PurePath
 from typing import Any, Optional
 
 import aiohttp
-import aiohttp_cors
+import aiohttp.web
 import cbor
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
 from aiohttp.web_urldispatcher import AbstractRoute
-from aiohttp_cors import CorsConfig
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
@@ -35,7 +34,7 @@ from neuro_logging import (
 )
 
 from .cache import PermissionsCache
-from .config import Config, CORSConfig, StorageMode
+from .config import Config, StorageMode
 from .fs.local import (
     DiskUsageInfo,
     FileStatus,
@@ -43,7 +42,12 @@ from .fs.local import (
     FileStatusType,
     LocalFileSystem,
 )
-from .security import AbstractPermissionChecker, AuthAction, PermissionChecker
+from .security import (
+    AUTH_CLIENT_KEY,
+    AbstractPermissionChecker,
+    AuthAction,
+    PermissionChecker,
+)
 from .storage import (
     MultipleStoragePathResolver,
     SingleStoragePathResolver,
@@ -60,6 +64,11 @@ logger = logging.getLogger(__name__)
 
 MAX_WS_READ_SIZE = 16 * 2**20  # 16 MiB
 MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2**16 + 100
+
+
+API_V1_KEY = aiohttp.web.AppKey("api_v1", aiohttp.web.Application)
+CONFIG_KEY = aiohttp.web.AppKey("config", Config)
+STORAGE_KEY = aiohttp.web.AppKey("storage", Storage)
 
 
 class ApiHandler:
@@ -131,19 +140,19 @@ class StorageHandler:
                 forgetting_interval_s=config.permission_forgetting_interval_s,
             )
 
-    def register(self, app: web.Application, cors: CorsConfig) -> None:
+    def register(self, app: web.Application) -> None:
         # TODO (A Danshyn 04/23/18): add some unit test for path matching
         path_resource = app.router.add_resource(r"/{path:.*}")
-        cors.add(path_resource.add_route("PUT", self.handle_put))
-        cors.add(path_resource.add_route("POST", self.handle_post))
-        cors.add(path_resource.add_route("HEAD", self.handle_head))
-        cors.add(path_resource.add_route("GET", self.handle_get))
-        cors.add(path_resource.add_route("DELETE", self.handle_delete))
-        cors.add(path_resource.add_route("PATCH", self.handle_patch))
+        path_resource.add_route("PUT", self.handle_put)
+        path_resource.add_route("POST", self.handle_post)
+        path_resource.add_route("HEAD", self.handle_head)
+        path_resource.add_route("GET", self.handle_get)
+        path_resource.add_route("DELETE", self.handle_delete)
+        path_resource.add_route("PATCH", self.handle_patch)
 
     @property
     def _storage(self) -> Storage:
-        return self._app["storage"]
+        return self._app[STORAGE_KEY]
 
     async def handle_put(self, request: web.Request) -> web.StreamResponse:
         operation = self._parse_put_operation(request)
@@ -831,22 +840,6 @@ def _get_bool_param(request: Request, name: str, default: bool = False) -> bool:
     raise ValueError(f'"{name}" request parameter can be "true"/"1" or "false"/"0"')
 
 
-def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> CorsConfig:
-    if not config.allowed_origins:
-        return aiohttp_cors.setup(app)
-
-    logger.info(f"Setting up CORS with allowed origins: {config.allowed_origins}")
-    default_options = aiohttp_cors.ResourceOptions(
-        allow_credentials=True,
-        expose_headers="*",
-        allow_headers="*",
-    )
-    cors = aiohttp_cors.setup(
-        app, defaults={origin: default_options for origin in config.allowed_origins}
-    )
-    return cors
-
-
 package_version = version(__package__)
 
 
@@ -871,9 +864,7 @@ async def create_app(config: Config) -> web.Application:
         middlewares=[handle_exceptions],
         handler_args=dict(keepalive_timeout=config.server.keep_alive_timeout_s),
     )
-    app["config"] = config
-
-    cors = _setup_cors(app, config.cors)
+    app[CONFIG_KEY] = config
 
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
@@ -891,7 +882,7 @@ async def create_app(config: Config) -> web.Application:
                 app=app, auth_client=auth_client, auth_scheme=AuthScheme.BEARER
             )
 
-            app["api_v1"]["auth_client"] = auth_client
+            app[API_V1_KEY][AUTH_CLIENT_KEY] = auth_client
 
             logger.info(
                 f"Auth Client for Storage API Initialized. "
@@ -914,7 +905,7 @@ async def create_app(config: Config) -> web.Application:
                     config.storage.fs_local_base_path / config.cluster_name,
                 )
             storage = Storage(path_resolver, fs)
-            app["api_v1"]["storage"] = storage
+            app[API_V1_KEY][STORAGE_KEY] = storage
 
             # TODO (Rafa Zubairov): configured service shall ensure that
             # pre-requisites are up and running
@@ -930,11 +921,11 @@ async def create_app(config: Config) -> web.Application:
     api_v1_app = web.Application()
     api_v1_handler = ApiHandler()
     probes_routes = api_v1_handler.register(api_v1_app)
-    app["api_v1"] = api_v1_app
+    app[API_V1_KEY] = api_v1_app
 
     storage_app = web.Application()
     storage_handler = StorageHandler(api_v1_app, config)
-    storage_handler.register(storage_app, cors)
+    storage_handler.register(storage_app)
 
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)
