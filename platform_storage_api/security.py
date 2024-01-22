@@ -7,7 +7,6 @@ from aiohttp import web
 from aiohttp_security import check_authorized, check_permission
 from neuro_auth_client import AuthClient, Permission
 from neuro_auth_client.client import ClientAccessSubTreeView
-from neuro_logging import trace
 from yarl import URL
 
 from .config import Config
@@ -56,7 +55,6 @@ class PermissionChecker(AbstractPermissionChecker):
             )
         )
 
-    @trace
     async def get_user_permissions_tree(
         self, request: web.Request, target_path: PurePath
     ) -> ClientAccessSubTreeView:
@@ -68,7 +66,6 @@ class PermissionChecker(AbstractPermissionChecker):
             raise web.HTTPNotFound
         return tree.sub_tree
 
-    @trace
     async def check_user_permissions(
         self, request: web.Request, target_path: PurePath, action: str
     ) -> None:
