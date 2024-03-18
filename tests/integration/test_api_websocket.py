@@ -12,13 +12,13 @@ import cbor
 
 from platform_storage_api.api import WSStorageOperation
 from platform_storage_api.fs.local import FileStatusType
-
-from .auth import _User, _UserFactory
 from tests.integration.conftest import (
     ApiConfig,
     get_filestatus_dict,
     get_liststatus_dict,
 )
+
+from .auth import _User, _UserFactory
 
 
 def ws_request(
