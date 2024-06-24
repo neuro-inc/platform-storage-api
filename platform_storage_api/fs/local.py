@@ -363,22 +363,21 @@ class LocalFileSystem(FileSystem):
             yield chunk
 
     def _scandir_iter(self, path: PurePath) -> Iterator[FileStatus]:
-        with self._resolve_dir_fd(path) as dirfd:
-            with os.scandir(dirfd) as scandir_it:
-                for entry in scandir_it:
-                    if entry.is_symlink():
-                        target = os.readlink(entry.name, dir_fd=dirfd)
-                        yield self._create_linkstatus(
-                            PurePath(entry.name),
-                            entry.stat(follow_symlinks=False),
-                            target=target,
-                        )
-                    else:
-                        yield self._create_filestatus(
-                            PurePath(entry.name),
-                            entry.stat(follow_symlinks=False),
-                            entry.is_dir(follow_symlinks=False),
-                        )
+        with self._resolve_dir_fd(path) as dirfd, os.scandir(dirfd) as scandir_it:
+            for entry in scandir_it:
+                if entry.is_symlink():
+                    target = os.readlink(entry.name, dir_fd=dirfd)
+                    yield self._create_linkstatus(
+                        PurePath(entry.name),
+                        entry.stat(follow_symlinks=False),
+                        target=target,
+                    )
+                else:
+                    yield self._create_filestatus(
+                        PurePath(entry.name),
+                        entry.stat(follow_symlinks=False),
+                        entry.is_dir(follow_symlinks=False),
+                    )
 
     async def _iterstatus_iter(
         self, dir_iter: Iterator[FileStatus]
@@ -566,11 +565,11 @@ class LocalFileSystem(FileSystem):
         await self._loop.run_in_executor(self._executor, self._remove, path, recursive)
 
     def _rename(self, old: PurePath, new: PurePath) -> None:
-        with self._resolve_dir_fd(old.parent) as src_dir_fd:
-            with self._resolve_dir_fd(new.parent) as dst_dir_fd:
-                os.rename(
-                    old.name, new.name, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd
-                )
+        with (
+            self._resolve_dir_fd(old.parent) as src_dir_fd,
+            self._resolve_dir_fd(new.parent) as dst_dir_fd,
+        ):
+            os.rename(old.name, new.name, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
 
     async def rename(self, old: PurePath, new: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
