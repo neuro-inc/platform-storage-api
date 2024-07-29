@@ -9,9 +9,9 @@ import aiohttp
 import yarl
 
 from platform_storage_api.fs.local import FileStatusType
+from tests.integration.conftest import ApiConfig, status_iter_response_to_list
 
 from .auth import _User, _UserFactory
-from tests.integration.conftest import ApiConfig, status_iter_response_to_list
 
 
 class TestStorageListAndResourceSharing:

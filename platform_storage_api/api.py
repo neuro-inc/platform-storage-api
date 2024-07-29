@@ -762,12 +762,12 @@ async def handle_error_if_streamed(
     error_class: type[web.HTTPError] = web.HTTPBadRequest,
 ) -> None:
     if response.prepared:
-        error_dict = dict(
-            error=str_error,
-            errno=errorcode[errno]
-            if errno is not None and errno in errorcode
-            else errno,
-        )
+        error_dict = {
+            "error": str_error,
+            "errno": (
+                errorcode[errno] if errno is not None and errno in errorcode else errno
+            ),
+        }
         await response.write(json.dumps(error_dict).encode())
     else:
         raise _http_exception(error_class, str_error, errno=errno)
@@ -841,7 +841,7 @@ async def add_version_to_header(request: Request, response: web.StreamResponse) 
 async def create_app(config: Config) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
-        handler_args=dict(keepalive_timeout=config.server.keep_alive_timeout_s),
+        handler_args={"keepalive_timeout": config.server.keep_alive_timeout_s},
     )
     app[CONFIG_KEY] = config
 
