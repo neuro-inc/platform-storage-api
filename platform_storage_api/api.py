@@ -23,15 +23,7 @@ from aiohttp.web_urldispatcher import AbstractRoute
 from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
-from neuro_logging import (
-    init_logging,
-    make_sentry_trace_config,
-    make_zipkin_trace_config,
-    notrace,
-    setup_sentry,
-    setup_zipkin,
-    setup_zipkin_tracer,
-)
+from neuro_logging import init_logging, setup_sentry
 
 from .cache import PermissionsCache
 from .config import Config, StorageMode
@@ -75,7 +67,6 @@ class ApiHandler:
     def register(self, app: web.Application) -> list[AbstractRoute]:
         return app.add_routes((web.get("/ping", self.handle_ping),))
 
-    @notrace
     async def handle_ping(self, request: web.Request) -> web.Response:
         return web.Response()
 
@@ -847,18 +838,6 @@ async def add_version_to_header(request: Request, response: web.StreamResponse) 
     response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
 
 
-def make_tracing_trace_configs(config: Config) -> list[aiohttp.TraceConfig]:
-    trace_configs = []
-
-    if config.zipkin:
-        trace_configs.append(make_zipkin_trace_config())
-
-    if config.sentry:
-        trace_configs.append(make_sentry_trace_config())
-
-    return trace_configs
-
-
 async def create_app(config: Config) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
@@ -871,11 +850,7 @@ async def create_app(config: Config) -> web.Application:
             logger.info("Initializing Auth Client For Storage API")
 
             auth_client = await exit_stack.enter_async_context(
-                AuthClient(
-                    config.auth.server_endpoint_url,
-                    config.auth.service_token,
-                    make_tracing_trace_configs(config),
-                )
+                AuthClient(config.auth.server_endpoint_url, config.auth.service_token)
             )
 
             await setup_security(
@@ -920,7 +895,7 @@ async def create_app(config: Config) -> web.Application:
 
     api_v1_app = web.Application()
     api_v1_handler = ApiHandler()
-    probes_routes = api_v1_handler.register(api_v1_app)
+    api_v1_handler.register(api_v1_app)
     app[API_V1_KEY] = api_v1_app
 
     storage_app = web.Application()
@@ -932,32 +907,9 @@ async def create_app(config: Config) -> web.Application:
 
     app.on_response_prepare.append(add_version_to_header)
 
-    if config.zipkin:
-        setup_zipkin(app, skip_routes=probes_routes)
-
     logger.info("Storage API has been initialized, ready to serve.")
 
     return app
-
-
-def setup_tracing(config: Config) -> None:
-    if config.zipkin:
-        setup_zipkin_tracer(
-            config.zipkin.app_name,
-            config.server.host,
-            config.server.port,
-            config.zipkin.url,
-            config.zipkin.sample_rate,
-        )
-
-    if config.sentry:
-        setup_sentry(
-            config.sentry.dsn,
-            app_name=config.sentry.app_name,
-            cluster_name=config.sentry.cluster_name,
-            sample_rate=config.sentry.sample_rate,
-            exclude=[FileNotFoundError],
-        )
 
 
 def main() -> None:
@@ -965,7 +917,7 @@ def main() -> None:
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
 
-    setup_tracing(config)
+    setup_sentry(health_check_url_path="/api/v1/ping")
 
     loop = asyncio.get_event_loop()
     app = loop.run_until_complete(create_app(config))
