@@ -35,9 +35,9 @@ class PermissionsCache(AbstractPermissionChecker):
     ) -> None:
         self._checker = checker
         self._time_factory = time_factory
-        self._cache: """collections.OrderedDict[
+        self._cache: collections.OrderedDict[
             PermissionsCacheKey, PermissionsCacheValue
-        ]""" = collections.OrderedDict()
+        ] = collections.OrderedDict()
         self.expiration_interval_s = expiration_interval_s
         self.forgetting_interval_s = forgetting_interval_s
 
