@@ -36,8 +36,8 @@ service:
 
 storages: []
 
-zipkin: {}
-
-sentry: {}
+sentry:
+  appName: platform-storage
+  sampleRate: 0.002
 
 priorityClassName: ""
