@@ -14,10 +14,33 @@ from platform_storage_api.fs.local import (
     FileStatus,
     FileStatusType,
     FileSystem,
+    FileUsage,
     LocalFileSystem,
     StorageType,
     copy_streams,
+    parse_du_size_output,
 )
+
+
+@pytest.mark.parametrize(
+    ["size_str", "size"],
+    [
+        ("3", 3),
+        ("3K", 3 * 1024),
+        ("3M", 3 * 1024**2),
+        ("3G", 3 * 1024**3),
+        ("3T", 3 * 1024**4),
+        ("3P", 3 * 1024**5),
+        ("3E", 3 * 1024**6),
+        ("3Z", 3 * 1024**7),
+        ("3Y", 3 * 1024**8),
+        ("3KB", 3 * 1000),
+        ("3KiB", 3 * 1024),
+        ("3.1KB", 3100),
+    ],
+)
+def test_parse_du_size_output(size_str: str, size: int) -> None:
+    assert parse_du_size_output(size_str) == size
 
 
 class TestFileSystem:
@@ -1382,3 +1405,19 @@ class TestLocalFileSystem:
     ) -> None:
         with pytest.raises(FileNotFoundError):
             await fs.disk_usage(path_with_symlink)
+
+    async def test_disk_usage_by_file(self, fs: FileSystem, tmp_dir_path: Path) -> None:
+        file1 = tmp_dir_path / "test1"
+        file1.write_text("test1")
+
+        file2 = tmp_dir_path / "test2"
+        file2.write_text("test2")
+
+        result = await fs.disk_usage_by_file(file1, file2)
+
+        assert result == [
+            FileUsage(path=file1, size=mock.ANY),
+            FileUsage(path=file2, size=mock.ANY),
+        ]
+        assert result[0].size
+        assert result[1].size

@@ -23,6 +23,10 @@ SCANDIR_CHUNK_SIZE = 100
 logger = logging.getLogger()
 
 
+class FileSystemException(Exception):
+    pass
+
+
 # TODO (A Danshyn 04/23/18): likely should be revisited
 class StorageType(str, enum.Enum):
     LOCAL = "local"
@@ -101,10 +105,16 @@ class RemoveListing:
 
 
 @dataclass(frozen=True)
-class DiskUsageInfo:
+class DiskUsage:
     total: int
     used: int
     free: int
+
+
+@dataclass(frozen=True)
+class FileUsage:
+    path: PurePath
+    size: int
 
 
 class FileSystem(AbstractAsyncContextManager):  # type: ignore
@@ -182,7 +192,11 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
-    async def disk_usage(self, path: PurePath) -> DiskUsageInfo:
+    async def disk_usage(self, path: PurePath) -> DiskUsage:
+        pass
+
+    @abc.abstractmethod
+    async def disk_usage_by_file(self, *paths: PurePath) -> list[FileUsage]:
         pass
 
 
@@ -395,7 +409,8 @@ class LocalFileSystem(FileSystem):
             yield self._iterstatus_iter(dir_iter)
         finally:
             await self._loop.run_in_executor(
-                self._executor, dir_iter.close  # type: ignore
+                self._executor,
+                dir_iter.close,  # type: ignore
             )
 
     def _get_file_or_dir_status(self, path: PurePath) -> FileStatus:
@@ -574,17 +589,63 @@ class LocalFileSystem(FileSystem):
     async def rename(self, old: PurePath, new: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
 
-    def _disk_usage(self, path: PurePath) -> DiskUsageInfo:
+    def _disk_usage(self, path: PurePath) -> DiskUsage:
         with self._resolve_dir_fd(path) as fd:
             total, used, free = shutil.disk_usage(fd)
-            return DiskUsageInfo(
+            return DiskUsage(
                 total=total,
                 used=used,
                 free=free,
             )
 
-    async def disk_usage(self, path: PurePath) -> DiskUsageInfo:
+    async def disk_usage(self, path: PurePath) -> DiskUsage:
         return await self._loop.run_in_executor(self._executor, self._disk_usage, path)
+
+    async def disk_usage_by_file(self, *paths: PurePath) -> list[FileUsage]:
+        async with aiofiles.tempfile.NamedTemporaryFile("w") as temp_file:
+            await temp_file.write("\0".join(str(p) for p in paths))
+            await temp_file.flush()
+            process = await asyncio.subprocess.create_subprocess_exec(
+                "du",
+                "-sh",
+                f"--files0-from={temp_file.name}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+        if process.returncode:
+            raise FileSystemException(stderr.decode())
+        result = []
+        for line in stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            size_str, *_, path = line.split()
+            result.append(
+                FileUsage(
+                    path=PurePath(path.decode()),
+                    size=parse_du_size_output(size_str.decode()),
+                )
+            )
+        return result
+
+
+_SIZE_UNIT_POWERS = {
+    unit: power
+    for power, unit in enumerate(("K", "M", "G", "T", "P", "E", "Z", "Y"), start=1)
+}
+
+
+def parse_du_size_output(size_str: str) -> int:
+    if not size_str:
+        return 0
+    if size_str[-1] == "B":
+        if size_str[-2] == "i":
+            return int(float(size_str[:-3]) * 1024 ** _SIZE_UNIT_POWERS[size_str[-3]])
+        return int(float(size_str[:-2]) * 1000 ** _SIZE_UNIT_POWERS[size_str[-2]])
+    if size_str[-1].isdigit():
+        return int(float(size_str))
+    return int(float(size_str[:-1]) * 1024 ** _SIZE_UNIT_POWERS[size_str[-1]])
 
 
 DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB

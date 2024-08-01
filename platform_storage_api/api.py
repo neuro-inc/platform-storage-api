@@ -28,7 +28,7 @@ from neuro_logging import init_logging, setup_sentry
 from .cache import PermissionsCache
 from .config import Config, StorageMode
 from .fs.local import (
-    DiskUsageInfo,
+    DiskUsage,
     FileStatus,
     FileStatusPermission,
     FileStatusType,
@@ -735,7 +735,7 @@ class StorageHandler:
         }
 
     @classmethod
-    def _convert_disk_usage_to_primitive(cls, status: DiskUsageInfo) -> dict[str, Any]:
+    def _convert_disk_usage_to_primitive(cls, status: DiskUsage) -> dict[str, Any]:
         return {
             "total": status.total,
             "used": status.used,
