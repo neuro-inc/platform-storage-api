@@ -8,7 +8,13 @@ from typing import Any, Optional, Union
 
 from neuro_logging import trace, trace_cm
 
-from .fs.local import DiskUsageInfo, FileStatus, FileSystem, RemoveListing, copy_streams
+from .fs.local import (
+    DiskUsage,
+    FileStatus,
+    FileSystem,
+    RemoveListing,
+    copy_streams,
+)
 
 
 class StoragePathResolver(abc.ABC):
@@ -188,8 +194,6 @@ class Storage:
         await self._fs.rename(real_old, real_new)
 
     @trace
-    async def disk_usage(
-        self, path: Union[PurePath, str, None] = None
-    ) -> DiskUsageInfo:
+    async def disk_usage(self, path: Union[PurePath, str, None] = None) -> DiskUsage:
         real_path = await self._path_resolver.resolve_path(PurePath(path or "/"))
         return await self._fs.disk_usage(real_path)

@@ -12,3 +12,5 @@ dist
 .python-version
 
 temp_deploy/
+
+.vscode/
