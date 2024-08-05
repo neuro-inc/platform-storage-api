@@ -78,7 +78,7 @@ class TestConfig:
         assert config.storage.fs_local_base_path == PurePath("/path/to/dir")
         assert config.storage.fs_local_thread_pool_size == 123
         assert config.platform.auth_url == URL("http://platform-auth")
-        assert config.platform.admin_url == URL("http://platform-admin")
+        assert config.platform.admin_url == URL("http://platform-admin/apis/admin/v1")
         assert config.platform.token == "test-token"
         assert config.platform.cluster_name == "test-cluster"
         assert config.aws.region == "test-region"

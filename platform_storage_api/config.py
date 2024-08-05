@@ -123,9 +123,12 @@ class EnvironConfigFactory:
         return StorageServerConfig(port=port, keep_alive_timeout_s=keep_alive_timeout_s)
 
     def create_platform(self) -> PlatformConfig:
+        admin_url = self._get_url("NP_PLATFORM_ADMIN_URL")
+        if admin_url:
+            admin_url = admin_url / "apis/admin/v1"
         return PlatformConfig(
             auth_url=self._get_url("NP_PLATFORM_AUTH_URL"),
-            admin_url=self._get_url("NP_PLATFORM_ADMIN_URL"),
+            admin_url=admin_url,
             token=self._environ["NP_PLATFORM_TOKEN"],
             cluster_name=self._environ["NP_PLATFORM_CLUSTER_NAME"],
         )

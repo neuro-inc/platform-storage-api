@@ -59,7 +59,7 @@ async def create_app(config: Config) -> AsyncIterator[App]:
 
         admin_client = await exit_stack.enter_async_context(
             AdminClient(
-                base_url=config.platform.admin_url / "apis/admin/v1",
+                base_url=config.platform.admin_url,
                 service_token=config.platform.token,
             )
         )
