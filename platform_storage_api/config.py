@@ -11,18 +11,26 @@ from yarl import URL
 class ServerConfig:
     host: str = "0.0.0.0"
     port: int = 8080
+
+
+@dataclass(frozen=True)
+class StorageServerConfig(ServerConfig):
     name: str = "Storage API"
     keep_alive_timeout_s: float = 75
 
     @classmethod
-    def from_environ(cls, environ: Optional[dict[str, str]] = None) -> "ServerConfig":
-        return EnvironConfigFactory(environ).create_server()
+    def from_environ(
+        cls, environ: Optional[dict[str, str]] = None
+    ) -> "StorageServerConfig":
+        return EnvironConfigFactory(environ).create_storage_server()
 
 
 @dataclass(frozen=True)
-class AuthConfig:
-    server_endpoint_url: Optional[URL]
-    service_token: str = field(repr=False)
+class PlatformConfig:
+    auth_url: Optional[URL]
+    admin_url: Optional[URL]
+    token: str = field(repr=False)
+    cluster_name: str
 
 
 class StorageMode(str, enum.Enum):
@@ -43,17 +51,32 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
+class AWSConfig:
+    region: str
+    metrics_s3_bucket_name: str
+    access_key_id: Optional[str] = field(repr=False, default=None)
+    secret_access_key: Optional[str] = field(repr=False, default=None)
+    s3_endpoint_url: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class Config:
-    server: ServerConfig
+    server: StorageServerConfig
     storage: StorageConfig
-    auth: AuthConfig
-    cluster_name: str
+    platform: PlatformConfig
+    aws: AWSConfig
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
     @classmethod
     def from_environ(cls, environ: Optional[dict[str, str]] = None) -> "Config":
         return EnvironConfigFactory(environ).create()
+
+
+@dataclass(frozen=True)
+class MetricsConfig:
+    aws: AWSConfig
+    server: ServerConfig = ServerConfig()
 
 
 class EnvironConfigFactory:
@@ -84,25 +107,38 @@ class EnvironConfigFactory:
         )
 
     def create_server(self) -> ServerConfig:
-        port = int(self._environ.get("NP_STORAGE_API_PORT", ServerConfig.port))
+        return ServerConfig(
+            host=self._environ.get("SERVER_HOST", ServerConfig.host),
+            port=int(self._environ.get("SERVER_PORT", ServerConfig.port)),
+        )
+
+    def create_storage_server(self) -> StorageServerConfig:
+        port = int(self._environ.get("NP_STORAGE_API_PORT", StorageServerConfig.port))
         keep_alive_timeout_s = int(
             self._environ.get(
-                "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT", ServerConfig.keep_alive_timeout_s
+                "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT",
+                StorageServerConfig.keep_alive_timeout_s,
             )
         )
-        return ServerConfig(port=port, keep_alive_timeout_s=keep_alive_timeout_s)
+        return StorageServerConfig(port=port, keep_alive_timeout_s=keep_alive_timeout_s)
 
-    def create_auth(self) -> AuthConfig:
-        url = self._get_url("NP_STORAGE_AUTH_URL")
-        token = self._environ["NP_STORAGE_AUTH_TOKEN"]
-        return AuthConfig(server_endpoint_url=url, service_token=token)
+    def create_platform(self) -> PlatformConfig:
+        return PlatformConfig(
+            auth_url=self._get_url("NP_PLATFORM_AUTH_URL"),
+            admin_url=self._get_url("NP_PLATFORM_ADMIN_URL"),
+            token=self._environ["NP_PLATFORM_TOKEN"],
+            cluster_name=self._environ["NP_PLATFORM_CLUSTER_NAME"],
+        )
+
+    def create_aws(self) -> AWSConfig:
+        return AWSConfig(
+            region=self._environ["AWS_REGION"],
+            metrics_s3_bucket_name=self._environ["AWS_METRICS_S3_BUCKET_NAME"],
+        )
 
     def create(self) -> Config:
-        server_config = self.create_server()
+        server_config = self.create_storage_server()
         storage_config = self.create_storage()
-        auth_config = self.create_auth()
-        cluster_name = self._environ["NP_CLUSTER_NAME"]
-        assert cluster_name
         permission_expiration_interval_s: float = float(
             self._environ.get(
                 "NP_PERMISSION_EXPIRATION_INTERVAL",
@@ -118,8 +154,14 @@ class EnvironConfigFactory:
         return Config(
             server=server_config,
             storage=storage_config,
-            auth=auth_config,
-            cluster_name=cluster_name,
+            platform=self.create_platform(),
+            aws=self.create_aws(),
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
+        )
+
+    def create_metrics(self) -> MetricsConfig:
+        return MetricsConfig(
+            server=self.create_server(),
+            aws=self.create_aws(),
         )
