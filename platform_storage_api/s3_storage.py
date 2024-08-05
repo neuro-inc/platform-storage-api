@@ -95,3 +95,15 @@ class StorageMetricsAsyncS3Storage:
                 raise
         await self._s3_client.create_bucket(Bucket=self._bucket_name)
         await put_object()
+
+    async def get_storage_usage(self) -> StorageUsage:
+        try:
+            response = await self._s3_client.get_object(
+                Bucket=self._bucket_name, Key=_AWS_STORAGE_USAGE_KEY
+            )
+        except ClientError as err:
+            if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
+                return StorageUsage(projects=[])
+        async with response["Body"]:
+            payload = await response["Body"].read()
+        return _EntityFactory.create_storage_usage(payload)

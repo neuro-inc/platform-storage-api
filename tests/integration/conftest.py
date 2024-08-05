@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import AsyncIterable, AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import replace
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Any, NamedTuple
 
 import aiobotocore.client
@@ -91,10 +90,11 @@ def platform_config(
 
 
 @pytest.fixture
-def config(platform_config: PlatformConfig, aws_config: AWSConfig) -> Config:
+def config(
+    platform_config: PlatformConfig, aws_config: AWSConfig, local_tmp_dir_path: Path
+) -> Config:
     server_config = StorageServerConfig()
-    path = PurePath(os.path.realpath("/tmp/np_storage"))
-    storage_config = StorageConfig(fs_local_base_path=path)
+    storage_config = StorageConfig(fs_local_base_path=local_tmp_dir_path)
     return Config(
         server=server_config,
         storage=storage_config,

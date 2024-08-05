@@ -83,9 +83,7 @@ class TestMetrics:
             passthrough=["http://0.0.0.0", "http://127.0.0.1"]
         ) as aiohttp_mock:
             aiohttp_mock.get(
-                URL(
-                    f"http://platform-admin/apis/admin/v1/clusters/{cluster_name}/orgs"
-                ),
+                f"http://platform-admin/apis/admin/v1/clusters/{cluster_name}/orgs",
                 payload=[],
             )
 
