@@ -83,7 +83,7 @@ def platform_config(
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=auth_server,
-        admin_url=URL("http://platform-admin"),
+        admin_url=URL("http://platform-admin/apis/admin/v1"),
         token=admin_token,
         cluster_name=cluster_name,
     )
