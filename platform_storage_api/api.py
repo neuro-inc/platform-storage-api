@@ -32,6 +32,7 @@ from .fs.local import (
     FileStatus,
     FileStatusPermission,
     FileStatusType,
+    FileSystem,
     LocalFileSystem,
 )
 from .security import (
@@ -838,6 +839,16 @@ async def add_version_to_header(request: Request, response: web.StreamResponse) 
     response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
 
 
+def create_path_resolver(config: Config, fs: FileSystem) -> StoragePathResolver:
+    if config.storage.mode == StorageMode.SINGLE:
+        return SingleStoragePathResolver(config.storage.fs_local_base_path)
+    return MultipleStoragePathResolver(
+        fs,
+        config.storage.fs_local_base_path,
+        config.storage.fs_local_base_path / config.platform.cluster_name,
+    )
+
+
 async def create_app(config: Config) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
@@ -850,7 +861,7 @@ async def create_app(config: Config) -> web.Application:
             logger.info("Initializing Auth Client For Storage API")
 
             auth_client = await exit_stack.enter_async_context(
-                AuthClient(config.auth.server_endpoint_url, config.auth.service_token)
+                AuthClient(config.platform.auth_url, config.platform.token)
             )
 
             await setup_security(
@@ -861,7 +872,7 @@ async def create_app(config: Config) -> web.Application:
 
             logger.info(
                 f"Auth Client for Storage API Initialized. "
-                f"URL={config.auth.server_endpoint_url}"
+                f"URL={config.platform.auth_url}"
             )
 
             fs = await exit_stack.enter_async_context(
@@ -869,16 +880,7 @@ async def create_app(config: Config) -> web.Application:
                     executor_max_workers=config.storage.fs_local_thread_pool_size
                 )
             )
-            if config.storage.mode == StorageMode.SINGLE:
-                path_resolver: StoragePathResolver = SingleStoragePathResolver(
-                    config.storage.fs_local_base_path
-                )
-            else:
-                path_resolver = MultipleStoragePathResolver(
-                    fs,
-                    config.storage.fs_local_base_path,
-                    config.storage.fs_local_base_path / config.cluster_name,
-                )
+            path_resolver = create_path_resolver(config, fs)
             storage = Storage(path_resolver, fs)
             app[API_V1_KEY][STORAGE_KEY] = storage
 

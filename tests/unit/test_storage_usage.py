@@ -1,5 +1,6 @@
+import os
 from collections.abc import AsyncIterator
-from pathlib import Path
+from pathlib import Path, PurePath
 from unittest import mock
 
 import pytest
@@ -7,9 +8,36 @@ from aioresponses import aioresponses
 from neuro_admin_client import AdminClient
 from yarl import URL
 
+from platform_storage_api.config import (
+    AWSConfig,
+    Config,
+    PlatformConfig,
+    StorageConfig,
+    StorageServerConfig,
+)
 from platform_storage_api.fs.local import FileSystem
 from platform_storage_api.storage import SingleStoragePathResolver
 from platform_storage_api.storage_usage import StorageUsage, StorageUsageService
+
+
+@pytest.fixture
+def config() -> Config:
+    return Config(
+        server=StorageServerConfig(),
+        storage=StorageConfig(
+            fs_local_base_path=PurePath(os.path.realpath("/tmp/np_storage"))
+        ),
+        platform=PlatformConfig(
+            auth_url=URL("http://platform-auth"),
+            admin_url=URL("http://platform-admin"),
+            token="test-token",
+            cluster_name="test-cluster",
+        ),
+        aws=AWSConfig(
+            region="test-region",
+            metrics_s3_bucket_name="test-bucket",
+        ),
+    )
 
 
 class TestStorageUsage:
@@ -22,13 +50,18 @@ class TestStorageUsage:
 
     @pytest.fixture
     def storage_usage_service(
-        self, local_fs: FileSystem, local_tmp_dir_path: Path, admin_client: AdminClient
+        self,
+        config: Config,
+        local_fs: FileSystem,
+        local_tmp_dir_path: Path,
+        admin_client: AdminClient,
     ) -> StorageUsageService:
         return StorageUsageService(
+            config=config,
             path_resolver=SingleStoragePathResolver(local_tmp_dir_path),
             fs=local_fs,
             admin_client=admin_client,
-            cluster_name="default",
+            storage_metrics_s3_storage=mock.AsyncMock(),
         )
 
     async def test_disk_usage(
@@ -38,7 +71,7 @@ class TestStorageUsage:
         aiohttp_mock: aioresponses,
     ) -> None:
         aiohttp_mock.get(
-            URL("http://platform-admin/apis/admin/v1/clusters/default/orgs"),
+            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/orgs"),
             payload=[
                 {
                     "org_name": "test-org",
@@ -65,7 +98,7 @@ class TestStorageUsage:
         self, storage_usage_service: StorageUsageService, aiohttp_mock: aioresponses
     ) -> None:
         aiohttp_mock.get(
-            URL("http://platform-admin/apis/admin/v1/clusters/default/orgs"),
+            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/orgs"),
             payload=[
                 {
                     "org_name": "test-org",
@@ -83,7 +116,7 @@ class TestStorageUsage:
         self, storage_usage_service: StorageUsageService, aiohttp_mock: aioresponses
     ) -> None:
         aiohttp_mock.get(
-            URL("http://platform-admin/apis/admin/v1/clusters/default/orgs"),
+            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/orgs"),
             payload=[],
         )
 

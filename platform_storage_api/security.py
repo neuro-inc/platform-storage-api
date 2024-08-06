@@ -50,10 +50,12 @@ class PermissionChecker(AbstractPermissionChecker):
 
     def _path_to_uri(self, target_path: PurePath) -> str:
         assert str(target_path)[0] == "/"
-        assert self._config.cluster_name
+        assert self._config.platform.cluster_name
         return str(
             URL.build(
-                scheme="storage", host=self._config.cluster_name, path=str(target_path)
+                scheme="storage",
+                host=self._config.platform.cluster_name,
+                path=str(target_path),
             )
         )
 

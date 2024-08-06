@@ -1,27 +1,53 @@
+from __future__ import annotations
+
 import json
-import os
 from collections.abc import AsyncIterable, AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import replace
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Any, NamedTuple
 
+import aiobotocore.client
 import aiohttp
 import pytest
 import pytest_asyncio
+import uvicorn
+from neuro_admin_client import AdminClient
+from yarl import URL
 
 from platform_storage_api.api import create_app
 from platform_storage_api.config import (
-    AuthConfig,
+    AWSConfig,
     Config,
-    ServerConfig,
+    MetricsConfig,
+    PlatformConfig,
     StorageConfig,
     StorageMode,
+    StorageServerConfig,
 )
+from platform_storage_api.fs.local import FileSystem
+from platform_storage_api.s3_storage import StorageMetricsAsyncS3Storage
+from platform_storage_api.storage import SingleStoragePathResolver
+from platform_storage_api.storage_usage import StorageUsageService
 
 pytest_plugins = [
     "tests.integration.docker",
     "tests.integration.auth",
+    "tests.integration.conftest_moto",
 ]
+
+
+@asynccontextmanager
+async def run_asgi_app(
+    app: Any, *, host: str = "0.0.0.0", port: int = 8080
+) -> AsyncIterator[None]:
+    server = uvicorn.Server(uvicorn.Config(app=app, host=host, port=port))
+    server.should_exit = True
+    await server.serve()
+    try:
+        yield
+    finally:
+        await server.shutdown()
 
 
 class ApiConfig(NamedTuple):
@@ -51,23 +77,41 @@ def multi_storage_server_url(multi_storage_api: ApiConfig) -> str:
     return multi_storage_api.storage_base_url
 
 
-@pytest.fixture
-def config(admin_token: str, cluster_name: str, auth_config: AuthConfig) -> Config:
-    server_config = ServerConfig()
-    path = PurePath(os.path.realpath("/tmp/np_storage"))
-    storage_config = StorageConfig(fs_local_base_path=path)
-    return Config(
-        server=server_config,
-        storage=storage_config,
-        auth=auth_config,
+@pytest.fixture()
+def platform_config(
+    auth_server: URL, admin_token: str, cluster_name: str
+) -> PlatformConfig:
+    return PlatformConfig(
+        auth_url=auth_server,
+        admin_url=URL("http://platform-admin/apis/admin/v1"),
+        token=admin_token,
         cluster_name=cluster_name,
     )
 
 
 @pytest.fixture
+def config(
+    platform_config: PlatformConfig, aws_config: AWSConfig, local_tmp_dir_path: Path
+) -> Config:
+    server_config = StorageServerConfig()
+    storage_config = StorageConfig(fs_local_base_path=local_tmp_dir_path)
+    return Config(
+        server=server_config,
+        storage=storage_config,
+        platform=platform_config,
+        aws=aws_config,
+    )
+
+
+@pytest.fixture
+def metrics_config(aws_config: AWSConfig) -> MetricsConfig:
+    return MetricsConfig(aws=aws_config)
+
+
+@pytest.fixture
 def multi_storage_config(config: Config) -> Config:
     config = replace(config, storage=replace(config.storage, mode=StorageMode.MULTIPLE))
-    Path(config.storage.fs_local_base_path, config.cluster_name).mkdir(
+    Path(config.storage.fs_local_base_path, config.platform.cluster_name).mkdir(
         parents=True, exist_ok=True
     )
     return config
@@ -120,3 +164,37 @@ def get_liststatus_dict(response_json: dict[str, Any]) -> list[Any]:
 
 def get_filestatus_dict(response_json: dict[str, Any]) -> dict[str, Any]:
     return response_json["FileStatus"]
+
+
+@pytest.fixture()
+async def admin_client() -> AsyncIterator[AdminClient]:
+    async with AdminClient(
+        base_url=URL("http://platform-admin/apis/admin/v1")
+    ) as client:
+        yield client
+
+
+@pytest.fixture()
+def storage_metrics_s3_storage(
+    s3_client: aiobotocore.client.AioBaseClient, aws_config: AWSConfig
+) -> StorageMetricsAsyncS3Storage:
+    return StorageMetricsAsyncS3Storage(
+        s3_client=s3_client, bucket_name=aws_config.metrics_s3_bucket_name
+    )
+
+
+@pytest.fixture()
+def storage_usage_service(
+    config: Config,
+    admin_client: AdminClient,
+    storage_metrics_s3_storage: StorageMetricsAsyncS3Storage,
+    local_fs: FileSystem,
+    local_tmp_dir_path: Path,
+) -> StorageUsageService:
+    return StorageUsageService(
+        config=config,
+        admin_client=admin_client,
+        storage_metrics_s3_storage=storage_metrics_s3_storage,
+        fs=local_fs,
+        path_resolver=SingleStoragePathResolver(local_tmp_dir_path),
+    )

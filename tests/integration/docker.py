@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import os
-from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
-from docker import DockerClient
 
 PYTEST_REUSE_DOCKER_OPT = "--reuse-docker"
 
@@ -24,12 +22,12 @@ def reuse_docker(request: Any) -> bool:
 
 
 @pytest.fixture(scope="session")
-def in_docker() -> bool:
-    return os.path.isfile("/.dockerenv")
+def docker_compose_file() -> str:
+    return str(Path(__file__).parent.resolve() / "docker/docker-compose.yml")
 
 
 @pytest.fixture(scope="session")
-def docker_client() -> Iterator[DockerClient]:
-    client = DockerClient()
-    yield client
-    client.close()
+def docker_setup(reuse_docker: bool) -> list[str]:
+    if reuse_docker:
+        return []
+    return ["up --build --wait -d"]

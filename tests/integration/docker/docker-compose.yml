@@ -1,0 +1,26 @@
+services:
+  platform-auth:
+    image: neuro-inc/platform-auth:latest
+    container_name: platform-storage-platform-auth
+    build:
+      context: ./platform-auth
+      dockerfile: Dockerfile
+    environment:
+      - NP_AUTH_API_PORT=8080
+      - NP_JWT_SECRET=secret
+    ports:
+      - 8080
+    healthcheck:
+      test: curl --fail http://localhost:8080/api/v1/ping
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
+  moto:
+    image: motoserver/moto:4.2.12
+    container_name: platform-storage-moto
+    command:
+      - -p
+      - "5000"
+    ports:
+      - 5000
