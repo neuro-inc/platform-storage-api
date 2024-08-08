@@ -136,7 +136,7 @@ class EnvironConfigFactory:
     def create_aws(self) -> AWSConfig:
         return AWSConfig(
             region=self._environ["AWS_REGION"],
-            s3_endpoint_url=self._environ.get("AWS_S3_ENDPOINT"),
+            s3_endpoint_url=self._environ.get("AWS_S3_ENDPOINT_URL"),
             metrics_s3_bucket_name=self._environ["AWS_METRICS_S3_BUCKET_NAME"],
         )
 

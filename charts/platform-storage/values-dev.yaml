@@ -47,6 +47,7 @@ aws:
       secretKeyRef:
         name: minio-gateway
         key: root-password
+  s3EndpointUrl: http://minio-gateway:9000
   metricsBucketName: apolo-storage-metrics
 
 storageUsageCollector:

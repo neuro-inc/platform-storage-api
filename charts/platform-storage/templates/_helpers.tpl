@@ -75,6 +75,10 @@ release: {{ .Release.Name | quote }}
 - name: AWS_SECRET_ACCESS_KEY
   {{- toYaml .Values.aws.secretAccessKey | nindent 2 }}
 {{- end }}
+{{- if .Values.aws.s3EndpointUrl }}
+- name: AWS_S3_ENDPOINT_URL
+  value: {{ .Values.aws.s3EndpointUrl }}
+{{- end }}
 - name: AWS_METRICS_S3_BUCKET_NAME
   value: {{ .Values.aws.metricsBucketName }}
 {{- end -}}

@@ -14,7 +14,7 @@ spec:
   jobLabel: job
   endpoints:
     - port: http
-      path: /metrics
+      path: /metrics/
       honorLabels: true
       interval: 15s
       relabelings:

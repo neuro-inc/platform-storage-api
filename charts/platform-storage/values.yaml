@@ -48,7 +48,8 @@ aws: {}
   # region:
   # accessKeyId: {}
   # secretAccessKey: {}
-  # metricsBucketName: {}
+  # s3EndpointUrl:
+  # metricsBucketName:
 
 storageUsageCollector:
   schedule: "0 * * * *" # every hour
