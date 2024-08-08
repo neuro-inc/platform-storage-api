@@ -33,7 +33,9 @@ class App:
 
     @new_trace
     async def upload_storage_usage(self) -> None:
+        LOGGER.info("Starting storage usage collection")
         await self.storage_usage_service.upload_storage_usage()
+        LOGGER.info("Finished storage usage collection")
 
 
 def create_path_resolver(config: Config, fs: FileSystem) -> StoragePathResolver:

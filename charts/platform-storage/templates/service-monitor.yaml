@@ -5,6 +5,7 @@ metadata:
   name: {{ include "platformStorage.metrics.fullname" . }}
   labels: {{ include "platformStorage.labels.standard" . | nindent 4 }}
     service: platform-storage-metrics
+    platform.apolo.us/scrape-metrics: "true"
 spec:
   selector:
     matchLabels:

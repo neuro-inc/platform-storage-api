@@ -141,6 +141,6 @@ class StorageUsageCollector(Collector):
         )
         for project in storage_usage.projects:
             metric_family.add_metric(
-                [project.org_name or "no_org", project.project_name], project.used
+                [project.org_name or "", project.project_name], project.used
             )
         yield metric_family

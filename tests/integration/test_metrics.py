@@ -100,6 +100,6 @@ class TestMetrics:
                 """\
             # HELP storage_used_bytes The amount of used storage space in bytes
             # TYPE storage_used_bytes gauge
-            storage_used_bytes{org_name="no_org",project_name="test-project"}"""
+            storage_used_bytes{org_name="",project_name="test-project"}"""
             )
         )

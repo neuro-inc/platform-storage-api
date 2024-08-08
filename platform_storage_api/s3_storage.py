@@ -93,8 +93,8 @@ class StorageMetricsAsyncS3Storage:
         except ClientError as err:
             if err.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
                 raise
-        await self._s3_client.create_bucket(Bucket=self._bucket_name)
-        await put_object()
+            await self._s3_client.create_bucket(Bucket=self._bucket_name)
+            await put_object()
 
     async def get_storage_usage(self) -> StorageUsage:
         try:
