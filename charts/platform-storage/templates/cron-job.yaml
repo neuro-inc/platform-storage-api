@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "platformStorage.fullname" . }}-usage-collector
+  labels:
+    {{- include "platformStorage.labels.standard" . | nindent 4 }}
+    service: platform-storage-usage-collector
+spec:
+  schedule: {{ .Values.storageUsageCollector.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.storageUsageCollector.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.storageUsageCollector.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.storageUsageCollector.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: collect
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - platform-storage-worker
+              {{- with .Values.storageUsageCollector.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              env:
+                {{- include "platformStorage.env" . | nindent 16 }}
+              {{- if .Values.storages }}
+              volumeMounts:
+                {{- include "platformStorage.volumeMounts" . | nindent 16 }}
+              {{- end }}
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.storages }}
+          volumes:
+            {{- include "platformStorage.volumes" . | nindent 12 }}
+          {{- end }}
+          restartPolicy: OnFailure
+      backoffLimit: {{ .Values.storageUsageCollector.backoffLimit }}

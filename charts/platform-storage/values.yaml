@@ -5,6 +5,7 @@ keepAliveTimeout: 75
 image:
   repository: $IMAGE_REPO
   tag: $IMAGE_TAG
+  pullPolicy: IfNotPresent
 
 imagePullSecrets: []
 
@@ -13,6 +14,7 @@ replicas: 2
 platform:
   clusterName:
   authUrl:
+  adminUrl:
   token: {}
 
 resources:
@@ -41,3 +43,41 @@ sentry:
   sampleRate: 0.002
 
 priorityClassName: ""
+
+aws: {}
+  # region:
+  # accessKeyId: {}
+  # secretAccessKey: {}
+  # metricsBucketName: {}
+
+storageUsageCollector:
+  schedule: "0 * * * *" # every hour
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  backoffLimit: 3
+
+  resources:
+    requests:
+      cpu: "0.1"
+      memory: "100Mi"
+    limits:
+      cpu: "0.3"
+      memory: "200Mi"
+
+metrics:
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: "0.1"
+      memory: "100Mi"
+    limits:
+      cpu: "0.2"
+      memory: "200Mi"
+
+  service:
+    port: 9000
+
+  serviceMonitor:
+    enabled: true

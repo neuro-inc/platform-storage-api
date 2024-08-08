@@ -33,3 +33,20 @@ sentry:
   clusterName: dev
 
 priorityClassName: "platform-services"
+
+aws:
+  region: minio
+  accessKeyId:
+    valueFrom:
+      secretKeyRef:
+        name: minio-gateway
+        key: root-user
+  secretAccessKey:
+    valueFrom:
+      secretKeyRef:
+        name: minio-gateway
+        key: root-password
+  metricsBucketName: apolo-storage-metrics
+
+storageUsageCollector:
+  schedule: "*/5 * * * *"

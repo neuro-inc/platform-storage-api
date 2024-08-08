@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platformStorage.metrics.fullname" . }}
+  labels:
+    {{- include "platformStorage.labels.standard" . | nindent 4 }}
+    service: platform-storage-metrics
+    job: platform-storage-metrics
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: {{ .Values.metrics.service.port }}
+    targetPort: http
+  selector:
+    {{- include "platformStorage.metrics.selectorLabels" . | nindent 4 }}

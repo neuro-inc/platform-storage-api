@@ -11,7 +11,7 @@ from typing import NoReturn
 import aiobotocore
 import aiobotocore.session
 from neuro_admin_client import AdminClient
-from neuro_logging import init_logging
+from neuro_logging import init_logging, new_trace, setup_sentry
 
 from .aws import create_async_s3_client
 from .config import Config, EnvironConfigFactory, StorageMode
@@ -31,6 +31,7 @@ LOGGER = logging.getLogger(__name__)
 class App:
     storage_usage_service: StorageUsageService
 
+    @new_trace
     async def upload_storage_usage(self) -> None:
         await self.storage_usage_service.upload_storage_usage()
 
@@ -117,6 +118,8 @@ async def run(config: Config) -> None:
 
 def main() -> None:
     init_logging()
+
+    setup_sentry()
 
     config = EnvironConfigFactory().create()
     LOGGER.info("Loaded config: %s", config)
