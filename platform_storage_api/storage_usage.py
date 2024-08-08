@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import timezone
@@ -18,6 +19,9 @@ UTC = timezone.utc
 
 if TYPE_CHECKING:
     from .s3_storage import StorageMetricsAsyncS3Storage, StorageMetricsS3Storage
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -55,6 +59,7 @@ class StorageUsageService:
 
     async def get_storage_usage(self) -> StorageUsage:
         org_project_paths = await self._get_org_project_paths()
+        LOGGER.debug("Collecting disk usage for: %s", org_project_paths)
         file_usages = await self._fs.disk_usage_by_file(
             *(p.path for p in org_project_paths)
         )
