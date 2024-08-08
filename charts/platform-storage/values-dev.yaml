@@ -5,6 +5,7 @@ keepAliveTimeout: 900
 platform:
   clusterName: default
   authUrl: http://platform-auth:8080
+  adminUrl: http://platform-admin:8080
   token:
     valueFrom:
       secretKeyRef:

@@ -77,7 +77,7 @@ metrics:
       memory: "200Mi"
 
   service:
-    port: 9000
+    port: 8080
 
   serviceMonitor:
     enabled: true
