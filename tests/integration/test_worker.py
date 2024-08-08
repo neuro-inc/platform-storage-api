@@ -20,8 +20,16 @@ class TestUploadStorageUsage:
         ) as aiohttp_mock:
             aiohttp_mock.get(
                 "http://platform-admin/apis/admin/v1/clusters"
-                f"/{config.platform.cluster_name}/orgs",
-                payload=[],
+                f"/{config.platform.cluster_name}/projects",
+                payload=[
+                    {
+                        "name": "test-project",
+                        "org_name": None,
+                        "cluster_name": config.platform.cluster_name,
+                        "default_role": "writer",
+                        "is_default": False,
+                    },
+                ],
             )
 
             await run(config)

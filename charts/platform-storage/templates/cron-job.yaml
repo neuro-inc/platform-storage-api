@@ -39,5 +39,4 @@ spec:
           volumes:
             {{- include "platformStorage.volumes" . | nindent 12 }}
           {{- end }}
-          restartPolicy: OnFailure
-      backoffLimit: {{ .Values.storageUsageCollector.backoffLimit }}
+          restartPolicy: Never
