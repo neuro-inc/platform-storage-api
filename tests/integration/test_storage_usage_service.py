@@ -17,7 +17,7 @@ def aiohttp_mock() -> Iterator[aioresponses]:
         yield mocked
 
 
-class TestMetrics:
+class TestStorageUsageService:
     async def test_upload_storage_usage(
         self,
         aiohttp_mock: aioresponses,
@@ -27,8 +27,16 @@ class TestMetrics:
         local_tmp_dir_path: Path,
     ) -> None:
         aiohttp_mock.get(
-            f"http://platform-admin/apis/admin/v1/clusters/{cluster_name}/orgs",
-            payload=[],
+            f"http://platform-admin/apis/admin/v1/clusters/{cluster_name}/projects",
+            payload=[
+                {
+                    "name": "test-project",
+                    "org_name": None,
+                    "cluster_name": cluster_name,
+                    "default_role": "writer",
+                    "is_default": False,
+                },
+            ],
         )
 
         (local_tmp_dir_path / "test-project").mkdir()
@@ -52,8 +60,16 @@ class TestMetrics:
         local_tmp_dir_path: Path,
     ) -> None:
         aiohttp_mock.get(
-            f"http://platform-admin/apis/admin/v1/clusters/{cluster_name}/orgs",
-            payload=[],
+            f"http://platform-admin/apis/admin/v1/clusters/{cluster_name}/projects",
+            payload=[
+                {
+                    "name": "test-project",
+                    "org_name": None,
+                    "cluster_name": cluster_name,
+                    "default_role": "writer",
+                    "is_default": False,
+                },
+            ],
         )
 
         (local_tmp_dir_path / "test-project").mkdir()

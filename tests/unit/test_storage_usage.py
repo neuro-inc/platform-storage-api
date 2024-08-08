@@ -71,13 +71,22 @@ class TestStorageUsage:
         aiohttp_mock: aioresponses,
     ) -> None:
         aiohttp_mock.get(
-            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/orgs"),
+            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/projects"),
             payload=[
                 {
+                    "name": "test-project-1",
+                    "org_name": None,
+                    "cluster_name": "test-cluster",
+                    "default_role": "writer",
+                    "is_default": False,
+                },
+                {
+                    "name": "test-project-2",
                     "org_name": "test-org",
-                    "default_role": "user",
-                    "maintenance": False,
-                }
+                    "cluster_name": "test-cluster",
+                    "default_role": "writer",
+                    "is_default": False,
+                },
             ],
         )
         (local_tmp_dir_path / "test-project-1").mkdir()
@@ -98,13 +107,22 @@ class TestStorageUsage:
         self, storage_usage_service: StorageUsageService, aiohttp_mock: aioresponses
     ) -> None:
         aiohttp_mock.get(
-            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/orgs"),
+            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/projects"),
             payload=[
                 {
+                    "name": "test-project-1",
+                    "org_name": None,
+                    "cluster_name": "test-cluster",
+                    "default_role": "writer",
+                    "is_default": False,
+                },
+                {
+                    "name": "test-project-2",
                     "org_name": "test-org",
-                    "default_role": "user",
-                    "maintenance": False,
-                }
+                    "cluster_name": "test-cluster",
+                    "default_role": "writer",
+                    "is_default": False,
+                },
             ],
         )
 
@@ -112,11 +130,11 @@ class TestStorageUsage:
 
         assert storage_usage == StorageUsage(projects=[])
 
-    async def test_disk_usage__no_orgs(
+    async def test_disk_usage__no_projects(
         self, storage_usage_service: StorageUsageService, aiohttp_mock: aioresponses
     ) -> None:
         aiohttp_mock.get(
-            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/orgs"),
+            URL("http://platform-admin/apis/admin/v1/clusters/test-cluster/projects"),
             payload=[],
         )
 

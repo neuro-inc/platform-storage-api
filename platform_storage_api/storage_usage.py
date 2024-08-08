@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import timezone
@@ -36,7 +37,7 @@ class StorageUsage:
 
 
 @dataclass(frozen=True)
-class OrgProjectPath:
+class ProjectPath:
     project_name: str
     path: PurePath
     org_name: Optional[str] = None
@@ -58,8 +59,7 @@ class StorageUsageService:
         self._path_resolver = path_resolver
 
     async def get_storage_usage(self) -> StorageUsage:
-        org_project_paths = await self._get_org_project_paths()
-        LOGGER.debug("Collecting disk usage for: %s", org_project_paths)
+        org_project_paths = await self._get_project_paths()
         file_usages = await self._fs.disk_usage_by_file(
             *(p.path for p in org_project_paths)
         )
@@ -75,53 +75,50 @@ class StorageUsageService:
             ],
         )
 
-    async def _get_org_project_paths(self) -> list[OrgProjectPath]:
-        org_clusters = await self._admin_client.list_org_clusters(
-            self._config.platform.cluster_name
-        )
-        org_names = {org_cluster.org_name for org_cluster in org_clusters}
-        result = await self._get_no_org_project_paths(org_names)
-        for org_cluster in org_clusters:
-            org_path = await self._path_resolver.resolve_path(
-                PurePath(f"/{org_cluster.org_name}")
-            )
+    async def _get_project_paths(self) -> list[ProjectPath]:
+        projects_by_org = await self._get_projects_by_org()
+        result = []
+        for org_name, project_names in projects_by_org.items():
+            org_path = await self._resolve_org_path(org_name)
             try:
                 async with self._fs.iterstatus(org_path) as statuses:
                     async for status in statuses:
                         if status.type != FileStatusType.DIRECTORY:
                             continue
+                        project_name = status.path.name
+                        if project_name not in project_names:
+                            continue
+                        LOGGER.debug(
+                            "Collecting storage usage for org %s, project %s",
+                            org_name or "NO_ORG",
+                            project_name,
+                        )
                         result.append(
-                            OrgProjectPath(
-                                org_name=org_cluster.org_name,
-                                project_name=status.path.name,
-                                path=org_path / status.path.name,
+                            ProjectPath(
+                                org_name=org_name,
+                                project_name=project_name,
+                                path=org_path / project_name,
                             )
                         )
             except FileNotFoundError:
                 continue
         return result
 
-    async def _get_no_org_project_paths(
-        self, org_names: set[str]
-    ) -> list[OrgProjectPath]:
-        result = []
-        no_org_path = await self._path_resolver.resolve_base_path(
+    async def _get_projects_by_org(self) -> dict[str | None, set[str]]:
+        projects = await self._admin_client.list_projects(
+            self._config.platform.cluster_name
+        )
+        projects_by_org: dict[str | None, set[str]] = defaultdict(set)
+        for project in projects:
+            projects_by_org[project.org_name].add(project.name)
+        return projects_by_org
+
+    async def _resolve_org_path(self, org_name: str | None) -> PurePath:
+        if org_name:
+            return await self._path_resolver.resolve_path(PurePath(f"/{org_name}"))
+        return await self._path_resolver.resolve_base_path(
             PurePath(f"/{self._config.platform.cluster_name}")
         )
-        async with self._fs.iterstatus(no_org_path) as statuses:
-            async for status in statuses:
-                if (
-                    status.type != FileStatusType.DIRECTORY
-                    or status.path.name in org_names
-                ):
-                    continue
-                result.append(
-                    OrgProjectPath(
-                        project_name=status.path.name,
-                        path=no_org_path / status.path.name,
-                    )
-                )
-        return result
 
     async def upload_storage_usage(self) -> None:
         storage_usage = await self.get_storage_usage()
