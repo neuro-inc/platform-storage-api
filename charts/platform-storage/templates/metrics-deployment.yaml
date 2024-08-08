@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platformStorage.metrics.fullname" . }}
+  labels:
+    {{- include "platformStorage.labels.standard" . | nindent 4 }}
+    service: platform-storage-metrics
+spec:
+  replicas: {{ .Values.metrics.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platformStorage.metrics.selectorLabels" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "platformStorage.metrics.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: metrics
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - platform-storage-metrics
+        ports:
+          - containerPort: {{ .Values.metrics.service.port }}
+            name: http
+            protocol: TCP
+        {{- with .Values.metrics.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        env:
+          - name: SERVER_PORT
+            value: {{ .Values.metrics.service.port | quote }}
+          {{- include "platformStorage.env.aws" . | nindent 10 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}

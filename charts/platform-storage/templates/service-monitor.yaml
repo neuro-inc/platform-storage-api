@@ -1,0 +1,25 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "platformStorage.metrics.fullname" . }}
+  labels: {{ include "platformStorage.labels.standard" . | nindent 4 }}
+    service: platform-storage-metrics
+    platform.apolo.us/scrape-metrics: "true"
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "platformStorage.name" . }}
+      release: {{ .Release.Name | quote }}
+      service: platform-storage-metrics
+  jobLabel: job
+  endpoints:
+    - port: http
+      path: /metrics/
+      honorLabels: true
+      interval: 15s
+      relabelings:
+        - sourceLabels:
+            - __metrics_path__
+          targetLabel: metrics_path
+{{- end }}

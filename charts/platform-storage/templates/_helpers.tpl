@@ -25,3 +25,100 @@ chart: {{ include "platformStorage.chart" . }}
 heritage: {{ .Release.Service | quote }}
 release: {{ .Release.Name | quote }}
 {{- end -}}
+
+{{- define "platformStorage.env" -}}
+- name: NP_STORAGE_LOCAL_BASE_PATH
+  value: /var/storage
+- name: NP_STORAGE_MODE
+{{- if gt (len .Values.storages) 1 }}
+  value: multiple
+{{- else }}
+  value: single
+{{- end }}
+- name: NP_PLATFORM_CLUSTER_NAME
+  value: {{ .Values.platform.clusterName | quote }}
+- name: NP_PLATFORM_AUTH_URL
+  value: {{ .Values.platform.authUrl | quote }}
+- name: NP_PLATFORM_ADMIN_URL
+  value: {{ .Values.platform.adminUrl | quote }}
+- name: NP_PLATFORM_TOKEN
+  {{- if .Values.platform.token }}
+  {{- toYaml .Values.platform.token | nindent 2 }}
+  {{- end }}
+- name: NP_PERMISSION_EXPIRATION_INTERVAL
+  value: {{ .Values.permissionExpirationInterval | quote }}
+- name: NP_PERMISSION_FORGETTING_INTERVAL
+  value: {{ .Values.permissionForgettingInterval | quote }}
+- name: NP_STORAGE_API_KEEP_ALIVE_TIMEOUT
+  value: {{ .Values.keepAliveTimeout | quote }}
+{{ include "platformStorage.env.aws" . }}
+{{- if .Values.sentry }}
+- name: SENTRY_DSN
+  value: {{ .Values.sentry.dsn }}
+- name: SENTRY_CLUSTER_NAME
+  value: {{ .Values.sentry.clusterName }}
+- name: SENTRY_APP_NAME
+  value: {{ .Values.sentry.appName }}
+- name: SENTRY_SAMPLE_RATE
+  value: {{ .Values.sentry.sampleRate | default 0 | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "platformStorage.env.aws" -}}
+- name: AWS_REGION
+  value: {{ .Values.aws.region }}
+{{- if .Values.aws.accessKeyId }}
+- name: AWS_ACCESS_KEY_ID
+  {{- toYaml .Values.aws.accessKeyId | nindent 2 }}
+{{- end }}
+{{- if .Values.aws.secretAccessKey }}
+- name: AWS_SECRET_ACCESS_KEY
+  {{- toYaml .Values.aws.secretAccessKey | nindent 2 }}
+{{- end }}
+{{- if .Values.aws.s3EndpointUrl }}
+- name: AWS_S3_ENDPOINT_URL
+  value: {{ .Values.aws.s3EndpointUrl }}
+{{- end }}
+- name: AWS_METRICS_S3_BUCKET_NAME
+  value: {{ .Values.aws.metricsBucketName }}
+{{- end -}}
+
+{{- define "platformStorage.volumes" -}}
+{{- range $index, $storage := .Values.storages -}}
+- name: storage-{{ $index }}
+  {{- if eq $storage.type "pvc" }}
+  persistentVolumeClaim:
+    claimName: {{ $storage.claimName }}
+  {{- else if eq $storage.type "nfs" }}
+  nfs:
+    server: {{ $storage.server }}
+    path: {{ .Values.exportPath }}
+  {{- end }}
+{{- end -}}
+{{- end -}}
+
+{{- define "platformStorage.volumeMounts" -}}
+{{- if gt (len .Values.storages) 1 -}}
+{{- range $index, $storage := .Values.storages -}}
+- name: storage-{{ $index }}
+  {{- if $storage.path }}
+  mountPath: /var/storage{{ $storage.path }}
+  {{- else }}
+  mountPath: /var/storage/{{ $.Values.platform.clusterName }}
+  {{- end }}
+{{- end -}}
+{{- else -}}
+- name: storage-0
+  mountPath: /var/storage
+{{- end -}}
+{{- end -}}
+
+{{- define "platformStorage.metrics.fullname" -}}
+{{ include "platformStorage.fullname" . }}-metrics
+{{- end -}}
+
+{{- define "platformStorage.metrics.selectorLabels" -}}
+app: {{ include "platformStorage.name" . }}
+release: {{ .Release.Name }}
+service: platform-storage-metrics
+{{- end -}}

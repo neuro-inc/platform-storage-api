@@ -5,6 +5,7 @@ keepAliveTimeout: 900
 platform:
   clusterName: default
   authUrl: http://platform-auth:8080
+  adminUrl: http://platform-admin:8080
   token:
     valueFrom:
       secretKeyRef:
@@ -33,3 +34,21 @@ sentry:
   clusterName: dev
 
 priorityClassName: "platform-services"
+
+aws:
+  region: minio
+  accessKeyId:
+    valueFrom:
+      secretKeyRef:
+        name: minio-gateway
+        key: root-user
+  secretAccessKey:
+    valueFrom:
+      secretKeyRef:
+        name: minio-gateway
+        key: root-password
+  s3EndpointUrl: http://minio-gateway:9000
+  metricsBucketName: apolo-storage-metrics
+
+storageUsageCollector:
+  schedule: "*/5 * * * *"
