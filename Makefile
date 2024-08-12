@@ -1,55 +1,47 @@
-AWS_REGION ?= us-east-1
+.PHONY: all test clean
+all test clean:
 
-GITHUB_OWNER ?= neuro-inc
+venv:
+	python -m venv venv
+	. venv/bin/activate; \
+	python -m pip install --upgrade pip
 
-IMAGE_TAG ?= latest
-
-IMAGE_REPO_aws    = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_REPO_github = ghcr.io/$(GITHUB_OWNER)
-
-IMAGE_REGISTRY ?= aws
-
-IMAGE_NAME      = platformstorageapi
-IMAGE_REPO_BASE = $(IMAGE_REPO_$(IMAGE_REGISTRY))
-IMAGE_REPO      = $(IMAGE_REPO_BASE)/$(IMAGE_NAME)
-
-HELM_ENV           ?= dev
-HELM_CHART          = platform-storage
-HELM_CHART_VERSION ?= 1.0.0
-HELM_APP_VERSION   ?= 1.0.0
-
-export IMAGE_REPO_BASE
-
-setup:
-	pip install -U pip
-	pip install -e .[dev]
+.PHONY: setup
+setup: venv
+	. venv/bin/activate; \
+	pip install -e .[dev]; \
 	pre-commit install
 
-format:
-ifdef CI
-	pre-commit run --all-files --show-diff-on-failure
-else
-	pre-commit run --all-files
-endif
+.PHONY: lint
+lint:
+	. venv/bin/activate; \
+	python -m pre_commit run --all-files
+	. venv/bin/activate; \
+	python -m mypy src tests
 
-lint: format
-	mypy platform_storage_api tests
-
-test_unit:
+test-unit:
+	. venv/bin/activate; \
 	pytest -vv tests/unit
 
-test_integration:
+test-integration:
+	. venv/bin/activate; \
 	pytest -vv tests/integration
 
-run:
-	docker run -it --rm --name platformstorageapi \
-		-p 8080:8080 \
-		-v /tmp/np_storage:/tmp/np_storage \
-		-e NP_STORAGE_LOCAL_BASE_PATH=/tmp/np_storage \
-		platformstorageapi:latest
+dist: venv setup.cfg pyproject.toml $(shell find src -type f)
+	make clean-dist
+	. venv/bin/activate; \
+	pip install -U build; \
+	python -m build --wheel ./;
 
-docker_build:
-	rm -rf build dist
-	pip install -U build
-	python -m build
-	docker build -t $(IMAGE_NAME):latest .
+.PHONY: clean-dist
+clean-dist:
+	rm -rf dist
+
+IMAGE_NAME = platformstorageapi
+
+build/image: .dockerignore Dockerfile dist
+	docker build \
+		--build-arg PY_VERSION=$$(cat .python-version) \
+		-t $(IMAGE_NAME):latest .
+	mkdir -p build
+	docker image inspect $(IMAGE_NAME):latest -f '{{ .ID }}' > $@

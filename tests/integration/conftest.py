@@ -13,8 +13,6 @@ import pytest
 import pytest_asyncio
 import uvicorn
 from neuro_admin_client import AdminClient
-from yarl import URL
-
 from platform_storage_api.api import create_app
 from platform_storage_api.config import (
     AWSConfig,
@@ -29,10 +27,11 @@ from platform_storage_api.fs.local import FileSystem
 from platform_storage_api.s3_storage import StorageMetricsAsyncS3Storage
 from platform_storage_api.storage import SingleStoragePathResolver
 from platform_storage_api.storage_usage import StorageUsageService
+from yarl import URL
 
 pytest_plugins = [
-    "tests.integration.docker",
-    "tests.integration.auth",
+    "tests.integration.conftest_docker",
+    "tests.integration.conftest_auth",
     "tests.integration.conftest_moto",
 ]
 

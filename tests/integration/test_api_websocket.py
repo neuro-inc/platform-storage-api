@@ -18,7 +18,7 @@ from tests.integration.conftest import (
     get_liststatus_dict,
 )
 
-from .auth import _User, _UserFactory
+from .conftest_auth import _User, _UserFactory
 
 
 def ws_request(

@@ -17,7 +17,7 @@ import pytest_asyncio
 from platform_storage_api.config import Config
 from platform_storage_api.fs.local import FileStatusType
 
-from .auth import _User, _UserFactory
+from .conftest_auth import _User, _UserFactory
 from .conftest import (
     ApiConfig,
     get_filestatus_dict,
@@ -1756,7 +1756,7 @@ class TestMultiStorage:
     ) -> None:
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
-        dir_path = f"org/dir"
+        dir_path = "org/dir"
         dir_url = f"{multi_storage_server_url}/{dir_path}"
         file_name = "file.txt"
         url = f"{dir_url}/{file_name}"

@@ -46,7 +46,7 @@ jobs:
     - name: Run integration tests
       run: make test_integration
     - name: Build Docker image
-      run: make docker_build
+      run: make build/image
     - name: Upload image artifact
       uses: neuro-inc/upload-image-action@v24.4.0
       with:
@@ -86,9 +86,17 @@ jobs:
       helm_charts: platform-storage
 
   deploy_dev:
-    name: Deploy on dev
-    needs: release
-    uses: neuro-inc/reuse/.github/workflows/deploy-dev.yaml@v24.5.0
-    with:
-      helm_charts: platform-storage
-      version: ${{ needs.release.outputs.version }}
+    name: deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    timeout-minutes: 5
+    needs:
+    - release
+    steps:
+    - name: Create Terraform Cloud run
+      uses: neuro-inc/terraform-cloud-run-action@v24.7.0
+      with:
+        token: ${{ secrets.TF_API_TOKEN }}
+        workspace: control-plane-dev
+        variables: |
+          platform_storage_version=${{ needs.release.outputs.version }}
