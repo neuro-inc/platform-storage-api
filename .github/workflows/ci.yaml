@@ -28,7 +28,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-py-3.9-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
+        key: ${{ runner.os }}-py-3.9-${{ hashFiles('setup.cfg') }}
     - name: Install dependencies
       run: make setup
     - name: Login to ghcr.io
@@ -38,13 +38,11 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ github.token }}
     - name: Lint
-      run: |
-        echo "::add-matcher::.github/actionlint-matcher.json"
-        make lint
+      run: make lint
     - name: Run unit tests
-      run: make test_unit
+      run: make test-unit
     - name: Run integration tests
-      run: make test_integration
+      run: make test-integration
     - name: Build Docker image
       run: make build/image
     - name: Upload image artifact
