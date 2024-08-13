@@ -18,6 +18,7 @@ from typing import Any, Optional, TypeVar, Union
 
 import aiofiles
 
+
 SCANDIR_CHUNK_SIZE = 100
 
 logger = logging.getLogger()
@@ -122,7 +123,8 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
     def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
         if type_ == StorageType.LOCAL:
             return LocalFileSystem(**kwargs)
-        raise ValueError(f"Unsupported storage type: {type_}")
+        msg = f"Unsupported storage type: {type_}"
+        raise ValueError(msg)
 
     async def __aenter__(self) -> "FileSystem":
         await self.init()
@@ -343,15 +345,18 @@ class LocalFileSystem(FileSystem):
 
     @classmethod
     def _create_filestatus(
-        cls, path: PurePath, stat: os.stat_result, is_dir: bool
+        cls,
+        path: PurePath,
+        stat: os.stat_result,
+        is_dir: bool,  # noqa: FBT001
     ) -> "FileStatus":
         mod_time = int(stat.st_mtime)  # converting float to int
         if is_dir:
             return FileStatus.create_dir_status(path, modification_time=mod_time)
-        else:
-            size = stat.st_size
-            return FileStatus.create_file_status(path, size, modification_time=mod_time)
+        size = stat.st_size
+        return FileStatus.create_file_status(path, size, modification_time=mod_time)
 
+    @classmethod
     def _create_linkstatus(
         cls,
         path: PurePath,
@@ -421,10 +426,9 @@ class LocalFileSystem(FileSystem):
             if statmodule.S_ISLNK(orig_st.st_mode):
                 target = os.readlink(name, dir_fd=dirfd)
                 return self._create_linkstatus(path, orig_st, target)
-            else:
-                return self._create_filestatus(
-                    path, orig_st, statmodule.S_ISDIR(orig_st.st_mode)
-                )
+            return self._create_filestatus(
+                path, orig_st, statmodule.S_ISDIR(orig_st.st_mode)
+            )
 
     async def get_filestatus(self, path: PurePath) -> FileStatus:
         return await self._loop.run_in_executor(
@@ -553,7 +557,7 @@ class LocalFileSystem(FileSystem):
             else:
                 os.unlink(entry.name, dir_fd=topfd)
 
-    def _remove(self, path: PurePath, recursive: bool) -> None:
+    def _remove(self, path: PurePath, recursive: bool) -> None:  # noqa: FBT001
         with self._resolve_dir_fd(path.parent) as dirfd:
             name = path.name
             assert name not in ("..", ".", "")
@@ -683,7 +687,7 @@ _T = TypeVar("_T")
 async def sync_iterator_to_async(
     loop: asyncio.AbstractEventLoop,
     executor: Optional[ThreadPoolExecutor],
-    iter: Iterable[_T],
+    iter_: Iterable[_T],
     queue_size: int = 5000,
 ) -> AsyncIterator[_T]:
     class EndMark:
@@ -701,7 +705,7 @@ async def sync_iterator_to_async(
         chunk: list[Union[_T, EndMark, Exception]] = []
         try:
             try:
-                for item in iter:
+                for item in iter_:
                     chunk.append(item)
                     if len(chunk) == chunk_size:
                         data = chunk

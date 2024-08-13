@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+
 PYTEST_REUSE_DOCKER_OPT = "--reuse-docker"
 
 
@@ -27,7 +28,7 @@ def docker_compose_file() -> str:
 
 
 @pytest.fixture(scope="session")
-def docker_setup(reuse_docker: bool) -> list[str]:
+def docker_setup(reuse_docker: bool) -> list[str]:  # noqa: FBT001
     if reuse_docker:
         return []
     return ["up --build --wait -d"]

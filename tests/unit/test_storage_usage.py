@@ -6,8 +6,6 @@ from unittest import mock
 import pytest
 from aioresponses import aioresponses
 from neuro_admin_client import AdminClient
-from yarl import URL
-
 from platform_storage_api.config import (
     AWSConfig,
     Config,
@@ -18,9 +16,10 @@ from platform_storage_api.config import (
 from platform_storage_api.fs.local import FileSystem
 from platform_storage_api.storage import SingleStoragePathResolver
 from platform_storage_api.storage_usage import StorageUsage, StorageUsageService
+from yarl import URL
 
 
-@pytest.fixture
+@pytest.fixture()
 def config() -> Config:
     return Config(
         server=StorageServerConfig(),
@@ -41,14 +40,14 @@ def config() -> Config:
 
 
 class TestStorageUsage:
-    @pytest.fixture
+    @pytest.fixture()
     async def admin_client(self) -> AsyncIterator[AdminClient]:
         async with AdminClient(
             base_url=URL("http://platform-admin/apis/admin/v1")
         ) as client:
             yield client
 
-    @pytest.fixture
+    @pytest.fixture()
     def storage_usage_service(
         self,
         config: Config,

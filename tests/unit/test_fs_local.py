@@ -9,7 +9,6 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
-
 from platform_storage_api.fs.local import (
     FileStatus,
     FileStatusType,
@@ -23,7 +22,7 @@ from platform_storage_api.fs.local import (
 
 
 @pytest.mark.parametrize(
-    ["size_str", "size"],
+    ("size_str", "size"),
     [
         ("3", 3),
         ("3K", 3 * 1024),
@@ -56,11 +55,11 @@ class TestFileSystem:
             FileSystem.create(StorageType.S3)
 
 
-async def remove_normal(fs: FileSystem, path: PurePath, recursive: bool) -> None:
+async def remove_normal(fs: FileSystem, path: PurePath, recursive: bool) -> None:  # noqa: FBT001
     await fs.remove(path, recursive=recursive)
 
 
-async def remove_iter(fs: FileSystem, path: PurePath, recursive: bool) -> None:
+async def remove_iter(fs: FileSystem, path: PurePath, recursive: bool) -> None:  # noqa: FBT001
     async for _ in fs.iterremove(path, recursive=recursive):
         pass
 
@@ -69,47 +68,47 @@ RemoveMethod = Callable[[FileSystem, PurePath, bool], Coroutine[Any, Any, None]]
 
 
 class TestLocalFileSystem:
-    @pytest.fixture
+    @pytest.fixture()
     def tmp_dir_path(self) -> Iterator[Path]:
         # although blocking, this is fine for tests
         with tempfile.TemporaryDirectory() as d:
             yield Path(os.path.realpath(d))
 
-    @pytest.fixture
+    @pytest.fixture()
     def tmp_file_path(self, tmp_dir_path: Path) -> Iterator[Path]:
         # although blocking, this is fine for tests
         with tempfile.NamedTemporaryFile(dir=tmp_dir_path) as f:
             f.flush()
             yield Path(f.name)
 
-    @pytest.fixture
-    def path_with_symlink(self, tmp_dir_path: Path) -> Iterator[Path]:
+    @pytest.fixture()
+    def path_with_symlink(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "dir").mkdir()
         (tmp_dir_path / "dir/subdir").mkdir()
         os.symlink("dir", tmp_dir_path / "link")
-        yield tmp_dir_path / "link/subdir"
+        return tmp_dir_path / "link/subdir"
 
-    @pytest.fixture
-    def symlink_to_dir(self, tmp_dir_path: Path) -> Iterator[Path]:
+    @pytest.fixture()
+    def symlink_to_dir(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "dir").mkdir()
         path = tmp_dir_path / "dirlink"
         os.symlink("dir", path, target_is_directory=True)
         assert path.is_dir()
-        yield path
+        return path
 
-    @pytest.fixture
-    def symlink_to_file(self, tmp_dir_path: Path) -> Iterator[Path]:
+    @pytest.fixture()
+    def symlink_to_file(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "file").write_bytes(b"test")
         path = tmp_dir_path / "filelink"
         os.symlink("file", path)
         assert path.is_file()
-        yield path
+        return path
 
-    @pytest.fixture
-    def free_symlink(self, tmp_dir_path: Path) -> Iterator[Path]:
+    @pytest.fixture()
+    def free_symlink(self, tmp_dir_path: Path) -> Path:
         path = tmp_dir_path / "nonexistentlink"
         os.symlink("nonexistent", path)
-        yield path
+        return path
 
     @pytest_asyncio.fixture
     async def fs(self) -> AsyncIterator[FileSystem]:
@@ -416,7 +415,7 @@ class TestLocalFileSystem:
         fs: FileSystem,
         tmp_dir_path: Path,
         remove_method: RemoveMethod,
-        recursive: bool,
+        recursive: bool,  # noqa: FBT001
     ) -> None:
         path = tmp_dir_path / "nested"
         with pytest.raises(FileNotFoundError):
@@ -429,7 +428,7 @@ class TestLocalFileSystem:
         fs: FileSystem,
         path_with_symlink: Path,
         remove_method: RemoveMethod,
-        recursive: bool,
+        recursive: bool,  # noqa: FBT001
     ) -> None:
         path = path_with_symlink / "file"
         path.write_bytes(b"")
@@ -457,7 +456,7 @@ class TestLocalFileSystem:
             )
         ]
 
-        await remove_method(fs, path, True)
+        await remove_method(fs, path, True)  # noqa: FBT003
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
@@ -481,7 +480,7 @@ class TestLocalFileSystem:
         statuses = await fs.liststatus(dir_path)
         assert len(statuses) == 2
 
-        await remove_method(fs, dir_path, True)
+        await remove_method(fs, dir_path, True)  # noqa: FBT003
 
         statuses = await fs.liststatus(tmp_dir_path)
         assert statuses == []
@@ -494,7 +493,7 @@ class TestLocalFileSystem:
         await fs.mkdir(dir_path)
 
         with pytest.raises(IsADirectoryError):
-            await remove_method(fs, dir_path, False)
+            await remove_method(fs, dir_path, False)  # noqa: FBT003
 
     @pytest.mark.parametrize("remove_method", [remove_normal, remove_iter])
     @pytest.mark.parametrize("recursive", [True, False])
@@ -502,7 +501,7 @@ class TestLocalFileSystem:
         self,
         fs: FileSystem,
         tmp_dir_path: Path,
-        recursive: bool,
+        recursive: bool,  # noqa: FBT001
         remove_method: RemoveMethod,
     ) -> None:
         expected_path = Path("nested")
@@ -536,7 +535,7 @@ class TestLocalFileSystem:
         fs: FileSystem,
         tmp_dir_path: Path,
         remove_method: RemoveMethod,
-        recursive: bool,
+        recursive: bool,  # noqa: FBT001
     ) -> None:
         dir_path = tmp_dir_path / "dir"
         await fs.mkdir(dir_path)
@@ -758,8 +757,7 @@ class TestLocalFileSystem:
                     modification_time=status.modification_time,
                     permission=status.permission,
                 )
-            else:
-                return status
+            return status
 
         return set(map(rename, statuses))
 
@@ -1248,7 +1246,7 @@ class TestLocalFileSystem:
         old_statuses_old_dir = set(await fs.liststatus(old_path))
         old_statuses_new_dir = set(await fs.liststatus(new_path))
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # noqa: PT011
             await fs.rename(old_path, new_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))
@@ -1293,7 +1291,7 @@ class TestLocalFileSystem:
         old_statuses = set(await fs.liststatus(tmp_dir_path))
         old_statuses_old_dir = set(await fs.liststatus(old_path))
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # noqa: PT011
             await fs.rename(old_path, tmp_dir_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))
@@ -1330,7 +1328,7 @@ class TestLocalFileSystem:
         old_statuses = set(await fs.liststatus(tmp_dir_path))
         old_statuses_old_dir = set(await fs.liststatus(old_path))
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # noqa: PT011
             await fs.rename(old_path, new_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))
@@ -1359,16 +1357,16 @@ class TestLocalFileSystem:
         old_statuses = set(await fs.liststatus(tmp_dir_path))
         old_statuses_old_dir = set(await fs.liststatus(old_path))
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # noqa: PT011
             await fs.rename(old_path, tmp_dir_path / ".")
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # noqa: PT011
             await fs.rename(old_path, tmp_dir_path / "..")
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # noqa: PT011
             await fs.rename(tmp_dir_path / ".", old_path)
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # noqa: PT011
             await fs.rename(tmp_dir_path / "..", old_path)
 
         statuses = set(await fs.liststatus(tmp_dir_path))

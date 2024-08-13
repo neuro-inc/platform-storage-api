@@ -9,11 +9,10 @@ import pytest
 from aiobotocore.client import AioBaseClient
 from aioresponses import aioresponses
 from fastapi import FastAPI
-from yarl import URL
-
 from platform_storage_api.config import MetricsConfig
 from platform_storage_api.metrics import create_app
 from platform_storage_api.storage_usage import StorageUsageService
+from yarl import URL
 
 from .conftest import run_asgi_app
 
