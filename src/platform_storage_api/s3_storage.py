@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 
 from .storage_usage import StorageUsage
 
+
 _AWS_STORAGE_USAGE_KEY = "storage_usage.json"
 
 
