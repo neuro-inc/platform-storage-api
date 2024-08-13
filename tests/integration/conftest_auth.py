@@ -13,6 +13,7 @@ from neuro_auth_client import AuthClient, User
 from pytest_docker.plugin import Services
 from yarl import URL
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +31,7 @@ def auth_jwt_secret() -> str:
 _TokenFactory = Callable[[str], str]
 
 
-@pytest.fixture
+@pytest.fixture()
 def token_factory() -> _TokenFactory:
     def _factory(name: str) -> str:
         payload = {"identity": name}
@@ -39,23 +40,23 @@ def token_factory() -> _TokenFactory:
     return _factory
 
 
-@pytest.fixture
+@pytest.fixture()
 def admin_token(token_factory: Callable[[str], str]) -> str:
     return token_factory("admin")
 
 
-@pytest.fixture
+@pytest.fixture()
 def cluster_token(token_factory: Callable[[str], str]) -> str:
     return token_factory("cluster")
 
 
-@pytest.fixture
+@pytest.fixture()
 def no_claim_token(auth_jwt_secret: str) -> str:
     payload: dict[str, Any] = {}
     return jwt.encode(payload, auth_jwt_secret, algorithm="HS256")
 
 
-@pytest.fixture
+@pytest.fixture()
 async def auth_client(auth_server: URL, admin_token: str) -> AsyncIterator[AuthClient]:
     async with AuthClient(url=auth_server, token=admin_token) as client:
         yield client
@@ -70,7 +71,7 @@ class _User:
 _UserFactory = Callable[..., Awaitable[_User]]
 
 
-@pytest.fixture
+@pytest.fixture()
 async def granter(auth_client: AuthClient, admin_token: str) -> Any:
     async def f(whom: Any, what: Any, sourcer: Any) -> None:
         headers = auth_client._generate_headers(sourcer.token)
@@ -82,7 +83,7 @@ async def granter(auth_client: AuthClient, admin_token: str) -> Any:
     return f
 
 
-@pytest.fixture
+@pytest.fixture()
 async def regular_user_factory(
     auth_client: AuthClient,
     token_factory: _TokenFactory,

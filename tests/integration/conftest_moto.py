@@ -7,10 +7,9 @@ import aiohttp
 import pytest
 from aiobotocore.client import AioBaseClient
 from aiobotocore.session import AioSession
+from platform_storage_api.config import AWSConfig
 from pytest_docker.plugin import Services
 from yarl import URL
-
-from platform_storage_api.config import AWSConfig
 
 
 @pytest.fixture(scope="session")

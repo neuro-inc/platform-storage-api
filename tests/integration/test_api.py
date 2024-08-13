@@ -13,17 +13,16 @@ import aiohttp
 import aiohttp.web
 import pytest
 import pytest_asyncio
-
 from platform_storage_api.config import Config
 from platform_storage_api.fs.local import FileStatusType
 
-from .conftest_auth import _User, _UserFactory
 from .conftest import (
     ApiConfig,
     get_filestatus_dict,
     get_liststatus_dict,
     status_iter_response_to_list,
 )
+from .conftest_auth import _User, _UserFactory
 
 
 def make_url(server_url: str, user: _User, path: str) -> str:
@@ -955,7 +954,7 @@ class TestStorage:
     @pytest.mark.parametrize("use_stream_response", [False, True])
     async def test_cant_delete_folder_without_non_recursive(
         self,
-        use_stream_response: bool,
+        use_stream_response: bool,  # noqa: FBT001
         server_url: str,
         client: aiohttp.ClientSession,
         regular_user_factory: _UserFactory,
@@ -1006,7 +1005,6 @@ class TestStorage:
 
 
 class TestGetFileStatus:
-
     payload = b"test"
     len_payload = len(payload)
     file1 = "file1.txt"
@@ -1050,15 +1048,15 @@ class TestGetFileStatus:
 
     @classmethod
     async def init_test_stat(
-        self, server_url: str, client: aiohttp.ClientSession, alice: _User
+        cls, server_url: str, client: aiohttp.ClientSession, alice: _User
     ) -> int:
         expected_mtime_min = int(current_time())
         # Alice creates a file in her home 'file1.txt'
-        await self.put_file(server_url, client, alice, self.file1)
+        await cls.put_file(server_url, client, alice, cls.file1)
         # and 'file3.txt' in directory 'dir3'
-        await self.put_file(server_url, client, alice, self.dir3_file3)
+        await cls.put_file(server_url, client, alice, cls.dir3_file3)
         # and 'dir4' in directory 'dir3'
-        await self.put_dir(server_url, client, alice, self.dir3_dir4)
+        await cls.put_dir(server_url, client, alice, cls.dir3_dir4)
         return expected_mtime_min
 
     async def test_filestatus_alice_checks_her_own_files(
@@ -1270,7 +1268,7 @@ class TestGetFileStatus:
             assert payload["modificationTime"] >= mtime_min
 
     @pytest.mark.parametrize(
-        "perm_file,perm_parent_dir",
+        ("perm_file", "perm_parent_dir"),
         [("read", "read"), ("write", "read"), ("manage", "read")],
     )
     async def test_filestatus_share_file_then_check_parent_dir(
@@ -1317,7 +1315,7 @@ class TestGetFileStatus:
             assert payload["modificationTime"] >= mtime_min
 
     @pytest.mark.parametrize(
-        "perm_dir,perm_parent_dir",
+        ("perm_dir", "perm_parent_dir"),
         [("read", "read"), ("write", "read"), ("manage", "read")],
     )
     async def test_filestatus_share_dir_then_check_parent_dir(
@@ -1379,7 +1377,7 @@ class TestGetFileStatus:
             assert payload["modificationTime"] >= mtime_min
 
     @pytest.mark.parametrize(
-        "perm_dir,perm_child_dir",
+        ("perm_dir", "perm_child_dir"),
         [("read", "read"), ("write", "write"), ("manage", "manage")],
     )
     async def test_filestatus_share_dir_then_check_child_dir(

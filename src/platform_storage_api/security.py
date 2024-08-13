@@ -11,6 +11,7 @@ from yarl import URL
 
 from .config import Config
 
+
 logger = logging.getLogger(__name__)
 
 AUTH_CLIENT_KEY = web.AppKey("auth_client", AuthClient)
@@ -75,7 +76,7 @@ class PermissionChecker(AbstractPermissionChecker):
     ) -> None:
         uri = self._path_to_uri(target_path)
         permission = Permission(uri=uri, action=action)
-        logger.info(f"Checking {permission}")
+        logger.info("Checking %s", permission)
         # TODO (Rafa Zubairov): test if user accessing his own data,
         # then use JWT token claims
         try:
@@ -83,8 +84,8 @@ class PermissionChecker(AbstractPermissionChecker):
         except web.HTTPUnauthorized:
             # TODO (Rafa Zubairov): Use tree based approach here
             self._raise_unauthorized()
-        except web.HTTPForbidden:
-            raise web.HTTPNotFound
+        except web.HTTPForbidden as e:
+            raise web.HTTPNotFound from e
 
     def _raise_unauthorized(self) -> None:
         raise web.HTTPUnauthorized(

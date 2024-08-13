@@ -5,7 +5,6 @@ from pathlib import Path, PurePath
 from typing import Any
 
 import pytest
-
 from platform_storage_api.fs.local import FileStatusType, FileSystem, LocalFileSystem
 from platform_storage_api.storage import (
     MultipleStoragePathResolver,
@@ -45,7 +44,7 @@ class TestMultipleStoragePathResolver:
 
 
 class TestStorage:
-    @pytest.fixture
+    @pytest.fixture()
     def storage(self, local_fs: FileSystem, local_tmp_dir_path: Path) -> Storage:
         return Storage(SingleStoragePathResolver(local_tmp_dir_path), local_fs)
 

@@ -9,12 +9,12 @@ from aiohttp.web import HTTPNotFound, Request
 from aiohttp_security.api import IDENTITY_KEY
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import IdentityPolicy
-
 from platform_storage_api.cache import (
     AbstractPermissionChecker,
     PermissionsCache,
     TimeFactory,
 )
+
 
 P = PurePath
 
@@ -43,8 +43,7 @@ class MockPermissionChecker(AbstractPermissionChecker):
             if sub_tree is None:
                 tree = ClientAccessSubTreeView(action=action, children={})
                 break
-            else:
-                tree = sub_tree
+            tree = sub_tree
         if not tree.can_list():
             raise HTTPNotFound
         return tree
@@ -66,7 +65,7 @@ class MockPermissionChecker(AbstractPermissionChecker):
             raise HTTPNotFound
 
 
-@pytest.fixture
+@pytest.fixture()
 def permission_tree() -> ClientAccessSubTreeView:
     return ClientAccessSubTreeView(
         action="deny",
@@ -87,12 +86,12 @@ def permission_tree() -> ClientAccessSubTreeView:
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def call_log() -> list[Any]:
     return []
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_time() -> TimeFactory:
     def mock_time() -> float:
         return mock_time.time  # type: ignore
@@ -101,7 +100,7 @@ def mock_time() -> TimeFactory:
     return mock_time
 
 
-@pytest.fixture
+@pytest.fixture()
 def cache(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -115,7 +114,7 @@ def cache(
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def slow_cache(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -129,7 +128,7 @@ def slow_cache(
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def webrequest() -> Request:
     webrequest = make_mocked_request(
         "GET", "/", headers={"Authorization": "Bearer authorization"}
@@ -307,8 +306,8 @@ async def test_expired_permissions_tree_concurrent(
         assert tree == ClientAccessSubTreeView("write", {})
 
     ntasks = 10
-    tasks = [asyncio.create_task(coro()) for i in range(ntasks)]
-    for i in range(ntasks):
+    tasks = [asyncio.create_task(coro()) for _ in range(ntasks)]
+    for _ in range(ntasks):
         await ready.acquire()
     start.set()
     await asyncio.gather(*tasks)
@@ -391,7 +390,7 @@ async def test_cached_path(
     call_log.clear()
 
     # Keep the path in the cache
-    for i in range(10):
+    for _ in range(10):
         # Expire cached permissions
         mock_time.time += 101.0
         await cache.check_user_permissions(webrequest, P("/bob/folder/file"), "write")

@@ -9,9 +9,9 @@ from unittest import mock
 
 import aiohttp
 import cbor
-
 from platform_storage_api.api import WSStorageOperation
 from platform_storage_api.fs.local import FileStatusType
+
 from tests.integration.conftest import (
     ApiConfig,
     get_filestatus_dict,
@@ -22,9 +22,9 @@ from .conftest_auth import _User, _UserFactory
 
 
 def ws_request(
-    op: WSStorageOperation, id: int, path: Optional[str] = None, **kwargs: Any
+    op: WSStorageOperation, id_: int, path: Optional[str] = None, **kwargs: Any
 ) -> bytes:
-    payload = {"op": op, "id": id, **kwargs}
+    payload = {"op": op, "id": id_, **kwargs}
     if path is not None:
         payload["path"] = path
     header = cbor.dumps(payload)

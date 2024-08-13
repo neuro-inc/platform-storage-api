@@ -12,6 +12,7 @@ from neuro_auth_client.client import ClientAccessSubTreeView
 
 from .security import AbstractPermissionChecker
 
+
 TimeFactory = Callable[[], float]
 PermissionsCacheKey = tuple[str, str]  # identity, path
 
@@ -62,7 +63,7 @@ class PermissionsCache(AbstractPermissionChecker):
         self._cache.move_to_end(key)
         return tree
 
-    async def _get_user_permissions_tree_cached(
+    async def _get_user_permissions_tree_cached(  # noqa: C901
         self, request: web.Request, target_path: PurePath
     ) -> Optional[ClientAccessSubTreeView]:
         self._cleanup_cache()
@@ -110,8 +111,7 @@ class PermissionsCache(AbstractPermissionChecker):
             sub_tree = tree.children.get(stack.pop())
             if sub_tree is None:
                 return ClientAccessSubTreeView(action=action, children={})
-            else:
-                tree = sub_tree
+            tree = sub_tree
         return tree
 
     async def _get_identity(self, request: web.Request) -> Optional[str]:

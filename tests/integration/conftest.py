@@ -29,6 +29,7 @@ from platform_storage_api.storage import SingleStoragePathResolver
 from platform_storage_api.storage_usage import StorageUsageService
 from yarl import URL
 
+
 pytest_plugins = [
     "tests.integration.conftest_docker",
     "tests.integration.conftest_auth",
@@ -66,12 +67,12 @@ class ApiConfig(NamedTuple):
         return self.endpoint + "/ping"
 
 
-@pytest.fixture
+@pytest.fixture()
 def server_url(api: ApiConfig) -> str:
     return api.storage_base_url
 
 
-@pytest.fixture
+@pytest.fixture()
 def multi_storage_server_url(multi_storage_api: ApiConfig) -> str:
     return multi_storage_api.storage_base_url
 
@@ -88,7 +89,7 @@ def platform_config(
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def config(
     platform_config: PlatformConfig, aws_config: AWSConfig, local_tmp_dir_path: Path
 ) -> Config:
@@ -102,12 +103,12 @@ def config(
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def metrics_config(aws_config: AWSConfig) -> MetricsConfig:
     return MetricsConfig(aws=aws_config)
 
 
-@pytest.fixture
+@pytest.fixture()
 def multi_storage_config(config: Config) -> Config:
     config = replace(config, storage=replace(config.storage, mode=StorageMode.MULTIPLE))
     Path(config.storage.fs_local_base_path, config.platform.cluster_name).mkdir(
@@ -146,7 +147,7 @@ async def client() -> AsyncIterator[aiohttp.ClientSession]:
         yield session
 
 
-@pytest.fixture
+@pytest.fixture()
 def cluster_name() -> str:
     return "test-cluster"
 

@@ -85,10 +85,7 @@ class EnvironConfigFactory:
 
     def _get_url(self, name: str) -> Optional[URL]:
         value = self._environ[name]
-        if value == "-":
-            return None
-        else:
-            return URL(value)
+        return None if value == "-" else URL(value)
 
     def create_storage(self) -> StorageConfig:
         fs_local_base_path = self._environ["NP_STORAGE_LOCAL_BASE_PATH"]
