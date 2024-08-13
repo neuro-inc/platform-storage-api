@@ -40,9 +40,9 @@ jobs:
     - name: Lint
       run: make lint
     - name: Run unit tests
-      run: make test-unit
+      run: make test_unit
     - name: Run integration tests
-      run: make test-integration
+      run: make test_integration
     - name: Build Docker image
       run: make build/image
     - name: Upload image artifact

@@ -19,11 +19,13 @@ lint:
 	. venv/bin/activate; \
 	python -m mypy src tests
 
-test-unit:
+.PHONY: test_unit
+test_unit:
 	. venv/bin/activate; \
 	pytest -vv tests/unit
 
-test-integration:
+.PHONY: test_integration
+test_integration:
 	. venv/bin/activate; \
 	pytest -vv tests/integration
 
