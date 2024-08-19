@@ -6,11 +6,12 @@ from unittest import mock
 
 import pytest
 from aioresponses import aioresponses
+
 from platform_storage_api.s3_storage import StorageMetricsAsyncS3Storage
 from platform_storage_api.storage_usage import StorageUsage, StorageUsageService
 
 
-@pytest.fixture()
+@pytest.fixture
 def aiohttp_mock() -> Iterator[aioresponses]:
     with aioresponses(passthrough=["http://0.0.0.0", "http://127.0.0.1"]) as mocked:
         yield mocked

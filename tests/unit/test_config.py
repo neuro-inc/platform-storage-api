@@ -1,13 +1,14 @@
 from pathlib import PurePath
 
 import pytest
+from yarl import URL
+
 from platform_storage_api.config import (
     Config,
     StorageConfig,
     StorageMode,
     StorageServerConfig,
 )
-from yarl import URL
 
 
 class TestServerConfig:

@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest import mock
 
 from aioresponses import aioresponses
+
 from platform_storage_api.config import Config
 from platform_storage_api.s3_storage import StorageMetricsAsyncS3Storage
 from platform_storage_api.storage_usage import StorageUsage

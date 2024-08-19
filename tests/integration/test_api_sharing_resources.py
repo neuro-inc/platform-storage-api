@@ -7,8 +7,8 @@ from unittest import mock
 
 import aiohttp
 import yarl
-from platform_storage_api.fs.local import FileStatusType
 
+from platform_storage_api.fs.local import FileStatusType
 from tests.integration.conftest import ApiConfig, status_iter_response_to_list
 
 from .conftest_auth import _User, _UserFactory

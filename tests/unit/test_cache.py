@@ -9,6 +9,7 @@ from aiohttp.web import HTTPNotFound, Request
 from aiohttp_security.api import IDENTITY_KEY
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import IdentityPolicy
+
 from platform_storage_api.cache import (
     AbstractPermissionChecker,
     PermissionsCache,
@@ -65,7 +66,7 @@ class MockPermissionChecker(AbstractPermissionChecker):
             raise HTTPNotFound
 
 
-@pytest.fixture()
+@pytest.fixture
 def permission_tree() -> ClientAccessSubTreeView:
     return ClientAccessSubTreeView(
         action="deny",
@@ -86,12 +87,12 @@ def permission_tree() -> ClientAccessSubTreeView:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def call_log() -> list[Any]:
     return []
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_time() -> TimeFactory:
     def mock_time() -> float:
         return mock_time.time  # type: ignore
@@ -100,7 +101,7 @@ def mock_time() -> TimeFactory:
     return mock_time
 
 
-@pytest.fixture()
+@pytest.fixture
 def cache(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -114,7 +115,7 @@ def cache(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def slow_cache(
     call_log: list[Any],
     permission_tree: ClientAccessSubTreeView,
@@ -128,7 +129,7 @@ def slow_cache(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def webrequest() -> Request:
     webrequest = make_mocked_request(
         "GET", "/", headers={"Authorization": "Bearer authorization"}
