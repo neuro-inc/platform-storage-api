@@ -6,7 +6,7 @@ import pytest
 from aioresponses import aioresponses
 
 
-@pytest.fixture()
+@pytest.fixture
 def aiohttp_mock() -> Iterator[aioresponses]:
     with aioresponses() as mocked:
         yield mocked

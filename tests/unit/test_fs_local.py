@@ -9,6 +9,7 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
+
 from platform_storage_api.fs.local import (
     FileStatus,
     FileStatusType,
@@ -68,27 +69,27 @@ RemoveMethod = Callable[[FileSystem, PurePath, bool], Coroutine[Any, Any, None]]
 
 
 class TestLocalFileSystem:
-    @pytest.fixture()
+    @pytest.fixture
     def tmp_dir_path(self) -> Iterator[Path]:
         # although blocking, this is fine for tests
         with tempfile.TemporaryDirectory() as d:
             yield Path(os.path.realpath(d))
 
-    @pytest.fixture()
+    @pytest.fixture
     def tmp_file_path(self, tmp_dir_path: Path) -> Iterator[Path]:
         # although blocking, this is fine for tests
         with tempfile.NamedTemporaryFile(dir=tmp_dir_path) as f:
             f.flush()
             yield Path(f.name)
 
-    @pytest.fixture()
+    @pytest.fixture
     def path_with_symlink(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "dir").mkdir()
         (tmp_dir_path / "dir/subdir").mkdir()
         os.symlink("dir", tmp_dir_path / "link")
         return tmp_dir_path / "link/subdir"
 
-    @pytest.fixture()
+    @pytest.fixture
     def symlink_to_dir(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "dir").mkdir()
         path = tmp_dir_path / "dirlink"
@@ -96,7 +97,7 @@ class TestLocalFileSystem:
         assert path.is_dir()
         return path
 
-    @pytest.fixture()
+    @pytest.fixture
     def symlink_to_file(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "file").write_bytes(b"test")
         path = tmp_dir_path / "filelink"
@@ -104,7 +105,7 @@ class TestLocalFileSystem:
         assert path.is_file()
         return path
 
-    @pytest.fixture()
+    @pytest.fixture
     def free_symlink(self, tmp_dir_path: Path) -> Path:
         path = tmp_dir_path / "nonexistentlink"
         os.symlink("nonexistent", path)

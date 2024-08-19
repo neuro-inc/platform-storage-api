@@ -9,9 +9,9 @@ from unittest import mock
 
 import aiohttp
 import cbor
+
 from platform_storage_api.api import WSStorageOperation
 from platform_storage_api.fs.local import FileStatusType
-
 from tests.integration.conftest import (
     ApiConfig,
     get_filestatus_dict,

@@ -9,21 +9,22 @@ import pytest
 from aiobotocore.client import AioBaseClient
 from aioresponses import aioresponses
 from fastapi import FastAPI
+from yarl import URL
+
 from platform_storage_api.config import MetricsConfig
 from platform_storage_api.metrics import create_app
 from platform_storage_api.storage_usage import StorageUsageService
-from yarl import URL
 
 from .conftest import run_asgi_app
 
 
-@pytest.fixture()
+@pytest.fixture
 def app(metrics_config: MetricsConfig) -> Iterator[FastAPI]:
     with create_app(config=metrics_config) as app:
         yield app
 
 
-@pytest.fixture()
+@pytest.fixture
 async def metrics_server(
     app: FastAPI, unused_tcp_port_factory: Callable[[], int]
 ) -> AsyncIterator[URL]:
@@ -33,7 +34,7 @@ async def metrics_server(
         yield URL(f"http://{host}:{port}")
 
 
-@pytest.fixture()
+@pytest.fixture
 async def client(metrics_server: URL) -> AsyncIterator[aiohttp.ClientSession]:
     async with aiohttp.ClientSession(base_url=metrics_server) as client:
         yield client

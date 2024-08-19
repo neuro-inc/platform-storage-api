@@ -7,9 +7,10 @@ import aiohttp
 import pytest
 from aiobotocore.client import AioBaseClient
 from aiobotocore.session import AioSession
-from platform_storage_api.config import AWSConfig
 from pytest_docker.plugin import Services
 from yarl import URL
+
+from platform_storage_api.config import AWSConfig
 
 
 @pytest.fixture(scope="session")
@@ -18,7 +19,7 @@ def _moto_server(docker_ip: str, docker_services: Services) -> URL:
     return URL(f"http://{docker_ip}:{port}")
 
 
-@pytest.fixture()
+@pytest.fixture
 async def moto_server(_moto_server: URL) -> AsyncIterator[URL]:
     yield _moto_server
     await _reset_moto_server(_moto_server)
@@ -30,7 +31,7 @@ async def _reset_moto_server(moto_url: URL) -> None:
             pass
 
 
-@pytest.fixture()
+@pytest.fixture
 def aws_config(moto_server: URL) -> AWSConfig:
     return AWSConfig(
         region="us-east-1",
@@ -41,12 +42,12 @@ def aws_config(moto_server: URL) -> AWSConfig:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def _session() -> AioSession:
     return aiobotocore.session.get_session()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def s3_client(
     moto_server: URL, aws_config: AWSConfig, _session: AioSession
 ) -> AsyncIterator[AioBaseClient]:

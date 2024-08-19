@@ -13,6 +13,8 @@ import pytest
 import pytest_asyncio
 import uvicorn
 from neuro_admin_client import AdminClient
+from yarl import URL
+
 from platform_storage_api.api import create_app
 from platform_storage_api.config import (
     AWSConfig,
@@ -27,7 +29,6 @@ from platform_storage_api.fs.local import FileSystem
 from platform_storage_api.s3_storage import StorageMetricsAsyncS3Storage
 from platform_storage_api.storage import SingleStoragePathResolver
 from platform_storage_api.storage_usage import StorageUsageService
-from yarl import URL
 
 
 pytest_plugins = [
@@ -67,17 +68,17 @@ class ApiConfig(NamedTuple):
         return self.endpoint + "/ping"
 
 
-@pytest.fixture()
+@pytest.fixture
 def server_url(api: ApiConfig) -> str:
     return api.storage_base_url
 
 
-@pytest.fixture()
+@pytest.fixture
 def multi_storage_server_url(multi_storage_api: ApiConfig) -> str:
     return multi_storage_api.storage_base_url
 
 
-@pytest.fixture()
+@pytest.fixture
 def platform_config(
     auth_server: URL, admin_token: str, cluster_name: str
 ) -> PlatformConfig:
@@ -89,7 +90,7 @@ def platform_config(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def config(
     platform_config: PlatformConfig, aws_config: AWSConfig, local_tmp_dir_path: Path
 ) -> Config:
@@ -103,12 +104,12 @@ def config(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def metrics_config(aws_config: AWSConfig) -> MetricsConfig:
     return MetricsConfig(aws=aws_config)
 
 
-@pytest.fixture()
+@pytest.fixture
 def multi_storage_config(config: Config) -> Config:
     config = replace(config, storage=replace(config.storage, mode=StorageMode.MULTIPLE))
     Path(config.storage.fs_local_base_path, config.platform.cluster_name).mkdir(
@@ -147,7 +148,7 @@ async def client() -> AsyncIterator[aiohttp.ClientSession]:
         yield session
 
 
-@pytest.fixture()
+@pytest.fixture
 def cluster_name() -> str:
     return "test-cluster"
 
@@ -166,7 +167,7 @@ def get_filestatus_dict(response_json: dict[str, Any]) -> dict[str, Any]:
     return response_json["FileStatus"]
 
 
-@pytest.fixture()
+@pytest.fixture
 async def admin_client() -> AsyncIterator[AdminClient]:
     async with AdminClient(
         base_url=URL("http://platform-admin/apis/admin/v1")
@@ -174,7 +175,7 @@ async def admin_client() -> AsyncIterator[AdminClient]:
         yield client
 
 
-@pytest.fixture()
+@pytest.fixture
 def storage_metrics_s3_storage(
     s3_client: aiobotocore.client.AioBaseClient, aws_config: AWSConfig
 ) -> StorageMetricsAsyncS3Storage:
@@ -183,7 +184,7 @@ def storage_metrics_s3_storage(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def storage_usage_service(
     config: Config,
     admin_client: AdminClient,
