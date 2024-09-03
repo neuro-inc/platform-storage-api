@@ -59,7 +59,7 @@ class TestMetrics:
         s3_client: AioBaseClient,
         metrics_config: MetricsConfig,
     ) -> None:
-        await s3_client.create_bucket(Bucket=metrics_config.aws.metrics_s3_bucket_name)
+        await s3_client.create_bucket(Bucket=metrics_config.s3.bucket_name)
 
         response = await client.get("/metrics")
 

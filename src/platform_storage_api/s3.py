@@ -9,12 +9,12 @@ import botocore
 import botocore.client
 import botocore.session
 
-from .config import AWSConfig
+from .config import S3Config
 
 
 @contextmanager
 def create_s3_client(
-    session: botocore.session.Session, config: AWSConfig
+    session: botocore.session.Session, config: S3Config
 ) -> Iterator[botocore.client.BaseClient]:
     client = session.create_client("s3", **_create_s3_client_kwargs(config))
     yield client
@@ -23,7 +23,7 @@ def create_s3_client(
 
 @asynccontextmanager
 async def create_async_s3_client(
-    session: aiobotocore.session.AioSession, config: AWSConfig
+    session: aiobotocore.session.AioSession, config: S3Config
 ) -> AsyncIterator[aiobotocore.client.AioBaseClient]:
     async with session.create_client(
         "s3", **_create_s3_client_kwargs(config)
@@ -31,7 +31,7 @@ async def create_async_s3_client(
         yield client
 
 
-def _create_s3_client_kwargs(config: AWSConfig) -> dict[str, Any]:
+def _create_s3_client_kwargs(config: S3Config) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
         "region_name": config.region,
         "config": botocore.config.Config(
@@ -42,6 +42,6 @@ def _create_s3_client_kwargs(config: AWSConfig) -> dict[str, Any]:
         kwargs["aws_access_key_id"] = config.access_key_id
     if config.secret_access_key:
         kwargs["aws_secret_access_key"] = config.secret_access_key
-    if config.s3_endpoint_url:
-        kwargs["endpoint_url"] = config.s3_endpoint_url
+    if config.endpoint_url:
+        kwargs["endpoint_url"] = config.endpoint_url
     return kwargs

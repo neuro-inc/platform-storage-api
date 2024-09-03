@@ -17,10 +17,10 @@ from yarl import URL
 
 from platform_storage_api.api import create_app
 from platform_storage_api.config import (
-    AWSConfig,
     Config,
     MetricsConfig,
     PlatformConfig,
+    S3Config,
     StorageConfig,
     StorageMode,
     StorageServerConfig,
@@ -92,7 +92,7 @@ def platform_config(
 
 @pytest.fixture
 def config(
-    platform_config: PlatformConfig, aws_config: AWSConfig, local_tmp_dir_path: Path
+    platform_config: PlatformConfig, s3_config: S3Config, local_tmp_dir_path: Path
 ) -> Config:
     server_config = StorageServerConfig()
     storage_config = StorageConfig(fs_local_base_path=local_tmp_dir_path)
@@ -100,13 +100,13 @@ def config(
         server=server_config,
         storage=storage_config,
         platform=platform_config,
-        aws=aws_config,
+        s3=s3_config,
     )
 
 
 @pytest.fixture
-def metrics_config(aws_config: AWSConfig) -> MetricsConfig:
-    return MetricsConfig(aws=aws_config)
+def metrics_config(s3_config: S3Config) -> MetricsConfig:
+    return MetricsConfig(s3=s3_config)
 
 
 @pytest.fixture
@@ -177,10 +177,10 @@ async def admin_client() -> AsyncIterator[AdminClient]:
 
 @pytest.fixture
 def storage_metrics_s3_storage(
-    s3_client: aiobotocore.client.AioBaseClient, aws_config: AWSConfig
+    s3_client: aiobotocore.client.AioBaseClient, s3_config: S3Config
 ) -> StorageMetricsAsyncS3Storage:
     return StorageMetricsAsyncS3Storage(
-        s3_client=s3_client, bucket_name=aws_config.metrics_s3_bucket_name
+        s3_client=s3_client, bucket_name=s3_config.bucket_name
     )
 
 

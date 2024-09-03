@@ -10,7 +10,7 @@ from aiobotocore.session import AioSession
 from pytest_docker.plugin import Services
 from yarl import URL
 
-from platform_storage_api.config import AWSConfig
+from platform_storage_api.config import S3Config
 
 
 @pytest.fixture(scope="session")
@@ -32,13 +32,13 @@ async def _reset_moto_server(moto_url: URL) -> None:
 
 
 @pytest.fixture
-def aws_config(moto_server: URL) -> AWSConfig:
-    return AWSConfig(
+def s3_config(moto_server: URL) -> S3Config:
+    return S3Config(
         region="us-east-1",
         access_key_id="test-access-key",
         secret_access_key="test-secret-key",
-        s3_endpoint_url=str(moto_server),
-        metrics_s3_bucket_name="storage-metrics",
+        endpoint_url=str(moto_server),
+        bucket_name="storage-metrics",
     )
 
 
@@ -49,13 +49,13 @@ def _session() -> AioSession:
 
 @pytest.fixture
 async def s3_client(
-    moto_server: URL, aws_config: AWSConfig, _session: AioSession
+    moto_server: URL, s3_config: S3Config, _session: AioSession
 ) -> AsyncIterator[AioBaseClient]:
     async with _session.create_client(
         "s3",
-        region_name=aws_config.region,
-        aws_access_key_id=aws_config.access_key_id,
-        aws_secret_access_key=aws_config.secret_access_key,
+        region_name=s3_config.region,
+        aws_access_key_id=s3_config.access_key_id,
+        aws_secret_access_key=s3_config.secret_access_key,
         endpoint_url=str(moto_server),
     ) as client:
         yield client
