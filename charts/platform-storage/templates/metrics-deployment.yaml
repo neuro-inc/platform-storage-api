@@ -37,7 +37,7 @@ spec:
         env:
           - name: SERVER_PORT
             value: {{ .Values.metrics.service.port | quote }}
-          {{- include "platformStorage.env.aws" . | nindent 10 }}
+          {{- include "platformStorage.env.s3" . | nindent 10 }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

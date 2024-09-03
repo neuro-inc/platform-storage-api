@@ -13,9 +13,9 @@ import aiobotocore.session
 from neuro_admin_client import AdminClient
 from neuro_logging import init_logging, new_trace, setup_sentry
 
-from .aws import create_async_s3_client
 from .config import Config, EnvironConfigFactory, StorageMode
 from .fs.local import FileSystem, LocalFileSystem
+from .s3 import create_async_s3_client
 from .s3_storage import StorageMetricsAsyncS3Storage
 from .storage import (
     MultipleStoragePathResolver,
@@ -54,11 +54,13 @@ async def create_app(config: Config) -> AsyncIterator[App]:
     async with AsyncExitStack() as exit_stack:
         session = aiobotocore.session.get_session()
         s3_client = await exit_stack.enter_async_context(
-            create_async_s3_client(session, config.aws)
+            create_async_s3_client(session, config.s3)
         )
 
         storage_metrics_s3_storage = StorageMetricsAsyncS3Storage(
-            s3_client, config.aws.metrics_s3_bucket_name
+            s3_client,
+            bucket_name=config.s3.bucket_name,
+            key_prefix=config.s3.key_prefix,
         )
 
         admin_client = await exit_stack.enter_async_context(

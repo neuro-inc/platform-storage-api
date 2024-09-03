@@ -10,7 +10,7 @@ from botocore.exceptions import ClientError
 from .storage_usage import StorageUsage
 
 
-_AWS_STORAGE_USAGE_KEY = "storage_usage.json"
+_S3_STORAGE_USAGE_KEY = "storage_usage.json"
 
 
 @pydantic.dataclasses.dataclass(frozen=True)
@@ -57,14 +57,24 @@ class _EntityFactory:
 
 
 class StorageMetricsS3Storage:
-    def __init__(self, s3_client: botocore.client.BaseClient, bucket_name: str) -> None:
+    def __init__(
+        self,
+        s3_client: botocore.client.BaseClient,
+        bucket_name: str,
+        key_prefix: str = "",
+    ) -> None:
         self._s3_client = s3_client
         self._bucket_name = bucket_name
+        self._key_prefix = key_prefix
+
+    @property
+    def _key(self) -> str:
+        return f"{self._key_prefix}{_S3_STORAGE_USAGE_KEY}"
 
     def get_storage_usage(self) -> StorageUsage:
         try:
             response = self._s3_client.get_object(
-                Bucket=self._bucket_name, Key=_AWS_STORAGE_USAGE_KEY
+                Bucket=self._bucket_name, Key=_S3_STORAGE_USAGE_KEY
             )
         except ClientError as err:
             if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
@@ -76,17 +86,25 @@ class StorageMetricsS3Storage:
 
 class StorageMetricsAsyncS3Storage:
     def __init__(
-        self, s3_client: aiobotocore.client.AioBaseClient, bucket_name: str
+        self,
+        s3_client: aiobotocore.client.AioBaseClient,
+        bucket_name: str,
+        key_prefix: str = "",
     ) -> None:
         self._s3_client = s3_client
         self._bucket_name = bucket_name
+        self._key_prefix = key_prefix
+
+    @property
+    def _key(self) -> str:
+        return f"{self._key_prefix}{_S3_STORAGE_USAGE_KEY}"
 
     async def put_storage_usage(self, storage_usage: StorageUsage) -> None:
         data = _PayloadFactory.create_storage_usage(storage_usage)
         put_object = functools.partial(
             self._s3_client.put_object,
             Bucket=self._bucket_name,
-            Key=_AWS_STORAGE_USAGE_KEY,
+            Key=self._key,
             Body=data,
         )
         try:
@@ -100,7 +118,7 @@ class StorageMetricsAsyncS3Storage:
     async def get_storage_usage(self) -> StorageUsage:
         try:
             response = await self._s3_client.get_object(
-                Bucket=self._bucket_name, Key=_AWS_STORAGE_USAGE_KEY
+                Bucket=self._bucket_name, Key=self._key
             )
         except ClientError as err:
             if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:

@@ -12,7 +12,7 @@ from neuro_admin_client import AdminClient
 from prometheus_client.metrics_core import GaugeMetricFamily, Metric
 from prometheus_client.registry import Collector
 
-from .config import AWSConfig, Config
+from .config import Config, S3Config
 from .fs.local import FileStatusType, FileSystem
 from .storage import StoragePathResolver
 
@@ -128,7 +128,7 @@ class StorageUsageService:
 
 class StorageUsageCollector(Collector):
     def __init__(
-        self, config: AWSConfig, storage_metrics_s3_storage: StorageMetricsS3Storage
+        self, config: S3Config, storage_metrics_s3_storage: StorageMetricsS3Storage
     ) -> None:
         super().__init__()
 

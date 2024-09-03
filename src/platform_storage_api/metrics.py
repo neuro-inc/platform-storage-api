@@ -10,8 +10,8 @@ from fastapi import FastAPI
 from neuro_logging import init_logging
 from prometheus_client import CollectorRegistry, make_asgi_app
 
-from .aws import create_s3_client
 from .config import EnvironConfigFactory, MetricsConfig
+from .s3 import create_s3_client
 from .s3_storage import StorageMetricsS3Storage
 from .storage_usage import StorageUsageCollector
 
@@ -21,15 +21,17 @@ def create_app(config: MetricsConfig) -> Iterator[FastAPI]:
     with ExitStack() as exit_stack:
         session = botocore.session.get_session()
         s3_client = exit_stack.enter_context(
-            create_s3_client(session=session, config=config.aws)
+            create_s3_client(session=session, config=config.s3)
         )
 
         storage_metrics_s3_storage = StorageMetricsS3Storage(
-            s3_client, config.aws.metrics_s3_bucket_name
+            s3_client,
+            bucket_name=config.s3.bucket_name,
+            key_prefix=config.s3.key_prefix,
         )
 
         collector = StorageUsageCollector(
-            config=config.aws, storage_metrics_s3_storage=storage_metrics_s3_storage
+            config=config.s3, storage_metrics_s3_storage=storage_metrics_s3_storage
         )
         registry = CollectorRegistry()
         registry.register(collector)

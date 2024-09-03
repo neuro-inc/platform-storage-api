@@ -43,8 +43,8 @@ class TestConfig:
             "NP_PLATFORM_ADMIN_URL": "-",
             "NP_PLATFORM_TOKEN": "test-token",
             "NP_PLATFORM_CLUSTER_NAME": "test-cluster",
-            "AWS_REGION": "test-region",
-            "AWS_METRICS_S3_BUCKET_NAME": "test-bucket",
+            "S3_REGION": "test-region",
+            "S3_BUCKET_NAME": "test-bucket",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
@@ -56,8 +56,8 @@ class TestConfig:
         assert config.platform.admin_url is None
         assert config.platform.token == "test-token"
         assert config.platform.cluster_name == "test-cluster"
-        assert config.aws.region == "test-region"
-        assert config.aws.metrics_s3_bucket_name == "test-bucket"
+        assert config.s3.region == "test-region"
+        assert config.s3.bucket_name == "test-bucket"
 
     def test_from_environ_custom(self) -> None:
         environ = {
@@ -69,8 +69,9 @@ class TestConfig:
             "NP_PLATFORM_TOKEN": "test-token",
             "NP_PLATFORM_CLUSTER_NAME": "test-cluster",
             "NP_STORAGE_API_KEEP_ALIVE_TIMEOUT": "900",
-            "AWS_REGION": "test-region",
-            "AWS_METRICS_S3_BUCKET_NAME": "test-bucket",
+            "S3_REGION": "test-region",
+            "S3_BUCKET_NAME": "test-bucket",
+            "S3_KEY_PREFIX": "test-key-prefix",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
@@ -81,5 +82,6 @@ class TestConfig:
         assert config.platform.admin_url == URL("http://platform-admin/apis/admin/v1")
         assert config.platform.token == "test-token"
         assert config.platform.cluster_name == "test-cluster"
-        assert config.aws.region == "test-region"
-        assert config.aws.metrics_s3_bucket_name == "test-bucket"
+        assert config.s3.region == "test-region"
+        assert config.s3.bucket_name == "test-bucket"
+        assert config.s3.key_prefix == "test-key-prefix"

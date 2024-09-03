@@ -51,7 +51,7 @@ release: {{ .Release.Name | quote }}
   value: {{ .Values.permissionForgettingInterval | quote }}
 - name: NP_STORAGE_API_KEEP_ALIVE_TIMEOUT
   value: {{ .Values.keepAliveTimeout | quote }}
-{{ include "platformStorage.env.aws" . }}
+{{ include "platformStorage.env.s3" . }}
 {{- if .Values.sentry }}
 - name: SENTRY_DSN
   value: {{ .Values.sentry.dsn }}
@@ -64,23 +64,27 @@ release: {{ .Release.Name | quote }}
 {{- end }}
 {{- end -}}
 
-{{- define "platformStorage.env.aws" -}}
-- name: AWS_REGION
-  value: {{ .Values.aws.region }}
-{{- if .Values.aws.accessKeyId }}
+{{- define "platformStorage.env.s3" -}}
+{{- if .Values.s3.accessKeyId }}
 - name: AWS_ACCESS_KEY_ID
-  {{- toYaml .Values.aws.accessKeyId | nindent 2 }}
+  {{- toYaml .Values.s3.accessKeyId | nindent 2 }}
 {{- end }}
-{{- if .Values.aws.secretAccessKey }}
+{{- if .Values.s3.secretAccessKey }}
 - name: AWS_SECRET_ACCESS_KEY
-  {{- toYaml .Values.aws.secretAccessKey | nindent 2 }}
+  {{- toYaml .Values.s3.secretAccessKey | nindent 2 }}
 {{- end }}
-{{- if .Values.aws.s3EndpointUrl }}
-- name: AWS_S3_ENDPOINT_URL
-  value: {{ .Values.aws.s3EndpointUrl }}
+- name: S3_REGION
+  value: {{ .Values.s3.region }}
+{{- if .Values.s3.endpoint }}
+- name: S3_ENDPOINT_URL
+  value: {{ .Values.s3.endpoint }}
 {{- end }}
-- name: AWS_METRICS_S3_BUCKET_NAME
-  value: {{ .Values.aws.metricsBucketName }}
+- name: S3_BUCKET_NAME
+  value: {{ .Values.s3.bucket }}
+{{- if .Values.s3.keyPrefix }}
+- name: S3_KEY_PREFIX
+  value: {{ .Values.s3.keyPrefix }}
+{{- end -}}
 {{- end -}}
 
 {{- define "platformStorage.volumes" -}}

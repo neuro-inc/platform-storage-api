@@ -9,9 +9,9 @@ from neuro_admin_client import AdminClient
 from yarl import URL
 
 from platform_storage_api.config import (
-    AWSConfig,
     Config,
     PlatformConfig,
+    S3Config,
     StorageConfig,
     StorageServerConfig,
 )
@@ -33,9 +33,9 @@ def config() -> Config:
             token="test-token",
             cluster_name="test-cluster",
         ),
-        aws=AWSConfig(
+        s3=S3Config(
             region="test-region",
-            metrics_s3_bucket_name="test-bucket",
+            bucket_name="test-bucket",
         ),
     )
 

@@ -51,12 +51,13 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
-class AWSConfig:
+class S3Config:
     region: str
-    metrics_s3_bucket_name: str
+    bucket_name: str
+    key_prefix: str = ""
     access_key_id: Optional[str] = field(repr=False, default=None)
     secret_access_key: Optional[str] = field(repr=False, default=None)
-    s3_endpoint_url: Optional[str] = None
+    endpoint_url: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -64,7 +65,7 @@ class Config:
     server: StorageServerConfig
     storage: StorageConfig
     platform: PlatformConfig
-    aws: AWSConfig
+    s3: S3Config
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -75,7 +76,7 @@ class Config:
 
 @dataclass(frozen=True)
 class MetricsConfig:
-    aws: AWSConfig
+    s3: S3Config
     server: ServerConfig = ServerConfig()
 
 
@@ -130,11 +131,12 @@ class EnvironConfigFactory:
             cluster_name=self._environ["NP_PLATFORM_CLUSTER_NAME"],
         )
 
-    def create_aws(self) -> AWSConfig:
-        return AWSConfig(
-            region=self._environ["AWS_REGION"],
-            s3_endpoint_url=self._environ.get("AWS_S3_ENDPOINT_URL"),
-            metrics_s3_bucket_name=self._environ["AWS_METRICS_S3_BUCKET_NAME"],
+    def create_s3(self) -> S3Config:
+        return S3Config(
+            region=self._environ["S3_REGION"],
+            endpoint_url=self._environ.get("S3_ENDPOINT_URL"),
+            bucket_name=self._environ["S3_BUCKET_NAME"],
+            key_prefix=self._environ.get("S3_KEY_PREFIX", S3Config.key_prefix),
         )
 
     def create(self) -> Config:
@@ -156,7 +158,7 @@ class EnvironConfigFactory:
             server=server_config,
             storage=storage_config,
             platform=self.create_platform(),
-            aws=self.create_aws(),
+            s3=self.create_s3(),
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
@@ -164,5 +166,5 @@ class EnvironConfigFactory:
     def create_metrics(self) -> MetricsConfig:
         return MetricsConfig(
             server=self.create_server(),
-            aws=self.create_aws(),
+            s3=self.create_s3(),
         )
