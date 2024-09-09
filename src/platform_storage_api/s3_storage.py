@@ -74,7 +74,7 @@ class StorageMetricsS3Storage:
     def get_storage_usage(self) -> StorageUsage:
         try:
             response = self._s3_client.get_object(
-                Bucket=self._bucket_name, Key=_S3_STORAGE_USAGE_KEY
+                Bucket=self._bucket_name, Key=self._key
             )
         except ClientError as err:
             if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
