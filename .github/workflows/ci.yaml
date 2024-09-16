@@ -111,9 +111,8 @@ jobs:
 #          platform_storage_version=${{ needs.release.outputs.version }}
 
   deploy_new_dev:
-    name: Deploy on dev
+    name: Deploy on new-dev
     runs-on: ubuntu-latest
-    needs: release
     steps:
     - name: Create Terraform Cloud run
       uses: neuro-inc/terraform-cloud-run-action@v24.7.0
