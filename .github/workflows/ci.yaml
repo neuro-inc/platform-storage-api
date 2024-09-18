@@ -94,6 +94,6 @@ jobs:
       uses: neuro-inc/terraform-cloud-run-action@v24.7.0
       with:
         token: ${{ secrets.TF_API_TOKEN }}
-        workspace: control-plane-dev
+        workspace: control-plane-apps-dev-421920
         variables: |
           platform_storage_version=${{ needs.release.outputs.version }}
