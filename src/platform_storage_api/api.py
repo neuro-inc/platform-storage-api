@@ -939,7 +939,10 @@ def main() -> None:
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
 
-    setup_sentry(health_check_url_path="/api/v1/ping")
+    setup_sentry(
+        health_check_url_path="/api/v1/ping",
+        ignore_errors=[FileNotFoundError, web.HTTPBadRequest, web.HTTPNotFound],
+    )
 
     loop = asyncio.get_event_loop()
     app = loop.run_until_complete(create_app(config))
