@@ -83,8 +83,8 @@ jobs:
       image: platformstorageapi
       helm_charts: platform-storage
 
-  deploy_dev:
-    name: Deploy to dev
+  deploy:
+    name: Deploy
     needs: release
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     uses: neuro-inc/reuse/.github/workflows/deploy-service.yaml@v24.10.0
