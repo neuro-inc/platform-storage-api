@@ -38,6 +38,9 @@ service:
 
 storages: []
 
+kube:
+  namespace: "default"
+
 sentry:
   appName: platform-storage
   sampleRate: 0.002

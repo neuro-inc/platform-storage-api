@@ -126,3 +126,7 @@ app: {{ include "platformStorage.name" . }}
 release: {{ .Release.Name }}
 service: platform-storage-metrics
 {{- end -}}
+
+{{- define "platformStorage.kubeAuthMountRoot" -}}
+{{- printf "/var/run/secrets/kubernetes.io/serviceaccount" -}}
+{{- end -}}

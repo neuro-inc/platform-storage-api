@@ -18,6 +18,14 @@ pip install -r requirements-test.txt
 pytest -vv tests
 ```
 
+NOTE:
+if you are running tests on a macOS,
+you should install the coreutils, so tests which are using the `du` cmd will work properly:
+
+```shell
+brew install coreutils
+```
+
 ### Running integration tests locally
 Make sure you have docker installed.
 To build docker image where test run, you should set the following ENV variables:
