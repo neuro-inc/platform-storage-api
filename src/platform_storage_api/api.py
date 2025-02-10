@@ -903,7 +903,6 @@ async def create_app(config: Config) -> web.Application:
             path_resolver = create_path_resolver(config, fs)
             storage = Storage(path_resolver, fs)
             app[API_V1_KEY][STORAGE_KEY] = storage
-
             # TODO (Rafa Zubairov): configured service shall ensure that
             # pre-requisites are up and running
             # TODO here we shall test whether AuthClient properly

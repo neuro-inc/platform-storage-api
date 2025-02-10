@@ -1,10 +1,15 @@
 import enum
+import logging
 import os
 from dataclasses import dataclass, field
-from pathlib import PurePath
-from typing import Optional
+from pathlib import Path, PurePath
+from typing import Optional, Union
 
+from apolo_kube_client.client import KubeClientAuthType
 from yarl import URL
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -61,11 +66,29 @@ class S3Config:
 
 
 @dataclass(frozen=True)
+class KubeConfig:
+    endpoint_url: str
+    cert_authority_data_pem: Optional[str] = field(repr=False, default=None)
+    cert_authority_path: Optional[str] = None
+    auth_type: KubeClientAuthType = KubeClientAuthType.NONE
+    auth_cert_path: Optional[str] = None
+    auth_cert_key_path: Optional[str] = None
+    token: Optional[str] = field(repr=False, default=None)
+    token_path: Optional[str] = None
+    namespace: str = "default"
+    client_conn_timeout_s: int = 300
+    client_read_timeout_s: int = 300
+    client_watch_timeout_s: int = 1800
+    client_conn_pool_size: int = 100
+
+
+@dataclass(frozen=True)
 class Config:
     server: StorageServerConfig
     storage: StorageConfig
     platform: PlatformConfig
     s3: S3Config
+    kube: Union[KubeConfig, None] = None
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -83,6 +106,31 @@ class MetricsConfig:
 class EnvironConfigFactory:
     def __init__(self, environ: Optional[dict[str, str]] = None) -> None:
         self._environ = environ or os.environ
+
+    def create(self) -> Config:
+        server_config = self.create_storage_server()
+        storage_config = self.create_storage()
+        permission_expiration_interval_s: float = float(
+            self._environ.get(
+                "NP_PERMISSION_EXPIRATION_INTERVAL",
+                Config.permission_expiration_interval_s,
+            )
+        )
+        permission_forgetting_interval_s: float = float(
+            self._environ.get(
+                "NP_PERMISSION_FORGETTING_INTERVAL",
+                Config.permission_forgetting_interval_s,
+            )
+        )
+        return Config(
+            server=server_config,
+            storage=storage_config,
+            platform=self.create_platform(),
+            s3=self.create_s3(),
+            kube=self.create_kube(),
+            permission_expiration_interval_s=permission_expiration_interval_s,
+            permission_forgetting_interval_s=permission_forgetting_interval_s,
+        )
 
     def _get_url(self, name: str) -> Optional[URL]:
         value = self._environ[name]
@@ -139,32 +187,53 @@ class EnvironConfigFactory:
             key_prefix=self._environ.get("S3_KEY_PREFIX", S3Config.key_prefix),
         )
 
-    def create(self) -> Config:
-        server_config = self.create_storage_server()
-        storage_config = self.create_storage()
-        permission_expiration_interval_s: float = float(
-            self._environ.get(
-                "NP_PERMISSION_EXPIRATION_INTERVAL",
-                Config.permission_expiration_interval_s,
-            )
-        )
-        permission_forgetting_interval_s: float = float(
-            self._environ.get(
-                "NP_PERMISSION_FORGETTING_INTERVAL",
-                Config.permission_forgetting_interval_s,
-            )
-        )
-        return Config(
-            server=server_config,
-            storage=storage_config,
-            platform=self.create_platform(),
-            s3=self.create_s3(),
-            permission_expiration_interval_s=permission_expiration_interval_s,
-            permission_forgetting_interval_s=permission_forgetting_interval_s,
-        )
-
     def create_metrics(self) -> MetricsConfig:
         return MetricsConfig(
             server=self.create_server(),
             s3=self.create_s3(),
+        )
+
+    def create_kube(self) -> Union[KubeConfig, None]:
+        endpoint_url = self._environ.get("NP_STORAGE_API_K8S_API_URL")
+        if not endpoint_url:
+            logger.info("kube client won't be initialized due to a missing url")
+            return None
+        auth_type = KubeClientAuthType(
+            self._environ.get(
+                "NP_STORAGE_API_K8S_AUTH_TYPE",
+                KubeConfig.auth_type.value
+            )
+        )
+        ca_path = self._environ.get("NP_STORAGE_API_K8S_CA_PATH")
+        ca_data = Path(ca_path).read_text() if ca_path else None
+
+        token_path = self._environ.get("NP_STORAGE_API_K8S_TOKEN_PATH")
+        token = Path(token_path).read_text() if token_path else None
+
+        return KubeConfig(
+            endpoint_url=endpoint_url,
+            cert_authority_data_pem=ca_data,
+            auth_type=auth_type,
+            auth_cert_path=self._environ.get("NP_STORAGE_API_K8S_AUTH_CERT_PATH"),
+            auth_cert_key_path=self._environ.get(
+                "NP_STORAGE_API_K8S_AUTH_CERT_KEY_PATH"),
+            token=token,
+            token_path=token_path,
+            namespace=self._environ.get("NP_STORAGE_API_K8S_NS", KubeConfig.namespace),
+            client_conn_timeout_s=int(
+                self._environ.get("NP_STORAGE_API_K8S_CLIENT_CONN_TIMEOUT")
+                or KubeConfig.client_conn_timeout_s
+            ),
+            client_read_timeout_s=int(
+                self._environ.get("NP_STORAGE_API_K8S_CLIENT_READ_TIMEOUT")
+                or KubeConfig.client_read_timeout_s
+            ),
+            client_watch_timeout_s=int(
+                self._environ.get("NP_STORAGE_API_K8S_CLIENT_WATCH_TIMEOUT")
+                or KubeConfig.client_watch_timeout_s
+            ),
+            client_conn_pool_size=int(
+                self._environ.get("NP_STORAGE_API_K8S_CLIENT_CONN_POOL_SIZE")
+                or KubeConfig.client_conn_pool_size
+            ),
         )
