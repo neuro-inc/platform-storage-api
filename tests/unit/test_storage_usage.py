@@ -10,6 +10,7 @@ from yarl import URL
 
 from platform_storage_api.config import (
     Config,
+    KubeConfig,
     PlatformConfig,
     S3Config,
     StorageConfig,
@@ -37,6 +38,9 @@ def config() -> Config:
             region="test-region",
             bucket_name="test-bucket",
         ),
+        kube=KubeConfig(
+            endpoint_url="https://localhost:8443",
+        )
     )
 
 

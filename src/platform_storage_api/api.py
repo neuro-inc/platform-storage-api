@@ -35,6 +35,7 @@ from .fs.local import (
     FileSystem,
     LocalFileSystem,
 )
+from .kube_service import KubeService, create_kube_client
 from .security import (
     AUTH_CLIENT_KEY,
     AbstractPermissionChecker,
@@ -63,6 +64,7 @@ MAX_WS_MESSAGE_SIZE = MAX_WS_READ_SIZE + 2**16 + 100
 API_V1_KEY = aiohttp.web.AppKey("api_v1", aiohttp.web.Application)
 CONFIG_KEY = aiohttp.web.AppKey("config", Config)
 STORAGE_KEY = aiohttp.web.AppKey("storage", Storage)
+KUBE_KEY = aiohttp.web.AppKey("kube", KubeService)
 
 
 class ApiHandler:
@@ -142,6 +144,10 @@ class StorageHandler:
         path_resource.add_route("GET", self.handle_get)
         path_resource.add_route("DELETE", self.handle_delete)
         path_resource.add_route("PATCH", self.handle_patch)
+
+    @property
+    def _kube_service(self) -> KubeService:
+        return self._app[KUBE_KEY]
 
     @property
     def _storage(self) -> Storage:
@@ -903,6 +909,12 @@ async def create_app(config: Config) -> web.Application:
             path_resolver = create_path_resolver(config, fs)
             storage = Storage(path_resolver, fs)
             app[API_V1_KEY][STORAGE_KEY] = storage
+            if config.kube is not None:
+                logger.info("Initializing Kubernetes client")
+                kube_client = await exit_stack.enter_async_context(
+                    create_kube_client(config.kube)
+                )
+                app[API_V1_KEY][KUBE_KEY] = KubeService(kube_client=kube_client)
 
             # TODO (Rafa Zubairov): configured service shall ensure that
             # pre-requisites are up and running
