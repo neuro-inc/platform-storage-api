@@ -13,15 +13,11 @@ import aiobotocore.session
 from neuro_admin_client import AdminClient
 from neuro_logging import init_logging, new_trace, setup_sentry
 
-from .config import Config, EnvironConfigFactory, StorageMode
-from .fs.local import FileSystem, LocalFileSystem
+from .config import Config, EnvironConfigFactory
+from .fs.local import LocalFileSystem
 from .s3 import create_async_s3_client
 from .s3_storage import StorageMetricsAsyncS3Storage
-from .storage import (
-    MultipleStoragePathResolver,
-    SingleStoragePathResolver,
-    StoragePathResolver,
-)
+from .storage import create_path_resolver
 from .storage_usage import StorageUsageService
 
 
@@ -37,16 +33,6 @@ class App:
         LOGGER.info("Starting storage usage collection")
         await self.storage_usage_service.upload_storage_usage()
         LOGGER.info("Finished storage usage collection")
-
-
-def create_path_resolver(config: Config, fs: FileSystem) -> StoragePathResolver:
-    if config.storage.mode == StorageMode.SINGLE:
-        return SingleStoragePathResolver(config.storage.fs_local_base_path)
-    return MultipleStoragePathResolver(
-        fs,
-        config.storage.fs_local_base_path,
-        config.storage.fs_local_base_path / config.platform.cluster_name,
-    )
 
 
 @asynccontextmanager

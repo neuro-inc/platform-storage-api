@@ -12,9 +12,7 @@ from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
     VolumeResolverError,
 )
-from platform_storage_api.cache import PermissionsCache
 from platform_storage_api.config import Config
-from platform_storage_api.security import AbstractPermissionChecker, PermissionChecker
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +23,7 @@ LABEL_APOLO_PROJECT_NAME = "platform.apolo.us/project"
 LABEL_APOLO_STORAGE_MOUNT_PATH = "platform.apolo.us/storage/mountPath"
 LABEL_APOLO_STORAGE_HOST_PATH = "platform.apolo.us/storage/hostPath"
 
-POD_INJECTED_VOLUME_NAME = "auto-injected-storage"
+POD_INJECTED_VOLUME_NAME = "storage-auto-injected-volume"
 
 
 class AdmissionReviewPatchType(str, Enum):
@@ -36,22 +34,13 @@ class AdmissionControllerApi:
     def __init__(self, app: web.Application, config: Config) -> None:
         self._app = app
         self._config = config
-        self._permission_checker: AbstractPermissionChecker = PermissionChecker(
-            app, config
-        )
-        if config.permission_expiration_interval_s > 0:
-            self._permission_checker = PermissionsCache(
-                self._permission_checker,
-                expiration_interval_s=config.permission_expiration_interval_s,
-                forgetting_interval_s=config.permission_forgetting_interval_s,
-            )
 
     @property
     def _volume_resolver(self) -> KubeVolumeResolver:
         return self._app[VOLUME_RESOLVER_KEY]
 
     def register(self, app: web.Application) -> None:
-        app.add_routes([web.post("", self.handle_post_mutate)])
+        app.add_routes([web.post("/mutate", self.handle_post_mutate)])
 
     async def handle_post_mutate(self, request: web.Request) -> Any:
         payload: dict[str, Any] = await request.json()
@@ -63,6 +52,7 @@ class AdmissionControllerApi:
         kind = obj.get("kind")
 
         if kind != "Pod":
+            # not a pod creation request. early-exit
             return web.json_response(response.to_dict())
 
         metadata = obj.get("metadata", {})
@@ -72,10 +62,17 @@ class AdmissionControllerApi:
         host_path_value = annotations.get(LABEL_APOLO_STORAGE_HOST_PATH)
 
         if not (mount_path_value and host_path_value):
-            # storage is not requested
+            # a pod does not request storage. we can do early-exit here
             return web.json_response(response.to_dict())
 
-        # let's first try to resolve a path which POD wants to mount
+        pod_spec = obj["spec"]
+        containers = pod_spec.get("containers") or []
+
+        if not containers:
+            # pod does not define any containers. we can exit
+            return web.json_response(response.to_dict())
+
+        # now let's try to resolve a path which POD wants to mount
         try:
             volume_spec = await self._volume_resolver.resolve_to_mount_volume(
                 path=host_path_value
@@ -86,8 +83,8 @@ class AdmissionControllerApi:
             response.allowed = False
             return web.json_response(response.to_dict())
 
-        # ensure spec.volumes exists
-        if "volumes" not in obj["spec"]:
+        # ensure volumes
+        if "volumes" not in pod_spec:
             response.add_patch(
                 path="/spec/volumes",
                 value=[]
@@ -102,23 +99,22 @@ class AdmissionControllerApi:
             }
         )
 
-        # 3) Add a volumeMount with subPath for the first container
-        if "containers" in obj["spec"] and len(obj["spec"]["containers"]) > 0:
-            if "volumeMounts" not in obj["spec"]["containers"][0]:
+        # add a volumeMount with mount path for all the POD containers
+        for idx, container in enumerate(containers):
+            if "volumeMounts" not in container:
                 response.add_patch(
-                    path="/spec/containers/0/volumeMounts",
+                    path=f"/spec/containers/{idx}/volumeMounts",
                     value=[]
                 )
 
             response.add_patch(
-                path="/spec/containers/0/volumeMounts/-",
+                path=f"/spec/containers/{idx}/volumeMounts/-",
                 value={
                     "name": POD_INJECTED_VOLUME_NAME,
                     "mountPath": mount_path_value,
                 }
             )
 
-        # Return as JSON
         return web.json_response(response.to_dict())
 
 

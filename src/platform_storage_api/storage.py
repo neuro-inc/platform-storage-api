@@ -8,6 +8,7 @@ from typing import Any, Optional, Union
 
 from neuro_logging import trace, trace_cm
 
+from .config import Config, StorageMode
 from .fs.local import (
     DiskUsage,
     FileStatus,
@@ -197,3 +198,13 @@ class Storage:
     async def disk_usage(self, path: Union[PurePath, str, None] = None) -> DiskUsage:
         real_path = await self._path_resolver.resolve_path(PurePath(path or "/"))
         return await self._fs.disk_usage(real_path)
+
+
+def create_path_resolver(config: Config, fs: FileSystem) -> StoragePathResolver:
+    if config.storage.mode == StorageMode.SINGLE:
+        return SingleStoragePathResolver(config.storage.fs_local_base_path)
+    return MultipleStoragePathResolver(
+        fs,
+        config.storage.fs_local_base_path,
+        config.storage.fs_local_base_path / config.platform.cluster_name,
+    )
