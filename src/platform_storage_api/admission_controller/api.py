@@ -95,7 +95,7 @@ class AdmissionControllerApi:
             path="/spec/volumes/-",
             value={
                 "name": POD_INJECTED_VOLUME_NAME,
-                **volume_spec,
+                **volume_spec.to_kube(),
             }
         )
 

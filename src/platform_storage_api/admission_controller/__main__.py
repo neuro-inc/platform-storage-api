@@ -26,5 +26,5 @@ def main() -> None:
     web.run_app(app, host=config.server.host, port=config.server.port)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
