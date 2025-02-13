@@ -4,12 +4,13 @@ import os
 import ssl
 import tempfile
 from base64 import b64decode
+from typing import cast
 
 from aiohttp import web
 from neuro_logging import init_logging, setup_sentry
 
 from platform_storage_api.admission_controller.app import create_app
-from platform_storage_api.config import Config
+from platform_storage_api.config import AdmissionControllerTlsConfig, Config
 
 
 logger = logging.getLogger(__name__)
@@ -33,10 +34,14 @@ def main() -> None:
     crt_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.crt')
     key_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.key')
 
+    tls_config = cast(
+        AdmissionControllerTlsConfig,
+        config.admission_controller_tls_config
+    )
     try:
         # extract certificates from the env and store in a temp files
-        crt_file.write(b64decode(config.admission_controller_tls_config.tls_cert).decode())
-        key_file.write(b64decode(config.admission_controller_tls_config.tls_key).decode())
+        crt_file.write(b64decode(tls_config.tls_cert).decode())
+        key_file.write(b64decode(tls_config.tls_key).decode())
         crt_file.close()
         key_file.close()
 
