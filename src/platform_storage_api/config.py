@@ -250,8 +250,8 @@ class EnvironConfigFactory:
     def create_admission_controller_tls_config(
         self
     ) -> Optional[AdmissionControllerTlsConfig]:
-        tls_key = self._environ.get("ADMISSION_CONTROLLER_TLS_KEY")
-        tls_cert = self._environ.get("ADMISSION_CONTROLLER_TLS_CERT")
+        tls_key = self._environ.get("NP_STORAGE_ADMISSION_CONTROLLER_TLS_KEY")
+        tls_cert = self._environ.get("NP_STORAGE_ADMISSION_CONTROLLER_TLS_CERT")
         if not (tls_key and tls_cert):
             return None
         return AdmissionControllerTlsConfig(
