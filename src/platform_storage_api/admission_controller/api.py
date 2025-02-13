@@ -31,7 +31,13 @@ class AdmissionReviewPatchType(str, Enum):
 
 
 class AdmissionControllerApi:
-    def __init__(self, app: web.Application, config: Config) -> None:
+
+    def __init__(
+        self,
+        app: web.Application,
+        config: Config
+    ) -> None:
+
         self._app = app
         self._config = config
 
@@ -40,7 +46,9 @@ class AdmissionControllerApi:
         return self._app[VOLUME_RESOLVER_KEY]
 
     def register(self, app: web.Application) -> None:
-        app.add_routes([web.post("/mutate", self.handle_post_mutate)])
+        app.add_routes([
+            web.post("/mutate", self.handle_post_mutate)
+        ])
 
     async def handle_post_mutate(self, request: web.Request) -> Any:
         payload: dict[str, Any] = await request.json()

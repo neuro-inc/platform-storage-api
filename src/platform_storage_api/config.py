@@ -83,12 +83,19 @@ class KubeConfig:
 
 
 @dataclass(frozen=True)
+class AdmissionControllerTlsConfig:
+    tls_cert: str = field(repr=False)
+    tls_key: str = field(repr=False)
+
+
+@dataclass(frozen=True)
 class Config:
     server: StorageServerConfig
     storage: StorageConfig
     platform: PlatformConfig
     s3: S3Config
-    kube: Union[KubeConfig, None] = None
+    kube: Optional[KubeConfig] = None
+    admission_controller_tls_config: Optional[AdmissionControllerTlsConfig] = None
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -128,6 +135,8 @@ class EnvironConfigFactory:
             platform=self.create_platform(),
             s3=self.create_s3(),
             kube=self.create_kube(),
+            admission_controller_tls_config=\
+                self.create_admission_controller_tls_config(),
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
@@ -236,4 +245,16 @@ class EnvironConfigFactory:
                 self._environ.get("NP_STORAGE_API_K8S_CLIENT_CONN_POOL_SIZE")
                 or KubeConfig.client_conn_pool_size
             ),
+        )
+
+    def create_admission_controller_tls_config(
+        self
+    ) -> Optional[AdmissionControllerTlsConfig]:
+        tls_key = self._environ.get("ADMISSION_CONTROLLER_TLS_KEY")
+        tls_cert = self._environ.get("ADMISSION_CONTROLLER_TLS_CERT")
+        if not (tls_key and tls_cert):
+            return None
+        return AdmissionControllerTlsConfig(
+            tls_key=tls_key,
+            tls_cert=tls_cert,
         )

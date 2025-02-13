@@ -1,5 +1,9 @@
 import asyncio
 import logging
+import os
+import ssl
+import tempfile
+from base64 import b64decode
 
 from aiohttp import web
 from neuro_logging import init_logging, setup_sentry
@@ -23,7 +27,34 @@ def main() -> None:
 
     loop = asyncio.get_event_loop()
     app = loop.run_until_complete(create_app(config))
-    web.run_app(app, host=config.server.host, port=config.server.port)
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+
+    crt_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.crt')
+    key_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.key')
+
+    try:
+        # extract certificates from the env and store in a temp files
+        crt_file.write(b64decode(config.admission_controller_tls_config.tls_cert).decode())
+        key_file.write(b64decode(config.admission_controller_tls_config.tls_key).decode())
+        crt_file.close()
+        key_file.close()
+
+        context.load_cert_chain(
+            certfile=crt_file.name,
+            keyfile=key_file.name,
+        )
+
+        web.run_app(
+            app,
+            host=config.server.host,
+            port=config.server.port,
+            ssl_context=context,
+        )
+
+    finally:
+        os.unlink(crt_file.name)
+        os.unlink(key_file.name)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [dsmyk/deployment]
     tags: [v*.*, v*.*.*]
   pull_request:
     branches: [master]
@@ -77,7 +77,7 @@ jobs:
   release:
     name: Create release
     needs: test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/dsmyk/deployment' || startsWith(github.ref, 'refs/tags/'))
     uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v24.10.0
     with:
       image: platformstorageapi
@@ -86,7 +86,7 @@ jobs:
   deploy:
     name: Deploy
     needs: release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dsmyk/deployment'
     uses: neuro-inc/reuse/.github/workflows/deploy-service.yaml@v24.10.0
     secrets:
       tf_api_token: ${{ secrets.TF_API_TOKEN }}
