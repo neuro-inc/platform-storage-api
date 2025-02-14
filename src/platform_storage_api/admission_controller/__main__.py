@@ -29,7 +29,7 @@ def main() -> None:
     loop = asyncio.get_event_loop()
     app = loop.run_until_complete(create_app(config))
 
-    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
     crt_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.crt')
     key_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.key')
@@ -57,6 +57,9 @@ def main() -> None:
             ssl_context=context,
         )
 
+    except Exception as e:
+        logger.exception("Unhandled error")
+        raise e
     finally:
         os.unlink(crt_file.name)
         os.unlink(key_file.name)

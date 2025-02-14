@@ -4,6 +4,7 @@ from contextlib import AsyncExitStack
 from typing import cast
 
 from aiohttp import web
+from apolo_kube_client.client import kube_client_from_config
 
 from platform_storage_api.admission_controller.api import AdmissionControllerApi
 from platform_storage_api.admission_controller.app_keys import (
@@ -11,7 +12,6 @@ from platform_storage_api.admission_controller.app_keys import (
 )
 from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
-    create_kube_client,
 )
 from platform_storage_api.config import Config, KubeConfig
 from platform_storage_api.fs.local import LocalFileSystem
@@ -37,7 +37,7 @@ async def create_app(config: Config) -> web.Application:
 
             kube_config = cast(KubeConfig, config.kube)
             kube_client = await exit_stack.enter_async_context(
-                create_kube_client(kube_config)
+                kube_client_from_config(kube_config)
             )
             volume_resolver = await exit_stack.enter_async_context(
                 KubeVolumeResolver(
