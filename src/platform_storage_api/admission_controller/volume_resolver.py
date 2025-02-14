@@ -17,6 +17,7 @@ from platform_storage_api.storage import StoragePathResolver
 logger = logging.getLogger(__name__)
 
 KUBE_PLATFORM_STORAGE_APP_NAME = "platform-storage"
+KUBE_PLATFORM_NAMESPACE = "platform"
 
 
 class VolumeResolverError(Exception):
@@ -114,6 +115,9 @@ class KubeVolumeResolver:
         Iterates over all platform-storage pods, and figure out all the
         real volumes mounted to those pods, real paths, etc.
         """
+        logger.info("initializing volume resolver")
+        namespace_url = self._kube.generate_namespace_url(KUBE_PLATFORM_NAMESPACE)
+
         # internal storage name to a PV and PVC names
         storage_name_to_pvc: dict[str, str] = {}
         storage_name_to_pv: dict[str, str] = {}
@@ -124,7 +128,7 @@ class KubeVolumeResolver:
         # get all platform-storage PODs, and sort them by a creation timestamp,
         # so we'll have the most up-to-date info about volumes.
         pods_response = await self._kube.get(
-            f"{self._kube.namespace_url}/pods",
+            f"{namespace_url}/pods",
             params={
                 "labelSelector": f"service={KUBE_PLATFORM_STORAGE_APP_NAME}",
             }
@@ -156,7 +160,7 @@ class KubeVolumeResolver:
             # get PVs by claim names
             for storage_name, claim_name in storage_name_to_pvc.items():
                 claim = await self._kube.get(
-                    f"{self._kube.namespace_url}/persistentvolumeclaims/{claim_name}")
+                    f"{namespace_url}/persistentvolumeclaims/{claim_name}")
                 storage_name_to_pv[storage_name] = claim["spec"]["volumeName"]
 
             # finally, get real underlying storage paths
