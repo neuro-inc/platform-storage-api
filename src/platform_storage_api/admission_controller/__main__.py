@@ -29,7 +29,7 @@ def main() -> None:
     loop = asyncio.get_event_loop()
     app = loop.run_until_complete(create_app(config))
 
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 
     crt_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.crt')
     key_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.key')
