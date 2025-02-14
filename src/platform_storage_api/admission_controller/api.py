@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 LABEL_APOLO_ORG_NAME = "platform.apolo.us/org"
 LABEL_APOLO_PROJECT_NAME = "platform.apolo.us/project"
-LABEL_APOLO_STORAGE_MOUNT_PATH = "platform.apolo.us/storage/mountPath"
-LABEL_APOLO_STORAGE_HOST_PATH = "platform.apolo.us/storage/hostPath"
+LABEL_APOLO_STORAGE_MOUNT_PATH = "platform.apolo.us/storage.mountPath"
+LABEL_APOLO_STORAGE_HOST_PATH = "platform.apolo.us/storage.hostPath"
 
 POD_INJECTED_VOLUME_NAME = "storage-auto-injected-volume"
 
@@ -51,6 +51,7 @@ class AdmissionControllerApi:
         ])
 
     async def handle_post_mutate(self, request: web.Request) -> Any:
+        logger.info("mutate call")
         payload: dict[str, Any] = await request.json()
 
         uid = payload["request"]["uid"]
@@ -71,15 +72,18 @@ class AdmissionControllerApi:
 
         if not (mount_path_value and host_path_value):
             # a pod does not request storage. we can do early-exit here
+            logger.info("POD won't be mutated because doesnt define proper annotations")
             return web.json_response(response.to_dict())
 
         pod_spec = obj["spec"]
         containers = pod_spec.get("containers") or []
 
         if not containers:
+            logger.info("POD won't be mutated because doesnt define containers")
             # pod does not define any containers. we can exit
             return web.json_response(response.to_dict())
 
+        logger.info("Going to inject volumes")
         # now let's try to resolve a path which POD wants to mount
         try:
             volume_spec = await self._volume_resolver.resolve_to_mount_volume(
