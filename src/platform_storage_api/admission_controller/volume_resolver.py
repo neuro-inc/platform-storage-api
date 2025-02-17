@@ -5,6 +5,7 @@ from pathlib import PurePath
 from types import TracebackType
 from typing import Any, Optional
 
+import aiorwlock
 from apolo_kube_client.client import KubeClient
 
 from platform_storage_api.storage import StoragePathResolver
@@ -77,6 +78,8 @@ class KubeVolumeResolver:
         and a value is a kube volume definition.
         """
 
+        self._refresh_lock = aiorwlock.RWLock()
+
     async def __aenter__(self) -> "KubeVolumeResolver":
         """
         Initialize the kube volume resolver.
@@ -84,79 +87,7 @@ class KubeVolumeResolver:
         real volumes mounted to those pods, real paths, etc.
         """
         logger.info("initializing volume resolver")
-        namespace_url = self._kube.generate_namespace_url(KUBE_PLATFORM_NAMESPACE)
-
-        # internal storage name to a PV and PVC names
-        storage_name_to_pvc: dict[str, str] = {}
-        storage_name_to_pv: dict[str, str] = {}
-
-        # storage name to a local mounted path
-        storage_name_to_local_path: dict[str, str] = {}
-
-        # get all platform-storage PODs, and sort them by a creation timestamp,
-        # so we'll have the most up-to-date info about volumes.
-        pods_response = await self._kube.get(
-            f"{namespace_url}/pods",
-            params={
-                "labelSelector": f"service={KUBE_PLATFORM_STORAGE_APP_NAME}",
-            }
-        )
-        pods = sorted(
-            pods_response["items"],
-            key=lambda pod: pod["metadata"]["creationTimestamp"]
-        )
-
-        for pod in pods:
-
-            # go over volumes to identify linked PVCs
-            for volume in pod["spec"]["volumes"]:
-                pvc = volume.get("persistentVolumeClaim")
-                if not pvc:
-                    continue
-                storage_name, pvc_name = volume["name"], pvc["claimName"]
-                storage_name_to_pvc[storage_name] = pvc_name
-
-            # now let's go over containers and figure out mount paths for volumes
-            for container in pod["spec"]["containers"]:
-                for volume_mount in container["volumeMounts"]:
-                    volume_name = volume_mount["name"]
-                    if volume_name not in storage_name_to_pvc:
-                        continue
-                    mount_path = volume_mount["mountPath"]
-                    storage_name_to_local_path[volume_name] = mount_path
-
-            # get PVs by claim names
-            for storage_name, claim_name in storage_name_to_pvc.items():
-                claim = await self._kube.get(
-                    f"{namespace_url}/persistentvolumeclaims/{claim_name}")
-                storage_name_to_pv[storage_name] = claim["spec"]["volumeName"]
-
-            # finally, get real underlying storage paths
-            for storage_name, pv_name in storage_name_to_pv.items():
-                pv = await self._kube.get(
-                    f"{self._kube.api_v1_url}/persistentvolumes/{pv_name}")
-
-                # find a supported volume backend for this storage
-                try:
-                    volume_backend = next(
-                        iter(
-                            vb for vb in VolumeBackend if vb in pv["spec"]
-                        )
-                    )
-                except StopIteration:
-                    logger.info(
-                        "storage `%s` doesn't define supported volume backends",
-                        storage_name
-                    )
-                    continue
-
-                local_path = storage_name_to_local_path[storage_name]
-                volume_definition = KubeVolume(
-                    backend=volume_backend,
-                    spec=NfsVolumeSpec.from_pv(pv=pv),
-                )
-                self._local_fs_prefix_to_kube_volume[local_path] = volume_definition
-
+        await self._refresh_internal_state()
         return self
 
     async def __aexit__(
@@ -167,6 +98,85 @@ class KubeVolumeResolver:
     ) -> bool:
         return exc_type is None
 
+    async def _refresh_internal_state(self) -> None:
+        """
+        Refreshes an internal mapping of volumes
+        """
+        async with self._refresh_lock.writer_lock:  # type: ignore[attr-defined]
+            logger.info("refreshing internal state")
+            namespace_url = self._kube.generate_namespace_url(KUBE_PLATFORM_NAMESPACE)
+
+            # internal storage name to a PV and PVC names
+            storage_name_to_pvc: dict[str, str] = {}
+            storage_name_to_pv: dict[str, str] = {}
+
+            # storage name to a local mounted path
+            storage_name_to_local_path: dict[str, str] = {}
+
+            # get all platform-storage PODs, and sort them by a creation timestamp,
+            # so we'll have the most up-to-date info about volumes.
+            pods_response = await self._kube.get(
+                f"{namespace_url}/pods",
+                params={
+                    "labelSelector": f"service={KUBE_PLATFORM_STORAGE_APP_NAME}",
+                }
+            )
+            pods = sorted(
+                pods_response["items"],
+                key=lambda pod: pod["metadata"]["creationTimestamp"]
+            )
+
+            for pod in pods:
+
+                # go over volumes to identify linked PVCs
+                for volume in pod["spec"]["volumes"]:
+                    pvc = volume.get("persistentVolumeClaim")
+                    if not pvc:
+                        continue
+                    storage_name, pvc_name = volume["name"], pvc["claimName"]
+                    storage_name_to_pvc[storage_name] = pvc_name
+
+                # now let's go over containers and figure out mount paths for volumes
+                for container in pod["spec"]["containers"]:
+                    for volume_mount in container["volumeMounts"]:
+                        volume_name = volume_mount["name"]
+                        if volume_name not in storage_name_to_pvc:
+                            continue
+                        mount_path = volume_mount["mountPath"]
+                        storage_name_to_local_path[volume_name] = mount_path
+
+                # get PVs by claim names
+                for storage_name, claim_name in storage_name_to_pvc.items():
+                    claim = await self._kube.get(
+                        f"{namespace_url}/persistentvolumeclaims/{claim_name}")
+                    storage_name_to_pv[storage_name] = claim["spec"]["volumeName"]
+
+                # finally, get real underlying storage paths
+                for storage_name, pv_name in storage_name_to_pv.items():
+                    pv = await self._kube.get(
+                        f"{self._kube.api_v1_url}/persistentvolumes/{pv_name}")
+
+                    # find a supported volume backend for this storage
+                    try:
+                        volume_backend = next(
+                            iter(
+                                vb for vb in VolumeBackend if vb in pv["spec"]
+                            )
+                        )
+                    except StopIteration:
+                        logger.info(
+                            "storage `%s` doesn't define supported volume backends",
+                            storage_name
+                        )
+                        continue
+
+                    local_path = storage_name_to_local_path[storage_name]
+                    volume_definition = KubeVolume(
+                        backend=volume_backend,
+                        spec=NfsVolumeSpec.from_pv(pv=pv),
+                    )
+                    self._local_fs_prefix_to_kube_volume[local_path] = volume_definition
+
     async def resolve_to_mount_volume(
         self,
         path: str
@@ -175,27 +185,28 @@ class KubeVolumeResolver:
         Resolves a path to a proper mount volume, so later it can be used
         in a kube spec of a POD.
         """
-        normalized_path = PurePath(path.replace("storage://", "/"))
-        local_path = await self._path_resolver.resolve_path(normalized_path)
-        str_local_path = str(local_path)
+        async with self._refresh_lock.reader_lock:  # type: ignore[attr-defined]
+            normalized_path = PurePath(path.replace("storage://", "/"))
+            local_path = await self._path_resolver.resolve_path(normalized_path)
+            str_local_path = str(local_path)
 
-        for fs_path_prefix, kube_volume in self._local_fs_prefix_to_kube_volume.items():
+            for fs_path_prefix, kube_volume \
+                    in self._local_fs_prefix_to_kube_volume.items():
+                if not str_local_path.startswith(fs_path_prefix):
+                    continue
 
-            if not str_local_path.startswith(fs_path_prefix):
-                continue
-
-            # patch match, so we create a new volume definition with the adjusted path
-            new_mount_path = str_local_path.replace(
-                fs_path_prefix,
-                kube_volume.spec.path,
-                1,  # replace it only once at the beginning of the string
-            )
-            return KubeVolume(
-                backend=kube_volume.backend,
-                spec=NfsVolumeSpec(
-                    server=kube_volume.spec.server,
-                    path=new_mount_path
+                # patch match, so we create a new volume with the adjusted path
+                new_mount_path = str_local_path.replace(
+                    fs_path_prefix,
+                    kube_volume.spec.path,
+                    1,  # replace it only once at the beginning of the string
                 )
-            )
+                return KubeVolume(
+                    backend=kube_volume.backend,
+                    spec=NfsVolumeSpec(
+                        server=kube_volume.spec.server,
+                        path=new_mount_path
+                    )
+                )
 
-        raise VolumeResolverError()
+            raise VolumeResolverError()

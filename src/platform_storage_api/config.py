@@ -200,8 +200,6 @@ class EnvironConfigFactory:
         ca_data = Path(ca_path).read_text() if ca_path else None
 
         token_path = self._environ.get("NP_STORAGE_API_K8S_TOKEN_PATH")
-        # todo: kube client will read the token. this can be removed
-        token = Path(token_path).read_text().strip() if token_path else None
 
         return KubeConfig(
             endpoint_url=endpoint_url,
@@ -210,7 +208,7 @@ class EnvironConfigFactory:
             auth_cert_path=self._environ.get("NP_STORAGE_API_K8S_AUTH_CERT_PATH"),
             auth_cert_key_path=self._environ.get(
                 "NP_STORAGE_API_K8S_AUTH_CERT_KEY_PATH"),
-            token=token,
+            token=None,
             token_path=token_path,
             namespace=self._environ.get("NP_STORAGE_API_K8S_NS", KubeConfig.namespace),
             client_conn_timeout_s=int(
