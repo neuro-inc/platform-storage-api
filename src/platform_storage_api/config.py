@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 from typing import Optional, Union
 
-from apolo_kube_client.client import KubeClientAuthType
+from apolo_kube_client.client import KubeClientAuthType, KubeConfig
 from yarl import URL
 
 
@@ -66,20 +66,9 @@ class S3Config:
 
 
 @dataclass(frozen=True)
-class KubeConfig:
-    endpoint_url: str
-    cert_authority_data_pem: Optional[str] = field(repr=False, default=None)
-    cert_authority_path: Optional[str] = None
-    auth_type: KubeClientAuthType = KubeClientAuthType.NONE
-    auth_cert_path: Optional[str] = None
-    auth_cert_key_path: Optional[str] = None
-    token: Optional[str] = field(repr=False, default=None)
-    token_path: Optional[str] = None
-    namespace: str = "default"
-    client_conn_timeout_s: int = 300
-    client_read_timeout_s: int = 300
-    client_watch_timeout_s: int = 1800
-    client_conn_pool_size: int = 100
+class AdmissionControllerTlsConfig:
+    tls_cert: str = field(repr=False)
+    tls_key: str = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -88,7 +77,8 @@ class Config:
     storage: StorageConfig
     platform: PlatformConfig
     s3: S3Config
-    kube: Union[KubeConfig, None] = None
+    kube: Optional[KubeConfig] = None
+    admission_controller_tls_config: Optional[AdmissionControllerTlsConfig] = None
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -128,6 +118,8 @@ class EnvironConfigFactory:
             platform=self.create_platform(),
             s3=self.create_s3(),
             kube=self.create_kube(),
+            admission_controller_tls_config=\
+                self.create_admission_controller_tls_config(),
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
@@ -208,7 +200,8 @@ class EnvironConfigFactory:
         ca_data = Path(ca_path).read_text() if ca_path else None
 
         token_path = self._environ.get("NP_STORAGE_API_K8S_TOKEN_PATH")
-        token = Path(token_path).read_text() if token_path else None
+        # todo: kube client will read the token. this can be removed
+        token = Path(token_path).read_text().strip() if token_path else None
 
         return KubeConfig(
             endpoint_url=endpoint_url,
@@ -236,4 +229,16 @@ class EnvironConfigFactory:
                 self._environ.get("NP_STORAGE_API_K8S_CLIENT_CONN_POOL_SIZE")
                 or KubeConfig.client_conn_pool_size
             ),
+        )
+
+    def create_admission_controller_tls_config(
+        self
+    ) -> Optional[AdmissionControllerTlsConfig]:
+        tls_key = self._environ.get("NP_STORAGE_ADMISSION_CONTROLLER_TLS_KEY")
+        tls_cert = self._environ.get("NP_STORAGE_ADMISSION_CONTROLLER_TLS_CERT")
+        if not (tls_key and tls_cert):
+            return None
+        return AdmissionControllerTlsConfig(
+            tls_key=tls_key,
+            tls_cert=tls_cert,
         )

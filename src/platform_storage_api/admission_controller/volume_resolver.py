@@ -1,22 +1,19 @@
 import dataclasses
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from enum import Enum
 from pathlib import PurePath
 from types import TracebackType
 from typing import Any, Optional
 
-import aiohttp
 from apolo_kube_client.client import KubeClient
 
-from platform_storage_api.config import KubeConfig
 from platform_storage_api.storage import StoragePathResolver
 
 
 logger = logging.getLogger(__name__)
 
 KUBE_PLATFORM_STORAGE_APP_NAME = "platform-storage"
+KUBE_PLATFORM_NAMESPACE = "platform"
 
 
 class VolumeResolverError(Exception):
@@ -65,34 +62,6 @@ class KubeVolume:
         }
 
 
-@asynccontextmanager
-async def create_kube_client(
-    config: KubeConfig,
-    trace_configs: Optional[list[aiohttp.TraceConfig]] = None
-) -> AsyncIterator[KubeClient]:
-    client = KubeClient(
-        base_url=config.endpoint_url,
-        namespace=config.namespace,
-        cert_authority_path=config.cert_authority_path,
-        cert_authority_data_pem=config.cert_authority_data_pem,
-        auth_type=config.auth_type,
-        auth_cert_path=config.auth_cert_path,
-        auth_cert_key_path=config.auth_cert_key_path,
-        token=config.token,
-        token_path=config.token_path,
-        conn_timeout_s=config.client_conn_timeout_s,
-        read_timeout_s=config.client_read_timeout_s,
-        watch_timeout_s=config.client_watch_timeout_s,
-        conn_pool_size=config.client_conn_pool_size,
-        trace_configs=trace_configs,
-    )
-    try:
-        await client.init()
-        yield client
-    finally:
-        await client.close()
-
-
 class KubeVolumeResolver:
 
     def __init__(
@@ -114,6 +83,9 @@ class KubeVolumeResolver:
         Iterates over all platform-storage pods, and figure out all the
         real volumes mounted to those pods, real paths, etc.
         """
+        logger.info("initializing volume resolver")
+        namespace_url = self._kube.generate_namespace_url(KUBE_PLATFORM_NAMESPACE)
+
         # internal storage name to a PV and PVC names
         storage_name_to_pvc: dict[str, str] = {}
         storage_name_to_pv: dict[str, str] = {}
@@ -124,7 +96,7 @@ class KubeVolumeResolver:
         # get all platform-storage PODs, and sort them by a creation timestamp,
         # so we'll have the most up-to-date info about volumes.
         pods_response = await self._kube.get(
-            f"{self._kube.namespace_url}/pods",
+            f"{namespace_url}/pods",
             params={
                 "labelSelector": f"service={KUBE_PLATFORM_STORAGE_APP_NAME}",
             }
@@ -156,7 +128,7 @@ class KubeVolumeResolver:
             # get PVs by claim names
             for storage_name, claim_name in storage_name_to_pvc.items():
                 claim = await self._kube.get(
-                    f"{self._kube.namespace_url}/persistentvolumeclaims/{claim_name}")
+                    f"{namespace_url}/persistentvolumeclaims/{claim_name}")
                 storage_name_to_pv[storage_name] = claim["spec"]["volumeName"]
 
             # finally, get real underlying storage paths

@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.admissionController.app_name }}-sa
+  annotations:
+    "helm.sh/hook": pre-upgrade, post-upgrade
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Values.admissionController.app_name }}-role
+  annotations:
+    "helm.sh/hook": pre-upgrade, post-upgrade
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.admissionController.app_name }}-role-binding
+  annotations:
+    "helm.sh/hook": pre-upgrade, post-upgrade
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.admissionController.app_name }}-sa
+    namespace: platform
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: {{ .Values.admissionController.app_name }}-role
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.admissionController.app_name}}-clusterrole
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.admissionController.app_name}}-clusterrolebinding
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.admissionController.app_name}}-sa
+    namespace: platform
+roleRef:
+  kind: ClusterRole
+  name: {{ .Values.admissionController.app_name}}-clusterrole
+  apiGroup: rbac.authorization.k8s.io
