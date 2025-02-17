@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.admissionController.app_name }}-svc
+  namespace: platform
+spec:
+  selector:
+    app: {{ .Values.admissionController.app_name }}
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8080
+      protocol: TCP

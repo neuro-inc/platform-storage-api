@@ -51,6 +51,20 @@ release: {{ .Release.Name | quote }}
   value: {{ .Values.permissionForgettingInterval | quote }}
 - name: NP_STORAGE_API_KEEP_ALIVE_TIMEOUT
   value: {{ .Values.keepAliveTimeout | quote }}
+- name: NP_STORAGE_API_K8S_API_URL
+  value: https://kubernetes.default:443
+- name: NP_STORAGE_API_K8S_AUTH_TYPE
+  value: token
+- name: NP_STORAGE_API_K8S_CA_PATH
+  value: {{ include "platformStorage.kubeAuthMountRoot" . }}/ca.crt
+- name: NP_STORAGE_API_K8S_TOKEN_PATH
+  value: {{ include "platformStorage.kubeAuthMountRoot" . }}/token
+- name: NP_STORAGE_API_K8S_NS
+  value: {{ .Values.kube.namespace | default "default" | quote }}
+- name: NP_STORAGE_ADMISSION_CONTROLLER_TLS_KEY
+  value: {{ .Values.admissionController.storage_admission_controller_tls_key}}
+- name: NP_STORAGE_ADMISSION_CONTROLLER_TLS_CERT
+  value: {{ .Values.admissionController.storage_admission_controller_tls_cert}}
 {{ include "platformStorage.env.s3" . }}
 {{- if .Values.sentry }}
 - name: SENTRY_DSN

@@ -1,0 +1,23 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: platform-storage-mutating-webhook
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+webhooks:
+  - name: pod-volume-injector.apolo.us
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+    clientConfig:
+      caBundle: {{ .Values.admissionController.storage_admission_controller_ca_bundle }}
+      service:
+        namespace: platform
+        name: {{ .Values.admissionController.app_name }}-svc
+        path: /admission-controller/mutate
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: ["*"]
+        apiVersions: ["*"]
+        resources: ["pods"]
+    failurePolicy: Ignore

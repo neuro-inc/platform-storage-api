@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.admissionController.app_name }}
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.admissionController.app_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.admissionController.app_name }}
+    spec:
+      serviceAccountName: {{ .Values.admissionController.app_name }}-sa
+      containers:
+      - name: admission-controller
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - platform-storage-admission-controller
+        ports:
+          - containerPort: {{ .Values.admissionController.service.port }}
+            name: http
+            protocol: TCP
+        env:
+          - name: SERVER_PORT
+            value: {{ .Values.admissionController.service.port | quote }}
+          {{- include "platformStorage.env" . | nindent 10 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -85,3 +85,24 @@ metrics:
 
   serviceMonitor:
     enabled: true
+
+
+admissionController:
+  app_name: "storage-admission-controller"
+  storage_admission_controller_tls_key:
+    valueFrom:
+      secretKeyRef:
+        name: platform-storage-admission-controller
+        key: tls-key
+  storage_admission_controller_tls_cert:
+    valueFrom:
+      secretKeyRef:
+        name: platform-storage-admission-controller
+        key: tls-cert
+  storage_admission_controller_ca_bundle:
+    valueFrom:
+      secretKeyRef:
+        name: platform-storage-admission-controller
+        key: ca-bundle
+  service:
+    port: 8080

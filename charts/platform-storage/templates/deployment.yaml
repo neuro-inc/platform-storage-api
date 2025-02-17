@@ -55,16 +55,6 @@ spec:
         {{- end }}
         env:
           {{- include "platformStorage.env" . | nindent 10 }}
-          - name: NP_STORAGE_API_K8S_API_URL
-            value: https://kubernetes.default:443
-          - name: NP_STORAGE_API_K8S_AUTH_TYPE
-            value: token
-          - name: NP_STORAGE_API_K8S_CA_PATH
-            value: {{ include "platformStorage.kubeAuthMountRoot" . }}/ca.crt
-          - name: NP_STORAGE_API_K8S_TOKEN_PATH
-            value: {{ include "platformStorage.kubeAuthMountRoot" . }}/token
-          - name: NP_STORAGE_API_K8S_NS
-            value: {{ .Values.kube.namespace | default "default" | quote }}
         {{- if .Values.storages }}
         volumeMounts:
           {{- include "platformStorage.volumeMounts" . | nindent 10 }}
