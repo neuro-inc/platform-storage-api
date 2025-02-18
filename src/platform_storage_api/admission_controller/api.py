@@ -119,6 +119,9 @@ class AdmissionControllerApi:
             labels.get("app") == LABEL_PLATFORM_STORAGE_POD and
             labels.get("service") == LABEL_PLATFORM_STORAGE_POD
         ):
+            logger.info("new storage POD was spawned")
+            logger.info(labels)
+            logger.info(pod)
             return await self._handle_new_platform_storage_pod(
                 pod=pod,
                 admission_review=admission_review,
