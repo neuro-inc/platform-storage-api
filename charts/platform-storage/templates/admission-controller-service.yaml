@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: {{ .Values.admissionController.app_name }}-svc
   namespace: platform
+  labels:
+    {{- include "platformStorage.labels.standard" . | nindent 4 }}
 spec:
   selector:
     app: {{ .Values.admissionController.app_name }}

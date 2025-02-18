@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: {{ .Values.admissionController.app_name }}
   namespace: platform
+  labels:
+    {{- include "platformStorage.labels.standard" . | nindent 4 }}
+    service: {{ .Values.admissionController.app_name }}
 spec:
   replicas: 1
   selector:
@@ -13,7 +16,7 @@ spec:
       labels:
         app: {{ .Values.admissionController.app_name }}
     spec:
-      serviceAccountName: {{ .Values.admissionController.app_name }}-sa
+      serviceAccountName: {{ .Values.admissionController.app_name }}
       containers:
       - name: admission-controller
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

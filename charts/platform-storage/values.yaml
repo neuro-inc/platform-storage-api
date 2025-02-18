@@ -92,17 +92,17 @@ admissionController:
   storage_admission_controller_tls_key:
     valueFrom:
       secretKeyRef:
-        name: platform-storage-admission-controller
-        key: tls-key
+        name: platform-storage-ac-certs
+        key: tls.key
   storage_admission_controller_tls_cert:
     valueFrom:
       secretKeyRef:
-        name: platform-storage-admission-controller
-        key: tls-cert
+        name: platform-storage-ac-certs
+        key: tls.crt
   storage_admission_controller_ca_bundle:
     valueFrom:
       secretKeyRef:
-        name: platform-storage-admission-controller
-        key: ca-bundle
+        name: platform-storage-ac-certs
+        key: ca.bundle
   service:
     port: 8080
