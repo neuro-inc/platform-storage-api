@@ -89,17 +89,17 @@ metrics:
 
 admissionController:
   app_name: "storage-admission-controller"
-  storage_admission_controller_tls_key:
+  tlsKey:
     valueFrom:
       secretKeyRef:
         name: platform-storage-ac-certs
         key: tls.key
-  storage_admission_controller_tls_cert:
+  tlsCert:
     valueFrom:
       secretKeyRef:
         name: platform-storage-ac-certs
         key: tls.crt
-  storage_admission_controller_ca_bundle:
+  caBundle:
     valueFrom:
       secretKeyRef:
         name: platform-storage-ac-certs

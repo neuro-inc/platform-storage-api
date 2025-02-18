@@ -11,7 +11,7 @@ webhooks:
     admissionReviewVersions: ["v1", "v1beta1"]
     sideEffects: None
     clientConfig:
-      caBundle: {{ .Values.admissionController.storage_admission_controller_ca_bundle }}
+      caBundle: {{ .Values.admissionController.caBundle }}
       service:
         namespace: platform
         name: {{ .Values.admissionController.app_name }}-svc

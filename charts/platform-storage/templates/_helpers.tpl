@@ -62,9 +62,9 @@ release: {{ .Release.Name | quote }}
 - name: NP_STORAGE_API_K8S_NS
   value: {{ .Values.kube.namespace | default "default" | quote }}
 - name: NP_STORAGE_ADMISSION_CONTROLLER_TLS_KEY
-  value: {{ .Values.admissionController.storage_admission_controller_tls_key}}
+  value: {{ .Values.admissionController.tlsKey}}
 - name: NP_STORAGE_ADMISSION_CONTROLLER_TLS_CERT
-  value: {{ .Values.admissionController.storage_admission_controller_tls_cert}}
+  value: {{ .Values.admissionController.tlsCert}}
 {{ include "platformStorage.env.s3" . }}
 {{- if .Values.sentry }}
 - name: SENTRY_DSN
