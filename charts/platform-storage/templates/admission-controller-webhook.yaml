@@ -2,6 +2,8 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: platform-storage-mutating-webhook
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 webhooks:

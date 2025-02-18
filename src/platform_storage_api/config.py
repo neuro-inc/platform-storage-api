@@ -67,8 +67,8 @@ class S3Config:
 
 @dataclass(frozen=True)
 class AdmissionControllerTlsConfig:
-    tls_cert: str = field(repr=False)
-    tls_key: str = field(repr=False)
+    tls_cert: str = field()
+    tls_key: str = field()
 
 
 @dataclass(frozen=True)

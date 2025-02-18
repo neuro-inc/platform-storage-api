@@ -40,6 +40,8 @@ def main() -> None:
     )
     try:
         # extract certificates from the env and store in a temp files
+        logger.info(tls_config.tls_cert)
+        logger.info(tls_config.tls_key)
         crt_file.write(b64decode(tls_config.tls_cert).decode())
         key_file.write(b64decode(tls_config.tls_key).decode())
         crt_file.close()
