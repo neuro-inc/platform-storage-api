@@ -18,14 +18,18 @@ from platform_storage_api.config import Config
 
 logger = logging.getLogger(__name__)
 
-
-ANNOTATION_APOLO_INJECT_STORAGE = "platform.apolo.us/injectStorage"
+ANNOTATION_APOLO_INJECT_STORAGE = "platform.apolo.us/inject-storage"
 
 LABEL_APOLO_ORG_NAME = "platform.apolo.us/org"
 LABEL_APOLO_PROJECT_NAME = "platform.apolo.us/project"
 LABEL_PLATFORM_STORAGE_POD = "platform-storage"
 
 INJECTED_VOLUME_NAME_PREFIX = "storage-auto-injected-volume"
+
+
+class MountMode(str, Enum):
+    READ_ONLY = "r"
+    READ_WRITE = "rw"
 
 
 def create_injection_volume_name() -> str:
@@ -112,17 +116,6 @@ class AdmissionControllerApi:
             return admission_review.to_response()
 
         metadata = pod.get("metadata", {})
-        labels = metadata.get("labels")
-
-        # let's check if this is a new platform storage POD
-        if (
-            labels.get("app") == LABEL_PLATFORM_STORAGE_POD and
-            labels.get("service") == LABEL_PLATFORM_STORAGE_POD
-        ):
-            return await self._handle_new_platform_storage_pod(
-                pod=pod,
-                admission_review=admission_review,
-            )
 
         annotations = metadata.get("annotations", {})
         raw_injection_spec = annotations.get(ANNOTATION_APOLO_INJECT_STORAGE)
@@ -137,14 +130,6 @@ class AdmissionControllerApi:
             raw_injection_spec=raw_injection_spec,
             admission_review=admission_review,
         )
-
-    async def _handle_new_platform_storage_pod(
-        self,
-        pod: dict[str, Any],
-        admission_review: AdmissionReviewResponse,
-    ) -> web.Response:
-        await self._volume_resolver.refresh_internal_state(pod=pod)
-        return admission_review.to_response()
 
     async def _handle_injection(
         self,
@@ -162,6 +147,7 @@ class AdmissionControllerApi:
 
         logger.info("Going to inject volumes")
         try:
+            # todo: add validation for injection spec
             injection_spec = json.loads(raw_injection_spec)
         except ValueError:
             logger.info("Invalid injection spec. Denying the request")
@@ -183,7 +169,10 @@ class AdmissionControllerApi:
                     value=[]
                 )
 
-        for mount_path, storage_path in injection_spec.items():
+        for mount_path, details in injection_spec.items():
+            storage_path = details["storage_path"]
+            mount_mode = MountMode(details.get("mode") or "rw")
+
             # now let's try to resolve a path which POD wants to mount
             try:
                 volume_spec = await self._volume_resolver.resolve_to_mount_volume(
@@ -208,12 +197,16 @@ class AdmissionControllerApi:
 
             # add a volumeMount with mount path for all the POD containers
             for container_idx in range(len(containers)):
+                patch_value = {
+                    "name": future_volume_name,
+                    "mountPath": mount_path,
+                }
+                if mount_mode is MountMode.READ_ONLY:
+                    patch_value["readOnly"] = "true"
+
                 admission_review.add_patch(
                     path=f"/spec/containers/{container_idx}/volumeMounts/-",
-                    value={
-                        "name": future_volume_name,
-                        "mountPath": mount_path,
-                    }
+                    value=patch_value,
                 )
 
         return admission_review.to_response()

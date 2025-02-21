@@ -23,7 +23,6 @@ spec:
         app: {{ include "platformStorage.name" . }}
         release: {{ .Release.Name }}
         service: platform-storage
-        platform.apolo.us/storage-injection-webhook: "enabled"
       {{- if .Values.secrets }}
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}

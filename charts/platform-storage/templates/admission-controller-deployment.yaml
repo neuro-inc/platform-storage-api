@@ -1,22 +1,24 @@
+{{ include "apolo-admission-controller-helm-lib.preinstallJob" . }}
+{{ include "apolo-admission-controller-helm-lib.postinstallJob" . }}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.admissionController.app_name }}
-  namespace: platform
+  name: {{ include "platformStorage.fullname" . }}-injector
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
-    service: {{ .Values.admissionController.app_name }}
+    service: {{ .Values.admissionController.serviceName }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Values.admissionController.app_name }}
+      app: {{ .Values.admissionController.serviceName }}
   template:
     metadata:
       labels:
-        app: {{ .Values.admissionController.app_name }}
+        app: {{ .Values.admissionController.serviceName }}
     spec:
-      serviceAccountName: {{ .Values.admissionController.app_name }}
+      serviceAccountName: {{ .Values.admissionController.serviceName }}
       containers:
       - name: admission-controller
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -27,6 +29,10 @@ spec:
           - containerPort: {{ .Values.admissionController.service.port }}
             name: http
             protocol: TCP
+        {{- if .Values.storages }}
+        volumeMounts:
+          {{- include "platformStorage.volumeMounts" . | nindent 10 }}
+        {{- end }}
         env:
           - name: SERVER_PORT
             value: {{ .Values.admissionController.service.port | quote }}
@@ -34,4 +40,8 @@ spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.storages }}
+      volumes:
+        {{- include "platformStorage.volumes" . | nindent 8 }}
       {{- end }}

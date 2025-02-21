@@ -60,11 +60,11 @@ release: {{ .Release.Name | quote }}
 - name: NP_STORAGE_API_K8S_TOKEN_PATH
   value: {{ include "platformStorage.kubeAuthMountRoot" . }}/token
 - name: NP_STORAGE_API_K8S_NS
-  value: {{ .Values.kube.namespace | default "default" | quote }}
-- name: NP_STORAGE_ADMISSION_CONTROLLER_TLS_KEY
-  value: {{ .Values.admissionController.tlsKey}}
-- name: NP_STORAGE_ADMISSION_CONTROLLER_TLS_CERT
-  value: {{ .Values.admissionController.tlsCert}}
+  value: {{ .Release.Namespace }}
+- name: NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME
+  value: {{ .Values.admissionController.serviceName }}
+- name: NP_STORAGE_ADMISSION_CONTROLLER_SECRET_NAME_CERTS
+  value: {{ .Values.admissionController.secretNameCerts}}
 {{ include "platformStorage.env.s3" . }}
 {{- if .Values.sentry }}
 - name: SENTRY_DSN

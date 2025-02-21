@@ -66,9 +66,16 @@ class S3Config:
 
 
 @dataclass(frozen=True)
-class AdmissionControllerTlsConfig:
-    tls_cert: str = field(repr=False)
-    tls_key: str = field(repr=False)
+class AdmissionControllerConfig:
+    service_name: str
+    secret_name_certs: str
+
+    @classmethod
+    def from_environ(
+        cls,
+        environ: Optional[dict[str, str]] = None,
+    ) -> "AdmissionControllerConfig":
+        return EnvironConfigFactory(environ).create_admission_controller()
 
 
 @dataclass(frozen=True)
@@ -77,8 +84,8 @@ class Config:
     storage: StorageConfig
     platform: PlatformConfig
     s3: S3Config
+    admission_controller_config: AdmissionControllerConfig
     kube: Optional[KubeConfig] = None
-    admission_controller_tls_config: Optional[AdmissionControllerTlsConfig] = None
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
@@ -117,9 +124,8 @@ class EnvironConfigFactory:
             storage=storage_config,
             platform=self.create_platform(),
             s3=self.create_s3(),
+            admission_controller_config=self.create_admission_controller(),
             kube=self.create_kube(),
-            admission_controller_tls_config=\
-                self.create_admission_controller_tls_config(),
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
@@ -229,14 +235,11 @@ class EnvironConfigFactory:
             ),
         )
 
-    def create_admission_controller_tls_config(
-        self
-    ) -> Optional[AdmissionControllerTlsConfig]:
-        tls_key = self._environ.get("NP_STORAGE_ADMISSION_CONTROLLER_TLS_KEY")
-        tls_cert = self._environ.get("NP_STORAGE_ADMISSION_CONTROLLER_TLS_CERT")
-        if not (tls_key and tls_cert):
-            return None
-        return AdmissionControllerTlsConfig(
-            tls_key=tls_key,
-            tls_cert=tls_cert,
+    def create_admission_controller(self) -> AdmissionControllerConfig:
+        service_name = self._environ["NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME"]
+        secret_name_certs = \
+            self._environ["NP_STORAGE_ADMISSION_CONTROLLER_SECRET_NAME_CERTS"]
+        return AdmissionControllerConfig(
+            service_name=service_name,
+            secret_name_certs=secret_name_certs,
         )

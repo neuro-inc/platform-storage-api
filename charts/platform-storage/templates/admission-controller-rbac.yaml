@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ .Values.admissionController.app_name }}
+  name: {{ include "platformStorage.fullname" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 
@@ -10,7 +10,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ .Values.admissionController.app_name }}
+  name: {{ include "platformStorage.fullname" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 rules:
@@ -23,24 +23,24 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .Values.admissionController.app_name }}
+  name:{{ include "platformStorage.fullname" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Values.admissionController.app_name }}
-    namespace: platform
+    name: {{ include "platformStorage.fullname" . }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
   apiGroup: rbac.authorization.k8s.io
-  name: {{ .Values.admissionController.app_name }}
+  name: {{ include "platformStorage.fullname" . }}
 
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Values.admissionController.app_name}}
+  name: {{ include "platformStorage.fullname" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 rules:
@@ -56,14 +56,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Values.admissionController.app_name}}
+  name: {{ include "platformStorage.fullname" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Values.admissionController.app_name}}
-    namespace: platform
+    name: {{ include "platformStorage.fullname" . }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: {{ .Values.admissionController.app_name}}
+  name: {{ include "platformStorage.fullname" . }}
   apiGroup: rbac.authorization.k8s.io
