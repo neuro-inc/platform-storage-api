@@ -43,6 +43,7 @@ async def create_app(config: Config) -> web.Application:
                 KubeVolumeResolver(
                     kube_client=kube_client,
                     path_resolver=path_resolver,
+                    admission_controller_config=config.admission_controller_config,
                 )
             )
             app[VOLUME_RESOLVER_KEY] = volume_resolver

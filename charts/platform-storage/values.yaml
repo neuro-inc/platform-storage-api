@@ -38,9 +38,6 @@ service:
 
 storages: []
 
-kube:
-  namespace: "default"
-
 sentry:
   appName: platform-storage
   sampleRate: 0.002
@@ -88,21 +85,13 @@ metrics:
 
 
 admissionController:
-  app_name: "storage-admission-controller"
-  tlsKey:
-    valueFrom:
-      secretKeyRef:
-        name: platform-storage-ac-certs
-        key: tls.key
-  tlsCert:
-    valueFrom:
-      secretKeyRef:
-        name: platform-storage-ac-certs
-        key: tls.crt
-  caBundle:
-    valueFrom:
-      secretKeyRef:
-        name: platform-storage-ac-certs
-        key: ca.bundle
+  serviceName: "storage-admission-controller"
+  secretNameCerts: "storage-admission-controller"
+  webhookPath: "/admission-controller/mutate"
+  namespaceSelector: {}
+  objectSelector:
+    matchLabels:
+      platform.apolo.us/inject-storage: "true"
+  failurePolicy: "Ignore"
   service:
     port: 8080

@@ -9,6 +9,7 @@ from neuro_admin_client import AdminClient
 from yarl import URL
 
 from platform_storage_api.config import (
+    AdmissionControllerConfig,
     Config,
     KubeConfig,
     PlatformConfig,
@@ -37,6 +38,10 @@ def config() -> Config:
         s3=S3Config(
             region="test-region",
             bucket_name="test-bucket",
+        ),
+        admission_controller_config=AdmissionControllerConfig(
+            service_name="service-name",
+            secret_name_certs="secret",
         ),
         kube=KubeConfig(
             endpoint_url="https://localhost:8443",

@@ -1,22 +1,21 @@
 import asyncio
 import logging
-import os
 import ssl
 import tempfile
 from base64 import b64decode
-from typing import cast
 
 from aiohttp import web
+from apolo_kube_client.client import kube_client_from_config
 from neuro_logging import init_logging, setup_sentry
 
 from platform_storage_api.admission_controller.app import create_app
-from platform_storage_api.config import AdmissionControllerTlsConfig, Config
+from platform_storage_api.config import Config
 
 
 logger = logging.getLogger(__name__)
 
 
-def main() -> None:
+async def main() -> None:
     init_logging()
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
@@ -26,46 +25,52 @@ def main() -> None:
         ignore_errors=[web.HTTPNotFound],
     )
 
-    loop = asyncio.get_event_loop()
-    app = loop.run_until_complete(create_app(config))
-
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-
-    crt_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.crt')
-    key_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix='.key')
-
-    tls_config = cast(
-        AdmissionControllerTlsConfig,
-        config.admission_controller_tls_config
-    )
-    try:
-        # extract certificates from the env and store in a temp files
-        logger.info(tls_config.tls_cert)
-        logger.info(tls_config.tls_key)
-        crt_file.write(b64decode(tls_config.tls_cert).decode())
-        key_file.write(b64decode(tls_config.tls_key).decode())
-        crt_file.close()
-        key_file.close()
-
-        context.load_cert_chain(
-            certfile=crt_file.name,
-            keyfile=key_file.name,
+    # get the necessary certificates from the secrets
+    async with kube_client_from_config(config=config.kube) as kube:
+        secret_name_certs = config.admission_controller_config.secret_name_certs
+        response = await kube.get(
+            f"{kube.namespace_url}/secrets/{secret_name_certs}"
         )
+        secrets = response["data"]
+        tls_key = secrets["tls.key"]
+        tls_cert = secrets["tls.crt"]
 
-        web.run_app(
-            app,
-            host=config.server.host,
-            port=config.server.port,
+    # create SSL context from obtained certificates
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".crt") as crt_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".key") as key_file:
+            crt_file.write(b64decode(tls_cert).decode())
+            key_file.write(b64decode(tls_key).decode())
+            crt_file.flush()
+            key_file.flush()
+            context.load_cert_chain(
+                certfile=crt_file.name,
+                keyfile=key_file.name,
+            )
+
+    app = await create_app(config)
+    runner = web.AppRunner(app)
+    done = asyncio.Event()
+
+    try:
+        await runner.setup()
+        site = web.TCPSite(
+            runner,
+            config.server.host,
+            config.server.port,
             ssl_context=context,
         )
-
+        await site.start()
+        await done.wait()  # sleep forever
     except Exception as e:
         logger.exception("Unhandled error")
         raise e
     finally:
-        os.unlink(crt_file.name)
-        os.unlink(key_file.name)
+        await runner.cleanup()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
