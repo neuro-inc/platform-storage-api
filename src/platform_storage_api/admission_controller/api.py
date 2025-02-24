@@ -1,20 +1,20 @@
-import base64
-import dataclasses
-import json
 import logging
-from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 from aiohttp import web
 
 from platform_storage_api.admission_controller.app_keys import VOLUME_RESOLVER_KEY
+from platform_storage_api.admission_controller.schema import (
+    InjectionSchema,
+    MountMode,
+    AdmissionReviewResponse
+)
 from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
     VolumeResolverError,
 )
 from platform_storage_api.config import Config
-
 
 logger = logging.getLogger(__name__)
 
@@ -27,58 +27,9 @@ LABEL_PLATFORM_STORAGE_POD = "platform-storage"
 INJECTED_VOLUME_NAME_PREFIX = "storage-auto-injected-volume"
 
 
-class MountMode(str, Enum):
-    READ_ONLY = "r"
-    READ_WRITE = "rw"
-
-
 def create_injection_volume_name() -> str:
     """Creates a random volume name"""
     return f"{INJECTED_VOLUME_NAME_PREFIX}-{uuid4().hex}"
-
-
-class AdmissionReviewPatchType(str, Enum):
-    JSON = "JSONPatch"
-
-
-@dataclasses.dataclass
-class AdmissionReviewResponse:
-    uid: str
-    allowed: bool = True
-    patch: Optional[list[dict[str, Any]]] = None
-    patch_type: AdmissionReviewPatchType = AdmissionReviewPatchType.JSON
-
-    def add_patch(self, path: str, value: Any) -> None:
-        if self.patch is None:
-            self.patch = []
-
-        self.patch.append({
-            "op": "add",
-            "path": path,
-            "value": value,
-        })
-
-    def to_dict(self) -> dict[str, Any]:
-        patch: Optional[str] = None
-
-        if self.patch is not None:
-            # convert patch changes to a b64
-            dumped = json.dumps(self.patch).encode()
-            patch = base64.b64encode(dumped).decode()
-
-        return {
-            "apiVersion": "admission.k8s.io/v1",
-            "kind": "AdmissionReview",
-            "response": {
-                "uid": self.uid,
-                "allowed": self.allowed,
-                "patch": patch,
-                "patchType": AdmissionReviewPatchType.JSON.value
-            }
-        }
-
-    def to_response(self) -> web.Response:
-        return web.json_response(self.to_dict())
 
 
 class AdmissionControllerApi:
@@ -147,10 +98,9 @@ class AdmissionControllerApi:
 
         logger.info("Going to inject volumes")
         try:
-            # todo: add validation for injection spec
-            injection_spec = json.loads(raw_injection_spec)
-        except ValueError:
-            logger.info("Invalid injection spec. Denying the request")
+            injection_spec = InjectionSchema.validate_json(raw_injection_spec)
+        except Exception:
+            logger.exception("Invalid injection spec. Denying the request")
             admission_review.allowed = False
             return admission_review.to_response()
 
@@ -169,9 +119,10 @@ class AdmissionControllerApi:
                     value=[]
                 )
 
-        for mount_path, details in injection_spec.items():
-            storage_path = details["storage_path"]
-            mount_mode = MountMode(details.get("mode") or "rw")
+        for injection_schema in injection_spec:
+            mount_path = injection_schema.mount_path
+            storage_path = injection_schema.storage_path
+            mount_mode = injection_schema.mount_mode
 
             # now let's try to resolve a path which POD wants to mount
             try:

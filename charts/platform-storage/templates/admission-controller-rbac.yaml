@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "platformStorage.fullname" . }}
+  name: {{ include "admissionController.name" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 
@@ -10,7 +10,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "platformStorage.fullname" . }}
+  name: {{ include "admissionController.name" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 rules:
@@ -23,24 +23,24 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "platformStorage.fullname" . }}
+  name: {{ include "admissionController.name" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "platformStorage.fullname" . }}
+    name: {{ include "admissionController.name" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
   apiGroup: rbac.authorization.k8s.io
-  name: {{ include "platformStorage.fullname" . }}
+  name: {{ include "admissionController.name" . }}
 
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "platformStorage.fullname" . }}
+  name: {{ include "admissionController.name" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 rules:
@@ -50,20 +50,23 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
 
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "platformStorage.fullname" . }}
+  name: {{ include "admissionController.name" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "platformStorage.fullname" . }}
+    name: {{ include "admissionController.name" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: {{ include "platformStorage.fullname" . }}
+  name: {{ include "admissionController.name" . }}
   apiGroup: rbac.authorization.k8s.io

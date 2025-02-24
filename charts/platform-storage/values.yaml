@@ -91,6 +91,6 @@ admissionController:
   objectSelector:
     matchLabels:
       platform.apolo.us/inject-storage: "true"
-  failurePolicy: "Ignore"
+  failurePolicy: "Fail"
   service:
     port: 8080
