@@ -15,7 +15,7 @@ from platform_storage_api.config import Config
 logger = logging.getLogger(__name__)
 
 
-async def main() -> None:
+async def run() -> None:
     init_logging()
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
@@ -69,8 +69,12 @@ async def main() -> None:
         await runner.cleanup()
 
 
-if __name__ == "__main__":
+def main():
     try:
-        asyncio.run(main())
+        asyncio.run(run())
     except KeyboardInterrupt:
         pass
+
+
+if __name__ == "__main__":
+    main()

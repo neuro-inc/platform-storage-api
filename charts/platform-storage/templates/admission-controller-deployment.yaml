@@ -1,5 +1,7 @@
 {{ include "admission-controller-lib.preinstallJob" . }}
+---
 {{ include "admission-controller-lib.postinstallJob" . }}
+---
 
 apiVersion: apps/v1
 kind: Deployment
@@ -18,7 +20,7 @@ spec:
       labels:
         app: {{ .Values.admissionController.serviceName }}
     spec:
-      serviceAccountName: {{ .Values.admissionController.serviceName }}
+      serviceAccountName: {{ include "admissionController.name" . }}
       containers:
       - name: admission-controller
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
