@@ -27,9 +27,9 @@ async def main() -> None:
 
     # get the necessary certificates from the secrets
     async with kube_client_from_config(config=config.kube) as kube:
-        secret_name_certs = config.admission_controller_config.secret_name_certs
+        cert_secret_name = config.admission_controller_config.cert_secret_name
         response = await kube.get(
-            f"{kube.namespace_url}/secrets/{secret_name_certs}"
+            f"{kube.namespace_url}/secrets/{cert_secret_name}"
         )
         secrets = response["data"]
         tls_key = secrets["tls.key"]

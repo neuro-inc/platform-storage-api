@@ -1,5 +1,5 @@
-{{ include "apolo-admission-controller-helm-lib.preinstallJob" . }}
-{{ include "apolo-admission-controller-helm-lib.postinstallJob" . }}
+{{ include "admission-controller-lib.preinstallJob" . }}
+{{ include "admission-controller-lib.postinstallJob" . }}
 
 apiVersion: apps/v1
 kind: Deployment
