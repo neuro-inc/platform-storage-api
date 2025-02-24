@@ -86,7 +86,6 @@ metrics:
 
 admissionController:
   serviceName: "storage-admission-controller"
-  secretNameCerts: "storage-admission-controller"
   webhookPath: "/admission-controller/mutate"
   namespaceSelector: {}
   objectSelector:

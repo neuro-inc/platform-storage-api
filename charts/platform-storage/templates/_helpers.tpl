@@ -16,7 +16,7 @@
 {{- end -}}
 
 {{- define "admissionController.name" -}}
-{{ include "platformStorage.fullname" }}-injector
+{{ include "platformStorage.fullname" . }}-injector
 {{- end -}}
 
 {{- define "platformStorage.chart" -}}
@@ -67,6 +67,8 @@ release: {{ .Release.Name | quote }}
   value: {{ .Release.Namespace }}
 - name: NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME
   value: {{ .Values.admissionController.serviceName }}
+- name: NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME
+  value: "{{ .Values.admissionController.serviceName }}-cert"
 {{ include "platformStorage.env.s3" . }}
 {{- if .Values.sentry }}
 - name: SENTRY_DSN
