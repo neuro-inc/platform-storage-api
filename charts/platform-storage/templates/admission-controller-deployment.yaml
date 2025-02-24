@@ -4,7 +4,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "platformStorage.fullname" . }}-injector
+  name: {{ include "admissionController.name" . }}
   labels:
     {{- include "platformStorage.labels.standard" . | nindent 4 }}
     service: {{ .Values.admissionController.serviceName }}
