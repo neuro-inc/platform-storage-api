@@ -91,7 +91,7 @@ class KubeVolumeResolver:
         pods_response = await self._kube.get(
             f"{namespace_url}/pods",
             params={
-                "labelSelector": f"service={self._config.service_name}",
+                "labelSelector": f"app={self._config.service_name}",
             }
         )
         try:
