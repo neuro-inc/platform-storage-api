@@ -238,7 +238,7 @@ class EnvironConfigFactory:
     def create_admission_controller(self) -> AdmissionControllerConfig:
         service_name = self._environ["NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME"]
         secret_name_certs = \
-            self._environ["NP_STORAGE_ADMISSION_CONTROLLER_SECRET_NAME_CERTS"]
+            self._environ["NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME"]
         return AdmissionControllerConfig(
             service_name=service_name,
             secret_name_certs=secret_name_certs,
