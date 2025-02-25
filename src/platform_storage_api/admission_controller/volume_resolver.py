@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import socket
 from enum import Enum
 from pathlib import PurePath
 from types import TracebackType
@@ -85,15 +86,11 @@ class KubeVolumeResolver:
         """
         logger.info("initializing volume resolver")
         namespace_url = self._kube.generate_namespace_url()
+        pod_name = socket.gethostname()
 
         # get all storage admission controllers PODs,
         # and choose the freshest one
-        pods_response = await self._kube.get(
-            f"{namespace_url}/pods",
-            params={
-                "labelSelector": f"app={self._config.service_name}",
-            }
-        )
+        pods_response = await self._kube.get(f"{namespace_url}/pods/{pod_name}")
         try:
             most_fresh_pod = next(
                 iter(

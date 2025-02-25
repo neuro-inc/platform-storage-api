@@ -67,7 +67,6 @@ class S3Config:
 
 @dataclass(frozen=True)
 class AdmissionControllerConfig:
-    service_name: str
     cert_secret_name: str
 
     @classmethod
@@ -236,10 +235,8 @@ class EnvironConfigFactory:
         )
 
     def create_admission_controller(self) -> AdmissionControllerConfig:
-        service_name = self._environ["NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME"]
         cert_secret_name = \
             self._environ["NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME"]
         return AdmissionControllerConfig(
-            service_name=service_name,
             cert_secret_name=cert_secret_name,
         )

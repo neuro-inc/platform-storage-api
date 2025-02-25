@@ -65,8 +65,6 @@ release: {{ .Release.Name | quote }}
   value: {{ include "platformStorage.kubeAuthMountRoot" . }}/token
 - name: NP_STORAGE_API_K8S_NS
   value: {{ .Release.Namespace }}
-- name: NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME
-  value: {{ .Values.admissionController.serviceName }}
 - name: NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME
   value: "{{ .Values.admissionController.serviceName }}-cert"
 {{ include "platformStorage.env.s3" . }}

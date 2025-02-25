@@ -64,7 +64,6 @@ class TestConfig:
             "S3_REGION": "test-region",
             "S3_BUCKET_NAME": "test-bucket",
             "NP_STORAGE_API_K8S_API_URL": "https://localhost:8443",
-            "NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME": "admission-controller",
             "NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME": "secret",
         }
         config = Config.from_environ(environ)
@@ -109,7 +108,6 @@ class TestConfig:
             "NP_STORAGE_API_K8S_CLIENT_WATCH_TIMEOUT": "555",
             "NP_STORAGE_API_K8S_CLIENT_CONN_POOL_SIZE": "333",
             "NP_STORAGE_API_K8S_STORAGE_CLASS": "some-class",
-            "NP_STORAGE_ADMISSION_CONTROLLER_SERVICE_NAME": "admission-controller",
             "NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME": "secret",
         }
         config = Config.from_environ(environ)

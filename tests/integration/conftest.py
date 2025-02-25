@@ -104,7 +104,6 @@ def config(
         platform=platform_config,
         s3=s3_config,
         admission_controller_config=AdmissionControllerConfig(
-            service_name="service-name",
             cert_secret_name="secret",
         ),
         kube=KubeConfig(endpoint_url="https://localhost:8443"),

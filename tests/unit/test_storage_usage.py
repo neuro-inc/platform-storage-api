@@ -40,7 +40,6 @@ def config() -> Config:
             bucket_name="test-bucket",
         ),
         admission_controller_config=AdmissionControllerConfig(
-            service_name="service-name",
             cert_secret_name="secret",
         ),
         kube=KubeConfig(
