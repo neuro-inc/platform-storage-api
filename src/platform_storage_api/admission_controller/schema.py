@@ -23,20 +23,23 @@ class MountSchema(BaseModel):
     @classmethod
     def is_mount_path(cls, value: str) -> str:
         if not Path(value).is_absolute():
-            raise ValueError(f'`{value}` is not an absolute path')
+            err = f"`{value}` is not an absolute path"
+            raise ValueError(err)
         return value
 
     @field_validator('storage_path', mode='after')
     @classmethod
     def is_storage_path(cls, value: str) -> str:
         if not value.startswith("storage://"):
-            raise ValueError(f'`{value}` does not follow the storage:// schema')
+            err = f"`{value}` does not follow the storage:// schema"
+            raise ValueError(err)
         path = PurePosixPath(value)
         if len(path.parts) < 3:
-            raise ValueError(
-                f'`{value}` is invalid. '
-                f'Both org and project name must be present in the storage path'
+            err = (
+                f"`{value}` is invalid. "
+                "Both org and project name must be present in the storage path"
             )
+            raise ValueError(err)
         return value
 
 
