@@ -69,7 +69,7 @@ async def run() -> None:
         await runner.cleanup()
 
 
-def main():
+def main() -> None:
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
