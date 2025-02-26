@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import uuid
@@ -7,6 +8,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
+import aiohttp
 import pytest
 from jose import jwt
 from neuro_auth_client import AuthClient, User
@@ -17,13 +19,15 @@ from yarl import URL
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture(scope="session")
-def auth_server(docker_ip: str, docker_services: Services) -> URL:
+@pytest.fixture
+async def auth_server(docker_ip: str, docker_services: Services) -> URL:
     port = docker_services.port_for("platform-auth", 8080)
-    return URL(f"http://{docker_ip}:{port}")
+    url = URL(f"http://{docker_ip}:{port}")
+    await wait_for_auth_server(url)
+    return url
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def auth_jwt_secret() -> str:
     return os.environ.get("NP_JWT_SECRET", "secret")
 
@@ -108,3 +112,24 @@ async def regular_user_factory(
         return _User(name=user.name, token=token_factory(user.name))
 
     return _factory
+
+
+async def wait_for_auth_server(
+    url: URL, timeout_s: float = 300, interval_s: float = 1
+) -> None:
+    async def _wait() -> None:
+        last_exc = None
+        try:
+            while True:
+                try:
+                    async with AuthClient(url=url, token="") as auth_client:
+                        await auth_client.ping()
+                        break
+                except (AssertionError, OSError, aiohttp.ClientError) as exc:
+                    last_exc = exc
+                logger.debug("waiting for %s: %s", url, last_exc)
+                await asyncio.sleep(interval_s)
+        except asyncio.CancelledError:
+            pytest.fail(f"failed to connect to {url}: {last_exc}")
+
+    await asyncio.wait_for(_wait(), timeout=timeout_s)
