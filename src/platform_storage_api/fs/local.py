@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import stat as statmodule
+import sys
 from collections.abc import AsyncIterator, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -609,8 +610,15 @@ class LocalFileSystem(FileSystem):
         async with aiofiles.tempfile.NamedTemporaryFile("w") as temp_file:
             await temp_file.write("\0".join(str(p) for p in paths))
             await temp_file.flush()
+            if sys.platform == "darwin":
+                # `du` on a macOS doesn't accept a `files0-from` argument.
+                # for these purposes, macOS users should use a coreutils version
+                # which is a `gdu`.
+                cmd = "gdu"
+            else:
+                cmd = "du"
             process = await asyncio.subprocess.create_subprocess_exec(
-                "du",
+                cmd,
                 "-sh",
                 f"--files0-from={temp_file.name}",
                 stdout=asyncio.subprocess.PIPE,

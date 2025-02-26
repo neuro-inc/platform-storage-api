@@ -1,4 +1,4 @@
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 import pytest
 from yarl import URL
@@ -9,6 +9,24 @@ from platform_storage_api.config import (
     StorageMode,
     StorageServerConfig,
 )
+
+
+CA_DATA_PEM = "this-is-certificate-authority-public-key"
+TOKEN = "this-is-token"
+
+
+@pytest.fixture
+def cert_authority_path(tmp_path: Path) -> str:
+    ca_path = tmp_path / "ca.crt"
+    ca_path.write_text(CA_DATA_PEM)
+    return str(ca_path)
+
+
+@pytest.fixture
+def token_path(tmp_path: Path) -> str:
+    token_path = tmp_path / "token"
+    token_path.write_text(TOKEN)
+    return str(token_path)
 
 
 class TestServerConfig:
@@ -45,6 +63,8 @@ class TestConfig:
             "NP_PLATFORM_CLUSTER_NAME": "test-cluster",
             "S3_REGION": "test-region",
             "S3_BUCKET_NAME": "test-bucket",
+            "NP_STORAGE_API_K8S_API_URL": "https://localhost:8443",
+            "NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME": "secret",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080
@@ -59,7 +79,11 @@ class TestConfig:
         assert config.s3.region == "test-region"
         assert config.s3.bucket_name == "test-bucket"
 
-    def test_from_environ_custom(self) -> None:
+    def test_from_environ_custom(
+        self,
+        cert_authority_path: str,
+        token_path: str
+    ) -> None:
         environ = {
             "NP_STORAGE_MODE": "multiple",
             "NP_STORAGE_LOCAL_BASE_PATH": "/path/to/dir",
@@ -72,6 +96,19 @@ class TestConfig:
             "S3_REGION": "test-region",
             "S3_BUCKET_NAME": "test-bucket",
             "S3_KEY_PREFIX": "test-key-prefix",
+            "NP_STORAGE_API_K8S_API_URL": "https://localhost:8443",
+            "NP_STORAGE_API_K8S_AUTH_TYPE": "token",
+            "NP_STORAGE_API_K8S_CA_PATH": cert_authority_path,
+            "NP_STORAGE_API_K8S_TOKEN_PATH": token_path,
+            "NP_STORAGE_API_K8S_AUTH_CERT_PATH": "/cert_path",
+            "NP_STORAGE_API_K8S_AUTH_CERT_KEY_PATH": "/cert_key_path",
+            "NP_STORAGE_API_K8S_NS": "other-namespace",
+            "NP_STORAGE_API_K8S_CLIENT_CONN_TIMEOUT": "111",
+            "NP_STORAGE_API_K8S_CLIENT_READ_TIMEOUT": "222",
+            "NP_STORAGE_API_K8S_CLIENT_WATCH_TIMEOUT": "555",
+            "NP_STORAGE_API_K8S_CLIENT_CONN_POOL_SIZE": "333",
+            "NP_STORAGE_API_K8S_STORAGE_CLASS": "some-class",
+            "NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME": "secret",
         }
         config = Config.from_environ(environ)
         assert config.server.port == 8080

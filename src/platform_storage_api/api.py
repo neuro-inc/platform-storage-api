@@ -26,13 +26,12 @@ from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import init_logging, setup_sentry
 
 from .cache import PermissionsCache
-from .config import Config, StorageMode
+from .config import Config
 from .fs.local import (
     DiskUsage,
     FileStatus,
     FileStatusPermission,
     FileStatusType,
-    FileSystem,
     LocalFileSystem,
 )
 from .security import (
@@ -42,10 +41,8 @@ from .security import (
     PermissionChecker,
 )
 from .storage import (
-    MultipleStoragePathResolver,
-    SingleStoragePathResolver,
     Storage,
-    StoragePathResolver,
+    create_path_resolver,
 )
 
 
@@ -859,16 +856,6 @@ async def add_version_to_header(request: Request, response: web.StreamResponse) 
     response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
 
 
-def create_path_resolver(config: Config, fs: FileSystem) -> StoragePathResolver:
-    if config.storage.mode == StorageMode.SINGLE:
-        return SingleStoragePathResolver(config.storage.fs_local_base_path)
-    return MultipleStoragePathResolver(
-        fs,
-        config.storage.fs_local_base_path,
-        config.storage.fs_local_base_path / config.platform.cluster_name,
-    )
-
-
 async def create_app(config: Config) -> web.Application:
     app = web.Application(
         middlewares=[handle_exceptions],
@@ -903,7 +890,6 @@ async def create_app(config: Config) -> web.Application:
             path_resolver = create_path_resolver(config, fs)
             storage = Storage(path_resolver, fs)
             app[API_V1_KEY][STORAGE_KEY] = storage
-
             # TODO (Rafa Zubairov): configured service shall ensure that
             # pre-requisites are up and running
             # TODO here we shall test whether AuthClient properly

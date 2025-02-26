@@ -17,7 +17,9 @@ from yarl import URL
 
 from platform_storage_api.api import create_app
 from platform_storage_api.config import (
+    AdmissionControllerConfig,
     Config,
+    KubeConfig,
     MetricsConfig,
     PlatformConfig,
     S3Config,
@@ -101,6 +103,10 @@ def config(
         storage=storage_config,
         platform=platform_config,
         s3=s3_config,
+        admission_controller_config=AdmissionControllerConfig(
+            cert_secret_name="secret",
+        ),
+        kube=KubeConfig(endpoint_url="https://localhost:8443"),
     )
 
 

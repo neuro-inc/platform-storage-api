@@ -1,0 +1,49 @@
+{{ include "admission-controller-lib.preinstallJob" . }}
+---
+{{ include "admission-controller-lib.postinstallJob" . }}
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "admissionController.name" . }}
+  labels:
+    {{- include "platformStorage.labels.standard" . | nindent 4 }}
+    service: {{ .Values.admissionController.serviceName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.admissionController.serviceName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.admissionController.serviceName }}
+    spec:
+      serviceAccountName: {{ include "admissionController.name" . }}
+      containers:
+      - name: admission-controller
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - platform-storage-admission-controller
+        ports:
+          - containerPort: {{ .Values.admissionController.service.port }}
+            name: http
+            protocol: TCP
+        {{- if .Values.storages }}
+        volumeMounts:
+          {{- include "platformStorage.volumeMounts" . | nindent 10 }}
+        {{- end }}
+        env:
+          - name: SERVER_PORT
+            value: {{ .Values.admissionController.service.port | quote }}
+          {{- include "platformStorage.env" . | nindent 10 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.storages }}
+      volumes:
+        {{- include "platformStorage.volumes" . | nindent 8 }}
+      {{- end }}

@@ -82,3 +82,15 @@ metrics:
 
   serviceMonitor:
     enabled: true
+
+
+admissionController:
+  serviceName: "storage-admission-controller"
+  webhookPath: "/admission-controller/mutate"
+  namespaceSelector: {}
+  objectSelector:
+    matchLabels:
+      platform.apolo.us/inject-storage: "true"
+  failurePolicy: "Fail"
+  service:
+    port: 8080
