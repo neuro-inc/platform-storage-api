@@ -88,23 +88,12 @@ class KubeVolumeResolver:
         namespace_url = self._kube.generate_namespace_url()
         pod_name = socket.gethostname()
 
-        # get all storage admission controllers PODs,
-        # and choose the freshest one
-        pods_response = await self._kube.get(f"{namespace_url}/pods/{pod_name}")
         try:
-            most_fresh_pod = next(
-                iter(
-                    sorted(
-                        pods_response["items"],
-                        key=lambda pod: pod["metadata"]["creationTimestamp"],
-                        reverse=True,
-                    )
-                )
-            )
-        except StopIteration:
-            raise VolumeResolverError() from None
+            pod = await self._kube.get(f"{namespace_url}/pods/{pod_name}")
+        except Exception as e:
+            raise VolumeResolverError() from e
 
-        await self._refresh_internal_state(pod=most_fresh_pod)
+        await self._refresh_internal_state(pod=pod)
         return self
 
     async def __aexit__(
