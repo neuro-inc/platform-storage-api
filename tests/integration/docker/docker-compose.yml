@@ -1,10 +1,7 @@
 services:
   platform-auth:
-    image: neuro-inc/platform-auth:latest
+    image: ghcr.io/neuro-inc/platformauthapi:latest
     container_name: platform-storage-platform-auth
-    build:
-      context: ./platform-auth
-      dockerfile: Dockerfile
     environment:
       - NP_AUTH_API_PORT=8080
       - NP_JWT_SECRET=secret
