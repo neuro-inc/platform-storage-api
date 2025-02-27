@@ -154,7 +154,7 @@ class AdmissionControllerApi:
                     "mountPath": mount_path,
                 }
                 if mount_mode is MountMode.READ_ONLY:
-                    patch_value["readOnly"] = "true"
+                    patch_value["readOnly"] = True
 
                 admission_review.add_patch(
                     path=f"/spec/containers/{container_idx}/volumeMounts/-",
