@@ -149,7 +149,7 @@ class AdmissionControllerApi:
 
             # add a volumeMount with mount path for all the POD containers
             for container_idx in range(len(containers)):
-                patch_value = {
+                patch_value: dict[str, str | bool] = {
                     "name": future_volume_name,
                     "mountPath": mount_path,
                 }
