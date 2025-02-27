@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from apolo_kube_client.client import KubeClient
 
+from platform_storage_api.admission_controller.schema import SCHEMA_STORAGE
 from platform_storage_api.config import AdmissionControllerConfig
 from platform_storage_api.storage import StoragePathResolver
 
@@ -61,15 +62,51 @@ class KubeVolume:
         }
 
 
+class KubeApi:
+    """
+    Kube methods used by a volume resolver
+    """
+    def __init__(
+        self,
+        kube_client: KubeClient
+    ):
+        self._kube = kube_client
+
+    def generate_namespace_url(self) -> str:
+        return self._kube.generate_namespace_url()
+
+    async def get_pod(
+        self,
+        pod_name: str,
+        namespace_url: Optional[str] = None
+    ) -> dict[str, Any]:
+        namespace_url = namespace_url or self.generate_namespace_url()
+        url = f"{namespace_url}/pods/{pod_name}"
+        return await self._kube.get(url)
+
+    async def get_pvc(
+        self,
+        pvc_name: str,
+        namespace_url: Optional[str] = None
+    ) -> dict[str, Any]:
+        namespace_url = namespace_url or self.generate_namespace_url()
+        url = f"{namespace_url}/persistentvolumeclaims/{pvc_name}"
+        return await self._kube.get(url)
+
+    async def get_pv(self, pv_name: str) -> dict[str, Any]:
+        url = f"{self._kube.api_v1_url}/persistentvolumes/{pv_name}"
+        return await self._kube.get(url)
+
+
 class KubeVolumeResolver:
 
     def __init__(
         self,
-        kube_client: KubeClient,
+        kube_api: KubeApi,
         path_resolver: StoragePathResolver,
         admission_controller_config: AdmissionControllerConfig,
     ):
-        self._kube = kube_client
+        self._kube = kube_api
         self._path_resolver = path_resolver
         self._config = admission_controller_config
 
@@ -85,15 +122,19 @@ class KubeVolumeResolver:
         internal state updater, so we can resolve the real mount paths.
         """
         logger.info("initializing volume resolver")
-        namespace_url = self._kube.generate_namespace_url()
         pod_name = socket.gethostname()
 
         try:
-            pod = await self._kube.get(f"{namespace_url}/pods/{pod_name}")
+            pod = await self._kube.get_pod(pod_name)
         except Exception as e:
             raise VolumeResolverError() from e
 
         await self._refresh_internal_state(pod=pod)
+
+        if not self._local_fs_prefix_to_kube_volume:
+            err = "No eligible volumes are mounted to this pod"
+            raise VolumeResolverError(err)
+
         return self
 
     async def __aexit__(
@@ -114,7 +155,6 @@ class KubeVolumeResolver:
         of volumes
         """
         logger.info("refreshing internal state")
-        namespace_url = self._kube.generate_namespace_url()
 
         # internal storage name to a PV and PVC names
         storage_name_to_pvc: dict[str, str] = {}
@@ -142,14 +182,12 @@ class KubeVolumeResolver:
 
         # get PVs by claim names
         for storage_name, claim_name in storage_name_to_pvc.items():
-            claim = await self._kube.get(
-                f"{namespace_url}/persistentvolumeclaims/{claim_name}")
+            claim = await self._kube.get_pvc(pvc_name=claim_name)
             storage_name_to_pv[storage_name] = claim["spec"]["volumeName"]
 
         # finally, get real underlying storage paths
         for storage_name, pv_name in storage_name_to_pv.items():
-            pv = await self._kube.get(
-                f"{self._kube.api_v1_url}/persistentvolumes/{pv_name}")
+            pv = await self._kube.get_pv(pv_name)
 
             # find a supported volume backend for this storage
             try:
@@ -180,7 +218,7 @@ class KubeVolumeResolver:
         Resolves a path to a proper mount volume, so later it can be used
         in a kube spec of a POD.
         """
-        normalized_path = PurePath(path.replace("storage://", "/"))
+        normalized_path = PurePath(path.replace(SCHEMA_STORAGE, "/"))
         local_path = await self._path_resolver.resolve_path(normalized_path)
         str_local_path = str(local_path)
 

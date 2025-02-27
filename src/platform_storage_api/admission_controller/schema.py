@@ -9,6 +9,9 @@ from aiohttp import web
 from pydantic import BaseModel, TypeAdapter, field_validator
 
 
+SCHEMA_STORAGE = "storage://"
+
+
 class MountMode(str, Enum):
     READ_ONLY = "r"
     READ_WRITE = "rw"
@@ -30,8 +33,8 @@ class MountSchema(BaseModel):
     @field_validator('storage_path', mode='after')
     @classmethod
     def is_storage_path(cls, value: str) -> str:
-        if not value.startswith("storage://"):
-            err = f"`{value}` does not follow the storage:// schema"
+        if not value.startswith(SCHEMA_STORAGE):
+            err = f"`{value}` does not follow the {SCHEMA_STORAGE} schema"
             raise ValueError(err)
         path = PurePosixPath(value)
         if len(path.parts) < 3:

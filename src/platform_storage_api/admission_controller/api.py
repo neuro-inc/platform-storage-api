@@ -14,7 +14,6 @@ from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
     VolumeResolverError,
 )
-from platform_storage_api.config import Config
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,7 @@ INJECTED_VOLUME_NAME_PREFIX = "storage-auto-injected-volume"
 
 def create_injection_volume_name() -> str:
     """Creates a random volume name"""
-    return f"{INJECTED_VOLUME_NAME_PREFIX}-{uuid4().hex}"
+    return f"{INJECTED_VOLUME_NAME_PREFIX}-{str(uuid4())[:8]}"
 
 
 class AdmissionControllerApi:
@@ -38,11 +37,9 @@ class AdmissionControllerApi:
     def __init__(
         self,
         app: web.Application,
-        config: Config
     ) -> None:
 
         self._app = app
-        self._config = config
 
     @property
     def _volume_resolver(self) -> KubeVolumeResolver:
