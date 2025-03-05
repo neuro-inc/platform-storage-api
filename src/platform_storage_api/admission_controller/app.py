@@ -11,6 +11,7 @@ from platform_storage_api.admission_controller.app_keys import (
     VOLUME_RESOLVER_KEY,
 )
 from platform_storage_api.admission_controller.volume_resolver import (
+    KubeApi,
     KubeVolumeResolver,
 )
 from platform_storage_api.config import Config, KubeConfig
@@ -39,9 +40,10 @@ async def create_app(config: Config) -> web.Application:
             kube_client = await exit_stack.enter_async_context(
                 kube_client_from_config(kube_config)
             )
+            kube_api = KubeApi(kube_client)
             volume_resolver = await exit_stack.enter_async_context(
                 KubeVolumeResolver(
-                    kube_client=kube_client,
+                    kube_api=kube_api,
                     path_resolver=path_resolver,
                     admission_controller_config=config.admission_controller_config,
                 )
@@ -53,7 +55,7 @@ async def create_app(config: Config) -> web.Application:
     app.cleanup_ctx.append(_init_app)
 
     admission_controller_app = web.Application()
-    admission_controller_api = AdmissionControllerApi(app, config)
+    admission_controller_api = AdmissionControllerApi(app)
     admission_controller_api.register(admission_controller_app)
 
     app.add_subapp("/admission-controller", admission_controller_app)

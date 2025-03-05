@@ -37,6 +37,8 @@ pytest_plugins = [
     "tests.integration.conftest_docker",
     "tests.integration.conftest_auth",
     "tests.integration.conftest_moto",
+    "tests.integration.conftest_kube",
+    "tests.conftest_ac",
 ]
 
 

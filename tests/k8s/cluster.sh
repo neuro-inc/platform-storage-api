@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -o verbose
+
+# based on
+# https://github.com/kubernetes/minikube#linux-continuous-integration-without-vm-support
+
+function k8s::install_minikube {
+    local minikube_version="v1.25.2"
+    sudo apt-get update
+    sudo apt-get install -y conntrack
+    curl -Lo minikube https://storage.googleapis.com/minikube/releases/${minikube_version}/minikube-linux-amd64
+    chmod +x minikube
+    sudo mv minikube /usr/local/bin/
+    sudo -E minikube config set WantReportErrorPrompt false
+    sudo -E minikube config set WantNoneDriverWarning false
+}
+
+function k8s::start {
+    export KUBECONFIG=$HOME/.kube/config
+    mkdir -p $(dirname $KUBECONFIG)
+    touch $KUBECONFIG
+
+    export MINIKUBE_WANTUPDATENOTIFICATION=false
+    export MINIKUBE_WANTREPORTERRORPROMPT=false
+    export MINIKUBE_HOME=$HOME
+    export CHANGE_MINIKUBE_NONE_USER=true
+
+    sudo -E minikube start \
+        --vm-driver=none \
+        --install-addons=true \
+        --addons=registry \
+        --wait=all \
+        --wait-timeout=5m
+    kubectl config use-context minikube
+    kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
+        platform.neuromation.io/nodepool=minikube
+}
+
+function k8s::apply_all_configurations {
+    echo "Applying configurations..."
+    kubectl config use-context minikube
+    make dist
+    docker build -t admission-controller-tests:latest .
+    docker image save -o ac.tar admission-controller-tests:latest
+    minikube image load ac.tar
+    kubectl apply -f tests/k8s/rbac.yaml
+    kubectl apply -f tests/k8s/preinstall-job.yaml
+    kubectl apply -f tests/k8s/admission-controller-deployment.yaml
+    kubectl apply -f tests/k8s/postinstall-job.yaml
+}
+
+
+function k8s::clean {
+    echo "Cleaning up..."
+    kubectl config use-context minikube
+    kubectl delete -f tests/k8s/postinstall-job.yaml
+    kubectl delete -f tests/k8s/admission-controller-deployment.yaml
+    kubectl delete -f tests/k8s/preinstall-job.yaml
+    kubectl delete -f tests/k8s/rbac.yaml
+}
+
+
+function k8s::stop {
+  echo "Stopping minikube..."
+    sudo -E minikube stop || :
+    sudo -E minikube delete || :
+    sudo -E rm -rf ~/.minikube
+    sudo rm -rf /root/.minikube
+}
+
+
+function wait_postinstall() {
+  local TIMEOUT="${1:-60s}"
+  echo "Waiting up to $TIMEOUT for post-install job to succeed..."
+  if ! kubectl wait \
+       --for=condition=complete \
+       job/admission-controller-lib-postinstall \
+       --timeout="$TIMEOUT"
+  then
+    echo "ERROR: Job 'admission-controller-lib-postinstall' did not complete within $TIMEOUT."
+    echo "----- Displaying all Kubernetes events: -----"
+    kubectl get events --sort-by=.metadata.creationTimestamp
+    exit 1
+  fi
+
+  echo "A post-install job has succeeded!"
+  kubectl logs -l app=admission-controller
+}
+
+
+function k8s::apply {
+    minikube status
+    k8s::apply_all_configurations
+    wait_postinstall
+}
+
+case "${1:-}" in
+    install)
+        k8s::install_minikube
+        ;;
+    start)
+        k8s::start
+        ;;
+    apply)
+        k8s::apply
+        ;;
+    clean)
+        k8s::clean
+        ;;
+    stop)
+        k8s::stop
+        ;;
+esac

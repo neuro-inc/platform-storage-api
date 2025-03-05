@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-storage-injector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admission-controller
+  template:
+    metadata:
+      labels:
+        app: admission-controller
+    spec:
+      serviceAccountName: admission-controller
+      containers:
+      - name: admission-controller
+        image: docker.io/library/admission-controller-tests:latest
+        imagePullPolicy: "IfNotPresent"
+        command:
+          - platform-storage-admission-controller
+        ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+        env:
+          - name: NP_STORAGE_LOCAL_BASE_PATH
+            value: /var/storage
+          - name: NP_PLATFORM_ADMIN_URL
+            value: "http://platformadmin:8080"
+          - name: NP_PLATFORM_AUTH_URL
+            value: "http://platformauth:8080"
+          - name: NP_PLATFORM_TOKEN
+            value: "token"
+          - name: NP_PLATFORM_CLUSTER_NAME
+            value: "minikube"
+          - name: S3_REGION
+            value: "none"
+          - name: S3_BUCKET_NAME
+            value: ""
+          - name: SERVER_PORT
+            value: "8080"
+          - name: NP_STORAGE_API_K8S_API_URL
+            value: "https://kubernetes.default:443"
+          - name: NP_STORAGE_API_K8S_AUTH_TYPE
+            value: "token"
+          - name: NP_STORAGE_API_K8S_CA_PATH
+            value: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+          - name: NP_STORAGE_API_K8S_TOKEN_PATH
+            value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+          - name: NP_STORAGE_API_K8S_NS
+            value: "default"
+          - name: NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME
+            value: "admission-controller-cert"
+        volumeMounts:
+          - mountPath: /var/storage
+            name: volume
+      volumes:
+        - name: volume
+          hostPath:
+            path: /tmp/mnt
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: admission-controller
+spec:
+  selector:
+    app: admission-controller
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8080
+      protocol: TCP
