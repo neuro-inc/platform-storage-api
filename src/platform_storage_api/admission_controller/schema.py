@@ -56,9 +56,7 @@ class AdmissionReviewPatchType(str, Enum):
 @dataclasses.dataclass
 class AdmissionReviewResponse:
     uid: str
-    allowed: bool = True
     patch: Optional[list[dict[str, Any]]] = None
-    patch_type: AdmissionReviewPatchType = AdmissionReviewPatchType.JSON
 
     def add_patch(self, path: str, value: Any) -> None:
         if self.patch is None:
@@ -70,24 +68,41 @@ class AdmissionReviewResponse:
             "value": value,
         })
 
-    def to_dict(self) -> dict[str, Any]:
-        patch: Optional[str] = None
-
+    def allow(self) -> web.Response:
+        response = {
+            "uid": self.uid,
+            "allowed": True,
+        }
         if self.patch is not None:
             # convert patch changes to a b64
             dumped = json.dumps(self.patch).encode()
             patch = base64.b64encode(dumped).decode()
-
-        return {
-            "apiVersion": "admission.k8s.io/v1",
-            "kind": "AdmissionReview",
-            "response": {
-                "uid": self.uid,
-                "allowed": self.allowed,
+            response.update({
                 "patch": patch,
-                "patchType": AdmissionReviewPatchType.JSON.value
-            }
-        }
+                "patchType": AdmissionReviewPatchType.JSON.value,
+            })
 
-    def to_response(self) -> web.Response:
-        return web.json_response(self.to_dict())
+        return web.json_response(
+            {
+                "apiVersion": "admission.k8s.io/v1",
+                "kind": "AdmissionReview",
+                "response": response
+            }
+        )
+
+    def decline(self, status_code: int, message: str) -> web.Response:
+        return web.json_response(
+            {
+                "apiVersion": "admission.k8s.io/v1",
+                "kind": "AdmissionReview",
+                "response": {
+                    "uid": self.uid,
+                    "allowed": False,
+                    "status": {
+                        "code": status_code,
+                        "message": message,
+                    },
+
+                }
+            }
+        )

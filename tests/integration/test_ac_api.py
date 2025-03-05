@@ -1,7 +1,7 @@
 import base64
 import json
 from collections.abc import AsyncIterator, Iterator
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 from itertools import count
 from typing import Any
 from unittest.mock import Mock, patch
@@ -20,13 +20,11 @@ from platform_storage_api.admission_controller.volume_resolver import KubeVolume
 from tests.integration.conftest import ApiConfig
 
 
-@pytest.fixture
-async def api(
-    volume_resolver: KubeVolumeResolver,  # prepared volume resolver
-) -> AsyncIterator[ApiConfig]:
+@asynccontextmanager
+async def _api(volume_resolver: KubeVolumeResolver) -> AsyncIterator[ApiConfig]:
     """
-    Runs an admission-controller webhook API
-    """
+        Runs an admission-controller webhook API
+        """
     app = web.Application()
 
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
@@ -51,17 +49,32 @@ async def api(
     await runner.cleanup()
 
 
+@pytest.fixture
+async def nfs_api(
+    volume_resolver_with_nfs: KubeVolumeResolver,  # prepared volume resolver
+) -> AsyncIterator[ApiConfig]:
+    async with _api(volume_resolver=volume_resolver_with_nfs) as api:
+        yield api
+
+
+@pytest.fixture
+async def host_path_api(
+    volume_resolver_with_nfs: KubeVolumeResolver,  # prepared volume resolver
+) -> AsyncIterator[ApiConfig]:
+    async with _api(volume_resolver=volume_resolver_with_nfs) as api:
+        yield api
+
+
+# todo: we need this bug to fixed to use a dynamic fixtures parametrizing.
+#  https://github.com/pytest-dev/pytest-asyncio/issues/112
 class TestMutateApi:
-    url: str
     http: ClientSession
 
     @pytest.fixture(autouse=True)
     def setup(
         self,
-        api: ApiConfig,  # auto-run api
         client: aiohttp.ClientSession,
     ) -> None:
-        self.url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         self.http = client
 
     @pytest.fixture
@@ -79,12 +92,25 @@ class TestMutateApi:
             uuid_mock.side_effect = lambda: str(next(id_generator))
             yield
 
-    async def test__not_a_pod(self) -> None:
+    async def test__nfs__not_a_pod(self, nfs_api: ApiConfig) -> None:
+        return await self._test__not_a_pod(api=nfs_api)
+
+    async def test__host_path__not_a_pod(self, host_path_api: ApiConfig) -> None:
+        return await self._test__not_a_pod(api=host_path_api)
+
+    async def _test__not_a_pod(
+        self,
+        api: ApiConfig,
+    ) -> None:
         """
         Ensure a webhook will react only to a PODs requests.
         """
+        url = (
+            f"http://{api.host}:{api.port}/admission-controller/mutate"
+        )
+
         response = await self.http.post(
-            self.url,
+            url,
             json={
                 "request": {
                     "uid": str(uuid4()),
@@ -96,12 +122,30 @@ class TestMutateApi:
         )
         await self._ensure_allowed(response)
 
-    async def test__pod_without_injection_spec(self) -> None:
+    async def test__nfs__pod_without_injection_spec(
+        self,
+        nfs_api: ApiConfig,
+    ) -> None:
+        return await self._test__pod_without_injection_spec(api=nfs_api)
+
+    async def test__host_path__pod_without_injection_spec(
+        self,
+        host_path_api: ApiConfig,
+    ) -> None:
+        return await self._test__pod_without_injection_spec(api=host_path_api)
+
+    async def _test__pod_without_injection_spec(
+        self,
+        api: ApiConfig,
+    ) -> None:
         """
         No injection spec provided - this should be allowed.
         """
+        url = (
+            f"http://{api.host}:{api.port}/admission-controller/mutate"
+        )
         response = await self.http.post(
-            self.url,
+            url,
             json={
                 "request": {
                     "uid": str(uuid4()),
@@ -114,15 +158,35 @@ class TestMutateApi:
         )
         await self._ensure_allowed(response)
 
-    async def test__pod_defines_no_containers(
+    async def test__nfs__pod_defines_no_containers(
         self,
+        nfs_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        return await self._test__pod_defines_no_containers(
+            api=nfs_api, logger_mock=logger_mock
+        )
+
+    async def test__host_path__pod_defines_no_containers(
+        self,
+        host_path_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        return await self._test__pod_defines_no_containers(
+            api=host_path_api, logger_mock=logger_mock
+        )
+
+    async def _test__pod_defines_no_containers(
+        self,
+        api: ApiConfig,
         logger_mock: Mock,
     ) -> None:
         """
         Ensure POD won't be mutated if it doesn't define any containers
         """
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
-            self.url,
+            url,
             json={
                 "request": {
                     "uid": str(uuid4()),
@@ -144,16 +208,34 @@ class TestMutateApi:
         assert logger_mock.info.call_args[0][0] == \
                "POD won't be mutated because doesnt define containers"
 
-    async def test__pod_invalid_injection_spec(
+    async def test__nfs__pod_invalid_injection_spec(
         self,
+        nfs_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_invalid_injection_spec(nfs_api, logger_mock)
+
+    async def test__host_path__pod_invalid_injection_spec(
+        self,
+        host_path_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_invalid_injection_spec(host_path_api, logger_mock)
+
+    async def _test__pod_invalid_injection_spec(
+        self,
+        api: ApiConfig,
         logger_mock: Mock,
     ) -> None:
         """
         Ensure we'll disallow a creation of a POD if it defines the
         annotation, but such an annotation couldn't be properly validated
         """
+        url = (
+            f"http://{api.host}:{api.port}/admission-controller/mutate"
+        )
         response = await self.http.post(
-            self.url,
+            url,
             json={
                 "request": {
                     "uid": str(uuid4()),
@@ -176,19 +258,34 @@ class TestMutateApi:
             }
         )
         await self._ensure_not_allowed(response)
-        assert (logger_mock.exception.call_args[0][0] ==
-                "Invalid injection spec. Denying the request")
+        assert logger_mock.exception.call_args[0][0] == "injection spec is invalid"
 
-    async def test__ensure_volumes_will_be_added(
+    async def test__nfs__ensure_volumes_will_be_added(
         self,
+        nfs_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        return await self._test__ensure_volumes_will_be_added(nfs_api, uuid_mock)
+
+    async def test__host_path__ensure_volumes_will_be_added(
+        self,
+        host_path_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        return await self._test__ensure_volumes_will_be_added(host_path_api, uuid_mock)
+
+    async def _test__ensure_volumes_will_be_added(
+        self,
+        api: ApiConfig,
         uuid_mock: Mock,
     ) -> None:
         """
         If container doesn't define any volumes,
         we expect that a webhook will add them via an `add` operations
         """
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
-            self.url,
+            url,
             json={
                 "request": {
                     "uid": str(uuid4()),
@@ -244,8 +341,23 @@ class TestMutateApi:
 
         assert data["patch"] == expected_ops
 
-    async def test__resolve_single_volume(
+    async def test__nfs__resolve_single_volume(
         self,
+        nfs_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        return await self._test__resolve_single_volume(nfs_api, uuid_mock)
+
+    async def test__host_path__resolve_single_volume(
+        self,
+        host_path_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        return await self._test__resolve_single_volume(host_path_api, uuid_mock)
+
+    async def _test__resolve_single_volume(
+        self,
+        api: ApiConfig,
         uuid_mock: Mock,
     ) -> None:
         """
@@ -253,9 +365,10 @@ class TestMutateApi:
         Pod already defines volumes and volume mounts,
         so we expect only two add ops just to add an injected volume
         """
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
 
         response = await self.http.post(
-            self.url,
+            url,
             json={
                 "request": {
                     "uid": str(uuid4()),
@@ -309,16 +422,32 @@ class TestMutateApi:
         ]
         assert data["patch"] == expected_ops
 
-    async def test__resolve_multiple_volumes(
+    async def test__nfs__resolve_multiple_volumes(
         self,
+        nfs_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        return await self._test__resolve_multiple_volumes(nfs_api, uuid_mock)
+
+    async def test__host_path__resolve_multiple_volumes(
+        self,
+        host_path_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        return await self._test__resolve_multiple_volumes(host_path_api, uuid_mock)
+
+    async def _test__resolve_multiple_volumes(
+        self,
+        api: ApiConfig,
         uuid_mock: Mock,
     ) -> None:
         """
         Adding two volumes to the pod.
         One if a read-write, while another one is a read-only
         """
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
-            self.url,
+            url,
             json={
                 "request": {
                     "uid": str(uuid4()),
@@ -401,16 +530,36 @@ class TestMutateApi:
 
         assert data["patch"] == expected_ops
 
-    async def test__resolve_multiple_volumes_to_multiple_containers(
+    async def test__nfs__resolve_multiple_volumes_to_multiple_containers(
         self,
+        nfs_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        return await self._test__resolve_multiple_volumes_to_multiple_containers(
+            nfs_api, uuid_mock
+        )
+
+    async def test__host_path__resolve_multiple_volumes_to_multiple_containers(
+        self,
+        host_path_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        return await self._test__resolve_multiple_volumes_to_multiple_containers(
+            host_path_api, uuid_mock
+        )
+
+    async def _test__resolve_multiple_volumes_to_multiple_containers(
+        self,
+        api: ApiConfig,
         uuid_mock: Mock,
     ) -> None:
         """
         Adding two volumes to the pod, which defines two containers.
         Volumes should be added to each container.
         """
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
-            self.url,
+            url,
             json={
                 "request": {
                     "uid": str(uuid4()),
@@ -526,7 +675,7 @@ class TestMutateApi:
         assert response.status == 200
         data = await response.json()
         assert data["kind"] == "AdmissionReview"
-        patch_data = data["response"]["patch"]
+        patch_data = data["response"].get("patch")
         if patch_data:
             data["response"]["patch"] = json.loads(base64.b64decode(patch_data))
         return data["response"]

@@ -6,7 +6,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import timezone
 from pathlib import PurePath
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from neuro_admin_client import AdminClient
 from prometheus_client.metrics_core import GaugeMetricFamily, Metric
@@ -105,16 +105,16 @@ class StorageUsageService:
                 continue
         return result
 
-    async def _get_projects_by_org(self) -> dict[str | None, set[str]]:
+    async def _get_projects_by_org(self) -> dict[Union[str, None], set[str]]:
         projects = await self._admin_client.list_projects(
             self._config.platform.cluster_name
         )
-        projects_by_org: dict[str | None, set[str]] = defaultdict(set)
+        projects_by_org: dict[Union[str, None], set[str]] = defaultdict(set)
         for project in projects:
             projects_by_org[project.org_name].add(project.name)
         return projects_by_org
 
-    async def _resolve_org_path(self, org_name: str | None) -> PurePath:
+    async def _resolve_org_path(self, org_name: Optional[str]) -> PurePath:
         if org_name:
             return await self._path_resolver.resolve_path(PurePath(f"/{org_name}"))
         return await self._path_resolver.resolve_base_path(

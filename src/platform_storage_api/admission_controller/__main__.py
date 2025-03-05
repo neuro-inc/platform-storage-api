@@ -4,6 +4,7 @@ import ssl
 import tempfile
 from base64 import b64decode
 
+import uvloop
 from aiohttp import web
 from apolo_kube_client.client import kube_client_from_config
 from neuro_logging import init_logging, setup_sentry
@@ -11,6 +12,8 @@ from neuro_logging import init_logging, setup_sentry
 from platform_storage_api.admission_controller.app import create_app
 from platform_storage_api.config import Config
 
+
+uvloop.install()
 
 logger = logging.getLogger(__name__)
 
