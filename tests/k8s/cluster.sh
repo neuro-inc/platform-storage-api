@@ -27,8 +27,6 @@ function k8s::start {
 
     sudo -E minikube start \
         --vm-driver=none \
-        --install-addons=true \
-        --addons=registry \
         --wait=all \
         --wait-timeout=5m
     kubectl config use-context minikube
@@ -45,8 +43,10 @@ function k8s::apply_all_configurations {
     minikube image load ac.tar
     kubectl apply -f tests/k8s/rbac.yaml
     kubectl apply -f tests/k8s/preinstall-job.yaml
+    wait_job admission-controller-lib-preinstall
     kubectl apply -f tests/k8s/admission-controller-deployment.yaml
     kubectl apply -f tests/k8s/postinstall-job.yaml
+    wait_job admission-controller-lib-postinstall
 }
 
 
@@ -69,21 +69,21 @@ function k8s::stop {
 }
 
 
-function wait_postinstall() {
-  local TIMEOUT="${1:-60s}"
-  echo "Waiting up to $TIMEOUT for post-install job to succeed..."
+function wait_job() {
+  local JOB_NAME=$1
+  echo "Waiting up to 60 seconds for $JOB_NAME job to succeed..."
   if ! kubectl wait \
        --for=condition=complete \
-       job/admission-controller-lib-postinstall \
-       --timeout="$TIMEOUT"
+       job/$JOB_NAME \
+       --timeout="60s"
   then
-    echo "ERROR: Job 'admission-controller-lib-postinstall' did not complete within $TIMEOUT."
+    echo "ERROR: Job '$JOB_NAME' did not complete within 60 seconds."
     echo "----- Displaying all Kubernetes events: -----"
     kubectl get events --sort-by=.metadata.creationTimestamp
     exit 1
   fi
 
-  echo "A post-install job has succeeded!"
+  echo "job/$JOB_NAME succeeded"
   kubectl logs -l app=admission-controller
 }
 
@@ -91,7 +91,6 @@ function wait_postinstall() {
 function k8s::apply {
     minikube status
     k8s::apply_all_configurations
-    wait_postinstall
 }
 
 case "${1:-}" in
