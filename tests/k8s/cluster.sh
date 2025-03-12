@@ -83,7 +83,7 @@ function wait_job() {
     exit 1
   fi
 
-  echo "A post-install job has succeeded!"
+  echo "job/$JOB_NAME succeeded"
   kubectl logs -l app=admission-controller
 }
 
