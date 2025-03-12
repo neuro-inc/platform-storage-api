@@ -6,6 +6,11 @@ import pytest
 from aioresponses import aioresponses
 
 
+pytest_plugins = [
+    "tests.conftest_ac",
+]
+
+
 @pytest.fixture
 def aiohttp_mock() -> Iterator[aioresponses]:
     with aioresponses() as mocked:

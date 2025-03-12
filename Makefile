@@ -47,3 +47,23 @@ build/image: .dockerignore Dockerfile dist
 		-t $(IMAGE_NAME):latest .
 	mkdir -p build
 	docker image inspect $(IMAGE_NAME):latest -f '{{ .ID }}' > $@
+
+
+build/test-image:
+	docker build \
+		--build-arg PY_VERSION=$$(cat .python-version) \
+		-t admission-controller-tests:latest .
+
+docker_pull_test_images:
+ifeq ($(MINIKUBE_DRIVER),none)
+	make _docker_pull_test_images
+else
+	@eval $$(minikube docker-env); \
+	make _docker_pull_test_images
+endif
+
+_docker_pull_test_images:
+	docker pull ghcr.io/neuro-inc/admission-controller-lib:latest; \
+
+
+include k8s.mk

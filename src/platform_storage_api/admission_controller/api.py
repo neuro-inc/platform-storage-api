@@ -14,7 +14,6 @@ from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
     VolumeResolverError,
 )
-from platform_storage_api.config import Config
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,7 @@ INJECTED_VOLUME_NAME_PREFIX = "storage-auto-injected-volume"
 
 def create_injection_volume_name() -> str:
     """Creates a random volume name"""
-    return f"{INJECTED_VOLUME_NAME_PREFIX}-{uuid4().hex}"
+    return f"{INJECTED_VOLUME_NAME_PREFIX}-{str(uuid4())[:8]}"
 
 
 class AdmissionControllerApi:
@@ -38,11 +37,9 @@ class AdmissionControllerApi:
     def __init__(
         self,
         app: web.Application,
-        config: Config
     ) -> None:
 
         self._app = app
-        self._config = config
 
     @property
     def _volume_resolver(self) -> KubeVolumeResolver:
@@ -65,45 +62,48 @@ class AdmissionControllerApi:
 
         if kind != "Pod":
             # not a pod creation request. early-exit
-            return admission_review.to_response()
+            return admission_review.allow()
 
         metadata = pod.get("metadata", {})
 
         annotations = metadata.get("annotations", {})
-        raw_injection_spec = annotations.get(ANNOTATION_APOLO_INJECT_STORAGE)
 
-        if not raw_injection_spec:
+        if ANNOTATION_APOLO_INJECT_STORAGE not in annotations:
             # a pod does not request storage. we can do early-exit here
             logger.info("POD won't be mutated because doesnt define proper annotations")
-            return admission_review.to_response()
+            return admission_review.allow()
+
+        pod_spec = pod["spec"]
+
+        containers = pod_spec.get("containers") or []
+        if not containers:
+            logger.info("POD won't be mutated because doesnt define containers")
+            # pod does not define any containers. we can exit
+            return admission_review.allow()
+
+        raw_injection_spec = annotations[ANNOTATION_APOLO_INJECT_STORAGE]
 
         return await self._handle_injection(
-            pod=pod,
+            pod_spec=pod_spec,
             raw_injection_spec=raw_injection_spec,
             admission_review=admission_review,
         )
 
     async def _handle_injection(
         self,
-        pod: dict[str, Any],
+        pod_spec: dict[str, Any],
         raw_injection_spec: str,
         admission_review: AdmissionReviewResponse,
     ) -> web.Response:
-        pod_spec = pod["spec"]
         containers = pod_spec.get("containers") or []
-
-        if not containers:
-            logger.info("POD won't be mutated because doesnt define containers")
-            # pod does not define any containers. we can exit
-            return admission_review.to_response()
 
         logger.info("Going to inject volumes")
         try:
             injection_spec = InjectionSchema.validate_json(raw_injection_spec)
         except Exception:
-            logger.exception("Invalid injection spec. Denying the request")
-            admission_review.allowed = False
-            return admission_review.to_response()
+            error_message = "injection spec is invalid"
+            logger.exception(error_message)
+            return admission_review.decline(status_code=422, message=error_message)
 
         # let's ensure POD has volumes
         if "volumes" not in pod_spec:
@@ -131,10 +131,10 @@ class AdmissionControllerApi:
                     path=storage_path
                 )
             except VolumeResolverError:
+                error_message = "Unable to resolve a volume for a provided path"
                 # report an error and disallow spawning a POD
-                logger.exception("Unable to resolve a volume for a provided path")
-                admission_review.allowed = False
-                return admission_review.to_response()
+                logger.exception(error_message)
+                return admission_review.decline(status_code=400, message=error_message)
 
             future_volume_name = create_injection_volume_name()
 
@@ -161,4 +161,4 @@ class AdmissionControllerApi:
                     value=patch_value,
                 )
 
-        return admission_review.to_response()
+        return admission_review.allow()
