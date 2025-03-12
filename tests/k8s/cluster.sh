@@ -27,8 +27,6 @@ function k8s::start {
 
     sudo -E minikube start \
         --vm-driver=none \
-        --install-addons=true \
-        --addons=registry \
         --wait=all \
         --wait-timeout=5m
     kubectl config use-context minikube
@@ -77,9 +75,9 @@ function wait_job() {
   if ! kubectl wait \
        --for=condition=complete \
        job/$JOB_NAME \
-       --timeout="60"
+       --timeout="60s"
   then
-    echo "ERROR: Job 'admission-controller-lib-postinstall' did not complete within 60 seconds."
+    echo "ERROR: Job '$JOB_NAME' did not complete within 60 seconds."
     echo "----- Displaying all Kubernetes events: -----"
     kubectl get events --sort-by=.metadata.creationTimestamp
     exit 1
