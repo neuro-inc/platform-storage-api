@@ -62,12 +62,9 @@ class AdmissionControllerApi:
 
     async def handle_post_mutate(self, request: web.Request) -> Any:
         logger.info("mutate call")
-
         payload: dict[str, Any] = await request.json()
-
         uid = payload["request"]["uid"]
         pod = payload["request"]["object"]
-        spec = pod["spec"]
         metadata = pod.get("metadata", {}) or {}
         annotations = metadata.get("annotations", {}) or {}
         labels = metadata.get("labels", {}) or {}
@@ -85,6 +82,7 @@ class AdmissionControllerApi:
         except PreparationError as e:
             return admission_review.decline(status_code=422, message=str(e))
 
+        spec = pod["spec"]
         try:
             return await self._mutate(
                 pod_spec=spec,
