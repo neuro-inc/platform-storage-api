@@ -17,7 +17,7 @@ def valid_mount_path() -> str:
 
 @pytest.fixture
 def valid_storage_path() -> str:
-    return f"{SCHEMA_STORAGE}org/proj"
+    return f"{SCHEMA_STORAGE}default/org/proj"
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def test__storage_schema_doesnt_have_org_and_proj(
 
     expected_err = (
         f"`{storage_path}` is invalid. "
-        f"Both org and project name must be present in the storage path"
+        f"Cluster, org and project names must be present in the storage path"
     )
     assert expected_err in str(e.value)
 

@@ -231,8 +231,9 @@ class KubeVolumeResolver:
         path: str
     ) -> KubeVolume:
         """
-        Resolves a path to a proper mount volume, so later it can be used
+        resolves a path to a proper mount volume, so later it can be used
         in a kube spec of a POD.
+        :param path: an absolute path to a file
         """
         local_path = str(await self.to_local_path(storage_path=path))
 

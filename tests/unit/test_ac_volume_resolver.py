@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from apolo_kube_client.errors import ResourceNotFound
 
-from platform_storage_api.admission_controller.schema import SCHEMA_STORAGE
 from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
     NfsVolumeSpec,
@@ -108,12 +107,12 @@ async def test__resolve_successfully(
     """
     Successful resolving
     """
-    storage_path = "org/project"
+    storage_path = "/default/org/project"
 
     async with volume_resolver_with_nfs as vr:
-        volume = await vr.resolve_to_mount_volume(f"{SCHEMA_STORAGE}{storage_path}")
+        volume = await vr.resolve_to_mount_volume(storage_path)
 
         assert volume.backend == VolumeBackend.NFS
         spec = cast(NfsVolumeSpec, volume.spec)
         assert spec.server == "0.0.0.0"
-        assert spec.path == f"{volume_path}/{storage_path}"
+        assert spec.path == f"{volume_path}{storage_path}"
