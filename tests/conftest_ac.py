@@ -9,12 +9,15 @@ from platform_storage_api.admission_controller.volume_resolver import (
     VolumeBackend,
 )
 from platform_storage_api.config import AdmissionControllerConfig
-from platform_storage_api.storage import SingleStoragePathResolver, StoragePathResolver
+from platform_storage_api.storage import (
+    SingleStoragePathResolver,
+    StoragePathResolver,
+)
 
 
 @pytest.fixture
 def local_mount_path() -> str:
-    return "/var/storage"
+    return "/tmp/storage"
 
 
 @pytest.fixture

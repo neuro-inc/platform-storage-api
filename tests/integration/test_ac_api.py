@@ -13,6 +13,8 @@ from aiohttp import ClientResponse, ClientSession, web
 
 from platform_storage_api.admission_controller.api import (
     ANNOTATION_APOLO_INJECT_STORAGE,
+    LABEL_APOLO_ORG_NAME,
+    LABEL_APOLO_PROJECT_NAME,
     AdmissionControllerApi,
 )
 from platform_storage_api.admission_controller.app_keys import VOLUME_RESOLVER_KEY
@@ -23,8 +25,8 @@ from tests.integration.conftest import ApiConfig
 @asynccontextmanager
 async def _api(volume_resolver: KubeVolumeResolver) -> AsyncIterator[ApiConfig]:
     """
-        Runs an admission-controller webhook API
-        """
+    Runs an admission-controller webhook API
+    """
     app = web.Application()
 
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
@@ -260,6 +262,251 @@ class TestMutateApi:
         await self._ensure_not_allowed(response)
         assert logger_mock.exception.call_args[0][0] == "injection spec is invalid"
 
+    async def test__nfs__pod_no_org_label(
+        self,
+        nfs_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_no_org_label(nfs_api, logger_mock)
+
+    async def test__host_path__pod_no_org_label(
+        self,
+        host_path_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_no_org_label(host_path_api, logger_mock)
+
+    async def _test__pod_no_org_label(
+        self,
+        api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        """
+        Ensure we'll disallow a creation of a POD if it defines the
+        annotation, but doesn't have an org label
+        """
+        url = (
+            f"http://{api.host}:{api.port}/admission-controller/mutate"
+        )
+        response = await self.http.post(
+            url,
+            json={
+                "request": {
+                    "uid": str(uuid4()),
+                    "object": {
+                        "kind": "Pod",
+                        "metadata": {
+                            "annotations": {
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
+                                    {
+                                        "mount_path": "/var/mount-volume",
+                                        "storage_path": "storage://default/org/proj",
+                                        "mount_mode": "rw"
+                                    }
+                                ])
+                            }
+                        },
+                        "spec": {
+                            "containers": [
+                                {
+                                    "name": "container"
+                                }
+                            ],
+                        }
+                    }
+                }
+            }
+        )
+        await self._ensure_not_allowed(response)
+        assert logger_mock.error.call_args[0][0] == \
+               f"Missing label {LABEL_APOLO_ORG_NAME}"
+
+    async def test__nfs__pod_no_project_label(
+        self,
+        nfs_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_no_project_label(nfs_api, logger_mock)
+
+    async def test__host_path__pod_no_project_label(
+        self,
+        host_path_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_no_project_label(host_path_api, logger_mock)
+
+    async def _test__pod_no_project_label(
+        self,
+        api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        """
+        Ensure we'll disallow a creation of a POD if it defines the
+        annotation, but doesn't have a project label
+        """
+        url = (
+            f"http://{api.host}:{api.port}/admission-controller/mutate"
+        )
+        response = await self.http.post(
+            url,
+            json={
+                "request": {
+                    "uid": str(uuid4()),
+                    "object": {
+                        "kind": "Pod",
+                        "metadata": {
+                            "labels": {
+                                LABEL_APOLO_ORG_NAME: "org"
+                            },
+                            "annotations": {
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
+                                    {
+                                        "mount_path": "/var/mount-volume",
+                                        "storage_path": "storage://default/org/proj",
+                                        "mount_mode": "rw"
+                                    }
+                                ])
+                            }
+                        },
+                        "spec": {
+                            "containers": [
+                                {
+                                    "name": "container"
+                                }
+                            ],
+                        }
+                    }
+                }
+            }
+        )
+        await self._ensure_not_allowed(response)
+        assert logger_mock.error.call_args[0][0] == \
+               f"Missing label {LABEL_APOLO_PROJECT_NAME}"
+
+    async def test__nfs__pod_org_label_missmatch(
+        self,
+        nfs_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_org_label_missmatch(nfs_api, logger_mock)
+
+    async def test__host_path__pod_org_label_missmatch(
+        self,
+        host_path_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_org_label_missmatch(host_path_api, logger_mock)
+
+    async def _test__pod_org_label_missmatch(
+        self,
+        api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        """
+        Ensure we'll disallow a creation of a POD if the org/proj pair
+        doesn't correlate with the mounted path
+        """
+        url = (
+            f"http://{api.host}:{api.port}/admission-controller/mutate"
+        )
+        response = await self.http.post(
+            url,
+            json={
+                "request": {
+                    "uid": str(uuid4()),
+                    "object": {
+                        "kind": "Pod",
+                        "metadata": {
+                            "labels": {
+                                LABEL_APOLO_ORG_NAME: "invalid-org",
+                                LABEL_APOLO_PROJECT_NAME: "invalid-proj"
+                            },
+                            "annotations": {
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
+                                    {
+                                        "mount_path": "/var/mount-volume",
+                                        "storage_path": "storage://default/org/proj",
+                                        "mount_mode": "rw"
+                                    }
+                                ])
+                            }
+                        },
+                        "spec": {
+                            "containers": [
+                                {
+                                    "name": "container"
+                                }
+                            ],
+                        }
+                    }
+                }
+            }
+        )
+        await self._ensure_not_allowed(response)
+        assert logger_mock.error.call_args[0][0] == "org missmatch: `org`"
+
+    async def test__nfs__pod_project_label_missmatch(
+        self,
+        nfs_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_org_label_missmatch(nfs_api, logger_mock)
+
+    async def test__host_path__pod_project_label_missmatch(
+        self,
+        host_path_api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        await self._test__pod_org_label_missmatch(host_path_api, logger_mock)
+
+    async def _test__pod_project_label_missmatch(
+        self,
+        api: ApiConfig,
+        logger_mock: Mock,
+    ) -> None:
+        """
+        Ensure we'll disallow a creation of a POD if the org/proj pair
+        doesn't correlate with the mounted path
+        """
+        url = (
+            f"http://{api.host}:{api.port}/admission-controller/mutate"
+        )
+        response = await self.http.post(
+            url,
+            json={
+                "request": {
+                    "uid": str(uuid4()),
+                    "object": {
+                        "kind": "Pod",
+                        "metadata": {
+                            "labels": {
+                                LABEL_APOLO_ORG_NAME: "org",
+                                LABEL_APOLO_PROJECT_NAME: "invalid-proj"
+                            },
+                            "annotations": {
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
+                                    {
+                                        "mount_path": "/var/mount-volume",
+                                        "storage_path": "storage://default/org/proj",
+                                        "mount_mode": "rw"
+                                    }
+                                ])
+                            }
+                        },
+                        "spec": {
+                            "containers": [
+                                {
+                                    "name": "container"
+                                }
+                            ],
+                        }
+                    }
+                }
+            }
+        )
+        await self._ensure_not_allowed(response)
+        assert logger_mock.error.call_args[0][0] == "project missmatch: `invalid-proj`"
+
     async def test__nfs__ensure_volumes_will_be_added(
         self,
         nfs_api: ApiConfig,
@@ -292,11 +539,15 @@ class TestMutateApi:
                     "object": {
                         "kind": "Pod",
                         "metadata": {
+                            "labels": {
+                                LABEL_APOLO_ORG_NAME: "org",
+                                LABEL_APOLO_PROJECT_NAME: "proj",
+                            },
                             "annotations": {
                                 ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
                                     {
                                         "mount_path": "/var/mount-volume",
-                                        "storage_path": "storage://org/proj",
+                                        "storage_path": "storage://default/org/proj",
                                         "mount_mode": "rw"
                                     }
                                 ])
@@ -375,11 +626,15 @@ class TestMutateApi:
                     "object": {
                         "kind": "Pod",
                         "metadata": {
+                            "labels": {
+                                LABEL_APOLO_ORG_NAME: "org",
+                                LABEL_APOLO_PROJECT_NAME: "proj",
+                            },
                             "annotations": {
                                 ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
                                     {
                                         "mount_path": "/var/mount-volume",
-                                        "storage_path": "storage://org/proj",
+                                        "storage_path": "storage://default/org/proj",
                                         "mount_mode": "rw"
                                     }
                                 ])
@@ -454,16 +709,22 @@ class TestMutateApi:
                     "object": {
                         "kind": "Pod",
                         "metadata": {
+                            "labels": {
+                                LABEL_APOLO_ORG_NAME: "org",
+                                LABEL_APOLO_PROJECT_NAME: "proj",
+                            },
                             "annotations": {
                                 ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
                                     {
                                         "mount_path": "/var/mount-volume",
-                                        "storage_path": "storage://org/proj",
+                                        "storage_path":
+                                            "storage://default/org/proj/data1",
                                         "mount_mode": "rw"
                                     },
                                     {
                                         "mount_path": "/var/mount-volume-2",
-                                        "storage_path": "storage://org-2/proj-2",
+                                        "storage_path":
+                                            "storage://default/org/proj/data2",
                                         "mount_mode": "r"
                                     },
                                 ])
@@ -493,7 +754,7 @@ class TestMutateApi:
                 'value': {
                     'name': 'storage-auto-injected-volume-1',
                     'nfs': {
-                        'path': '/var/exports/org/proj',
+                        'path': '/var/exports/org/proj/data1',
                         'server': '0.0.0.0'
                     }
                 }
@@ -512,7 +773,7 @@ class TestMutateApi:
                 'value': {
                     'name': 'storage-auto-injected-volume-2',
                     'nfs': {
-                        'path': '/var/exports/org-2/proj-2',
+                        'path': '/var/exports/org/proj/data2',
                         'server': '0.0.0.0'
                     }
                 }
@@ -566,16 +827,22 @@ class TestMutateApi:
                     "object": {
                         "kind": "Pod",
                         "metadata": {
+                            "labels": {
+                                LABEL_APOLO_ORG_NAME: "org",
+                                LABEL_APOLO_PROJECT_NAME: "proj",
+                            },
                             "annotations": {
                                 ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
                                     {
                                         "mount_path": "/var/mount-volume",
-                                        "storage_path": "storage://org/proj",
+                                        "storage_path":
+                                            "storage://default/org/proj/data1",
                                         "mount_mode": "rw"
                                     },
                                     {
                                         "mount_path": "/var/mount-volume-2",
-                                        "storage_path": "storage://org-2/proj-2",
+                                        "storage_path":
+                                            "storage://default/org/proj/data2",
                                         "mount_mode": "r"
                                     },
                                 ])
@@ -606,7 +873,7 @@ class TestMutateApi:
                 'value': {
                     'name': 'storage-auto-injected-volume-1',
                     'nfs': {
-                        'path': '/var/exports/org/proj',
+                        'path': '/var/exports/org/proj/data1',
                         'server': '0.0.0.0'
                     }
                 }
@@ -633,7 +900,7 @@ class TestMutateApi:
                 'value': {
                     'name': 'storage-auto-injected-volume-2',
                     'nfs': {
-                        'path': '/var/exports/org-2/proj-2',
+                        'path': '/var/exports/org/proj/data2',
                         'server': '0.0.0.0'
                     }
                 }

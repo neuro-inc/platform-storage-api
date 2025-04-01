@@ -152,7 +152,7 @@ async def test_inject_single_storage(
         assert volume_name.startswith(INJECTED_VOLUME_NAME_PREFIX)
         actual_host_path = actual_host_path_volume["hostPath"]["path"]
         expected_host_path = f"{ACTUAL_HOST_PATH}/org/proj"
-        assert actual_host_path  == expected_host_path
+        assert actual_host_path == expected_host_path
 
         actual_host_path_volume_mount = next(
             iter(

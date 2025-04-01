@@ -3,13 +3,12 @@ import logging
 import socket
 from copy import deepcopy
 from enum import Enum
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from types import TracebackType
 from typing import Any, Optional, Union
 
 from apolo_kube_client.client import KubeClient
 
-from platform_storage_api.admission_controller.schema import SCHEMA_STORAGE
 from platform_storage_api.config import AdmissionControllerConfig
 from platform_storage_api.storage import StoragePathResolver
 
@@ -218,6 +217,15 @@ class KubeVolumeResolver:
             logger.info("created a volume mapping: %s", kube_volume_mapping)
             self._local_fs_prefix_to_kube_volume.update(kube_volume_mapping)
 
+    async def to_local_path(
+        self,
+        storage_path: str
+    ) -> Path:
+        """
+        Resolves a storage path to a local path
+        """
+        return Path(await self._path_resolver.resolve_path(PurePath(storage_path)))
+
     async def resolve_to_mount_volume(
         self,
         path: str
@@ -226,16 +234,14 @@ class KubeVolumeResolver:
         Resolves a path to a proper mount volume, so later it can be used
         in a kube spec of a POD.
         """
-        normalized_path = PurePath(path.replace(SCHEMA_STORAGE, "/"))
-        local_path = await self._path_resolver.resolve_path(normalized_path)
-        str_local_path = str(local_path)
+        local_path = str(await self.to_local_path(storage_path=path))
 
         for fs_path_prefix, kube_volume in self._local_fs_prefix_to_kube_volume.items():
-            if not str_local_path.startswith(fs_path_prefix):
+            if not local_path.startswith(fs_path_prefix):
                 continue
 
-            # patch match, so we create a new volume with the adjusted path
-            new_mount_path = str_local_path.replace(
+            # path match, so we create a new volume with the adjusted path
+            new_mount_path = local_path.replace(
                 fs_path_prefix,
                 kube_volume.spec.path,
                 1,  # replace it only once at the beginning of the string

@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Any, Union
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from platform_storage_api.admission_controller.schema import (
     AdmissionReviewResponse,
     InjectionSchema,
     MountMode,
+    MountSchema,
 )
 from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
@@ -25,6 +27,14 @@ LABEL_APOLO_PROJECT_NAME = "platform.apolo.us/project"
 LABEL_PLATFORM_STORAGE_POD = "platform-storage"
 
 INJECTED_VOLUME_NAME_PREFIX = "storage-auto-injected-volume"
+
+
+class PreparationError(Exception):
+    """Unable to prepare a proper injection spec"""
+
+
+class MutationError(Exception):
+    """Unable to mutate"""
 
 
 def create_injection_volume_name() -> str:
@@ -52,58 +62,140 @@ class AdmissionControllerApi:
 
     async def handle_post_mutate(self, request: web.Request) -> Any:
         logger.info("mutate call")
+
         payload: dict[str, Any] = await request.json()
 
         uid = payload["request"]["uid"]
+        pod = payload["request"]["object"]
+        spec = pod["spec"]
+        metadata = pod.get("metadata", {}) or {}
+        annotations = metadata.get("annotations", {}) or {}
+        labels = metadata.get("labels", {}) or {}
+
         admission_review = AdmissionReviewResponse(uid=uid)
 
-        pod = payload["request"]["object"]
-        kind = pod.get("kind")
-
-        if kind != "Pod":
-            # not a pod creation request. early-exit
+        if not self._should_mutate(pod, annotations):
             return admission_review.allow()
 
-        metadata = pod.get("metadata", {})
+        try:
+            injection_spec = await self._prepare(
+                labels=labels,
+                annotations=annotations,
+            )
+        except PreparationError as e:
+            return admission_review.decline(status_code=422, message=str(e))
 
-        annotations = metadata.get("annotations", {})
+        try:
+            return await self._mutate(
+                pod_spec=spec,
+                injection_spec=injection_spec,
+                admission_review=admission_review,
+            )
+        except MutationError as e:
+            return admission_review.decline(status_code=400, message=str(e))
+
+    @staticmethod
+    def _should_mutate(
+        pod: dict[str, Any],
+        annotations: dict[str, str],
+    ) -> bool:
+        """
+        Returns a boolean indicating whether a resource
+        should actually be mutated at all.
+        """
+        kind = pod.get("kind")
+        if kind != "Pod":
+            return False
 
         if ANNOTATION_APOLO_INJECT_STORAGE not in annotations:
             # a pod does not request storage. we can do early-exit here
-            logger.info("POD won't be mutated because doesnt define proper annotations")
-            return admission_review.allow()
+            logger.info(
+                "POD won't be mutated, "
+                "because doesnt define a storage-request annotation"
+            )
+            return False
 
         pod_spec = pod["spec"]
 
         containers = pod_spec.get("containers") or []
         if not containers:
             logger.info("POD won't be mutated because doesnt define containers")
-            # pod does not define any containers. we can exit
-            return admission_review.allow()
+            return False
 
+        return True
+
+    async def _prepare(
+        self,
+        labels: dict[str, Any],
+        annotations: dict[str, Any],
+    ) -> list[MountSchema]:
+        """
+        Prepares a POD mutation.
+        Ensures that all the annotations and labels are actually correct.
+        Ensures that the requested path actually exists.
+        Can decline a POD-creation request.
+        """
+        logger.info("preparing for storage injection")
         raw_injection_spec = annotations[ANNOTATION_APOLO_INJECT_STORAGE]
 
-        return await self._handle_injection(
-            pod_spec=pod_spec,
-            raw_injection_spec=raw_injection_spec,
-            admission_review=admission_review,
-        )
+        try:
+            injection_spec = InjectionSchema.validate_json(raw_injection_spec)
+        except Exception as e:
+            error_message = "injection spec is invalid"
+            logger.exception(error_message)
+            raise PreparationError(error_message) from e
 
-    async def _handle_injection(
+        # ensure labels are present
+        if LABEL_APOLO_ORG_NAME not in labels:
+            error_message = f"Missing label {LABEL_APOLO_ORG_NAME}"
+            logger.error(error_message)
+            raise PreparationError(error_message)
+        if LABEL_APOLO_PROJECT_NAME not in labels:
+            error_message = f"Missing label {LABEL_APOLO_PROJECT_NAME}"
+            logger.error(error_message)
+            raise PreparationError(error_message)
+
+        expected_org = labels[LABEL_APOLO_ORG_NAME]
+        expected_project = labels[LABEL_APOLO_PROJECT_NAME]
+
+        for injection_schema in injection_spec:
+
+            # extract cluster, org and project to compare with labels
+            _, cluster, org, project, *parts = Path(injection_schema.storage_path).parts
+
+            if org != expected_org:
+                error_message = f"org missmatch: `{org}`"
+                logger.error(error_message)
+                raise PreparationError(error_message)
+
+            if project != expected_project:
+                error_message = f"project missmatch: `{project}`"
+                logger.error(error_message)
+                raise PreparationError(error_message)
+
+            # update a storage path by removing a `storage` prefix,
+            # and removing a cluster name from the final storage path
+            injection_schema.storage_path = "/".join(["", org, project, *parts])
+
+        # here we are already confident that paths are valid,
+        # so we are checking them to ensure that real underlying paths exist
+        for injection_schema in injection_spec:
+            local_path = await self._volume_resolver.to_local_path(
+                injection_schema.storage_path
+            )
+            if not local_path.exists():
+                local_path.mkdir(parents=True, exist_ok=True)
+
+        return injection_spec
+
+    async def _mutate(
         self,
         pod_spec: dict[str, Any],
-        raw_injection_spec: str,
+        injection_spec: list[MountSchema],
         admission_review: AdmissionReviewResponse,
     ) -> web.Response:
         containers = pod_spec.get("containers") or []
-
-        logger.info("Going to inject volumes")
-        try:
-            injection_spec = InjectionSchema.validate_json(raw_injection_spec)
-        except Exception:
-            error_message = "injection spec is invalid"
-            logger.exception(error_message)
-            return admission_review.decline(status_code=422, message=error_message)
+        logger.info("Injecting volumes")
 
         # let's ensure POD has volumes
         if "volumes" not in pod_spec:
@@ -130,11 +222,11 @@ class AdmissionControllerApi:
                 volume_spec = await self._volume_resolver.resolve_to_mount_volume(
                     path=storage_path
                 )
-            except VolumeResolverError:
+            except VolumeResolverError as e:
                 error_message = "Unable to resolve a volume for a provided path"
                 # report an error and disallow spawning a POD
                 logger.exception(error_message)
-                return admission_review.decline(status_code=400, message=error_message)
+                raise MutationError(error_message) from e
 
             future_volume_name = create_injection_volume_name()
 

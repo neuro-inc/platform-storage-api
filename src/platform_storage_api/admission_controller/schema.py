@@ -37,10 +37,10 @@ class MountSchema(BaseModel):
             err = f"`{value}` does not follow the {SCHEMA_STORAGE} schema"
             raise ValueError(err)
         path = PurePosixPath(value)
-        if len(path.parts) < 3:
+        if len(path.parts) < 4:
             err = (
                 f"`{value}` is invalid. "
-                "Both org and project name must be present in the storage path"
+                "Cluster, org and project names must be present in the storage path"
             )
             raise ValueError(err)
         return value
