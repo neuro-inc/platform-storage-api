@@ -1,11 +1,13 @@
 import logging
-from pathlib import Path
 from typing import Any, Union
 from uuid import uuid4
 
 from aiohttp import web
 
-from platform_storage_api.admission_controller.app_keys import VOLUME_RESOLVER_KEY
+from platform_storage_api.admission_controller.app_keys import (
+    STORAGE_KEY,
+    VOLUME_RESOLVER_KEY,
+)
 from platform_storage_api.admission_controller.schema import (
     AdmissionReviewResponse,
     InjectionSchema,
@@ -16,6 +18,7 @@ from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
     VolumeResolverError,
 )
+from platform_storage_api.storage import Storage
 
 
 logger = logging.getLogger(__name__)
@@ -29,12 +32,33 @@ LABEL_PLATFORM_STORAGE_POD = "platform-storage"
 INJECTED_VOLUME_NAME_PREFIX = "storage-auto-injected-volume"
 
 
-class PreparationError(Exception):
+class AdmissionControllerError(Exception):
+    """Base admission controller error"""
+
+    def __init__(
+        self,
+        status_code: int,
+        message: str
+    ):
+        self.status_code = status_code
+        self.message = message
+
+
+class Forbidden(AdmissionControllerError):
+    def __init__(self, message: str):
+        super().__init__(status_code=403, message=message)
+
+
+class ValidationError(AdmissionControllerError):
     """Unable to prepare a proper injection spec"""
+    def __init__(self, message: str):
+        super().__init__(status_code=422, message=message)
 
 
-class MutationError(Exception):
+class MutationError(AdmissionControllerError):
     """Unable to mutate"""
+    def __init__(self, message: str):
+        super().__init__(status_code=400, message=message)
 
 
 def create_injection_volume_name() -> str:
@@ -48,12 +72,15 @@ class AdmissionControllerApi:
         self,
         app: web.Application,
     ) -> None:
-
         self._app = app
 
     @property
     def _volume_resolver(self) -> KubeVolumeResolver:
         return self._app[VOLUME_RESOLVER_KEY]
+
+    @property
+    def _storage(self) -> Storage:
+        return self._app[STORAGE_KEY]
 
     def register(self, app: web.Application) -> None:
         app.add_routes([
@@ -75,22 +102,29 @@ class AdmissionControllerApi:
             return admission_review.allow()
 
         try:
+            spec = pod["spec"]
             injection_spec = await self._prepare(
                 labels=labels,
                 annotations=annotations,
             )
-        except PreparationError as e:
-            return admission_review.decline(status_code=422, message=str(e))
-
-        spec = pod["spec"]
-        try:
-            return await self._mutate(
+            # enrichment of `admission_review` happens inside
+            await self._mutate(
                 pod_spec=spec,
                 injection_spec=injection_spec,
                 admission_review=admission_review,
             )
-        except MutationError as e:
-            return admission_review.decline(status_code=400, message=str(e))
+        except AdmissionControllerError as e:
+            return admission_review.decline(
+                status_code=e.status_code,
+                message=e.message
+            )
+        except Exception:
+            return admission_review.decline(
+                status_code=400,
+                message="storage injector unhandled error"
+            )
+        else:
+            return admission_review.allow()
 
     @staticmethod
     def _should_mutate(
@@ -141,48 +175,37 @@ class AdmissionControllerApi:
         except Exception as e:
             error_message = "injection spec is invalid"
             logger.exception(error_message)
-            raise PreparationError(error_message) from e
+            raise ValidationError(error_message) from e
 
         # ensure labels are present
         if LABEL_APOLO_ORG_NAME not in labels:
             error_message = f"Missing label {LABEL_APOLO_ORG_NAME}"
             logger.error(error_message)
-            raise PreparationError(error_message)
+            raise ValidationError(error_message)
         if LABEL_APOLO_PROJECT_NAME not in labels:
             error_message = f"Missing label {LABEL_APOLO_PROJECT_NAME}"
             logger.error(error_message)
-            raise PreparationError(error_message)
+            raise ValidationError(error_message)
 
         expected_org = labels[LABEL_APOLO_ORG_NAME]
         expected_project = labels[LABEL_APOLO_PROJECT_NAME]
 
         for injection_schema in injection_spec:
 
-            # extract cluster, org and project to compare with labels
-            _, cluster, org, project, *parts = Path(injection_schema.storage_path).parts
-
-            if org != expected_org:
-                error_message = f"org missmatch: `{org}`"
+            if injection_schema.org != expected_org:
+                error_message = f"org missmatch: `{injection_schema.org}`"
                 logger.error(error_message)
-                raise PreparationError(error_message)
+                raise Forbidden(error_message)
 
-            if project != expected_project:
-                error_message = f"project missmatch: `{project}`"
+            if injection_schema.project != expected_project:
+                error_message = f"project missmatch: `{injection_schema.project}`"
                 logger.error(error_message)
-                raise PreparationError(error_message)
-
-            # update a storage path by removing a `storage` prefix,
-            # and removing a cluster name from the final storage path
-            injection_schema.storage_path = "/".join(["", org, project, *parts])
+                raise Forbidden(error_message)
 
         # here we are already confident that paths are valid,
-        # so we are checking them to ensure that real underlying paths exist
+        # so in addition, we try to create them
         for injection_schema in injection_spec:
-            local_path = await self._volume_resolver.to_local_path(
-                injection_schema.storage_path
-            )
-            if not local_path.exists():
-                local_path.mkdir(parents=True, exist_ok=True)
+            await self._storage.mkdir(injection_schema.storage_path)
 
         return injection_spec
 
@@ -192,6 +215,11 @@ class AdmissionControllerApi:
         injection_spec: list[MountSchema],
         admission_review: AdmissionReviewResponse,
     ) -> web.Response:
+        """
+        Performs mutation and enriches an `admission_review` object
+        with various patch operations.
+        Raises an error if mutation is impossible.
+        """
         containers = pod_spec.get("containers") or []
         logger.info("Injecting volumes")
 

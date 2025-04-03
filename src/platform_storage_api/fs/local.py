@@ -314,6 +314,10 @@ class LocalFileSystem(FileSystem):
             yield f
 
     def _mkdir(self, path: PurePath) -> None:
+        """
+        A safe recursive directory creation mechanism,
+        with additional protections against race conditions and symlink attacks.
+        """
         # TODO (A Danshyn 04/23/18): consider setting mode
         dirfd = None
         try:

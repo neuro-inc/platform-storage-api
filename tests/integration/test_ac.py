@@ -146,7 +146,7 @@ async def test_inject_single_storage(
         annotations={
             "platform.apolo.us/inject-storage": json.dumps([{
                 "mount_path": "/var/pod_mount",
-                "storage_path": f"storage://default/{org}/{project}"
+                "storage_uri": f"storage://default/{org}/{project}"
             }])
         },
         labels={
@@ -191,11 +191,11 @@ async def test_inject_multiple_storages(
             "platform.apolo.us/inject-storage": json.dumps([
                 {
                     "mount_path": "/var/pod_mount",
-                    "storage_path": f"storage://default/{org}/{project}/1"
+                    "storage_uri": f"storage://default/{org}/{project}/1"
                 },
                 {
                     "mount_path": "/var/pod_mount_2",
-                    "storage_path": f"storage://default/{org}/{project}/2"
+                    "storage_uri": f"storage://default/{org}/{project}/2"
                 },
             ]),
         },
