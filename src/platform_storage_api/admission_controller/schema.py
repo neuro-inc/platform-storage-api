@@ -2,6 +2,7 @@ import base64
 import dataclasses
 import json
 from enum import Enum
+from functools import cached_property
 from pathlib import Path, PurePosixPath
 from typing import Any, Optional
 
@@ -19,8 +20,31 @@ class MountMode(str, Enum):
 
 class MountSchema(BaseModel):
     mount_path: str
-    storage_path: str
+    storage_uri: str
     mount_mode: MountMode = MountMode.READ_WRITE  # RW as a default
+
+    @cached_property
+    def _uri_parts(self) -> tuple[str, ...]:
+        return Path(self.storage_uri).parts
+
+    @cached_property
+    def org(self) -> str:
+        _, _, org, *_ = self._uri_parts
+        return org
+
+    @cached_property
+    def project(self) -> str:
+        _, _, _, project, *_ = self._uri_parts
+        return project
+
+    @cached_property
+    def path_parts(self) -> list[str]:
+        _, _, _, _, *parts = self._uri_parts
+        return parts
+
+    @cached_property
+    def storage_path(self) -> str:
+        return "/".join(["", self.org, self.project, *self.path_parts])
 
     @field_validator('mount_path', mode='after')
     @classmethod
@@ -30,17 +54,17 @@ class MountSchema(BaseModel):
             raise ValueError(err)
         return value
 
-    @field_validator('storage_path', mode='after')
+    @field_validator('storage_uri', mode='after')
     @classmethod
-    def is_storage_path(cls, value: str) -> str:
+    def is_storage_uri(cls, value: str) -> str:
         if not value.startswith(SCHEMA_STORAGE):
             err = f"`{value}` does not follow the {SCHEMA_STORAGE} schema"
             raise ValueError(err)
         path = PurePosixPath(value)
-        if len(path.parts) < 3:
+        if len(path.parts) < 4:
             err = (
                 f"`{value}` is invalid. "
-                "Both org and project name must be present in the storage path"
+                "Cluster, org and project names must be present in the storage URI"
             )
             raise ValueError(err)
         return value

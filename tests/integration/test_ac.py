@@ -8,7 +8,11 @@ import pytest
 from apolo_kube_client.client import KubeClient
 from apolo_kube_client.errors import ResourceInvalid
 
-from platform_storage_api.admission_controller.api import INJECTED_VOLUME_NAME_PREFIX
+from platform_storage_api.admission_controller.api import (
+    INJECTED_VOLUME_NAME_PREFIX,
+    LABEL_APOLO_ORG_NAME,
+    LABEL_APOLO_PROJECT_NAME,
+)
 
 
 # values are also defined at `tests/k8s/admission-controller-deployment.yaml`
@@ -19,7 +23,8 @@ ACTUAL_VOLUME_MOUNT_PATH = "/var/storage"
 @asynccontextmanager
 async def pod_cm(
     kube_client: KubeClient,
-    annotations: Optional[dict[str, Any]] = None
+    annotations: Optional[dict[str, Any]] = None,
+    labels: Optional[dict[str, Any]] = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """
     A context manager for creating the pod, returning the response,
@@ -44,6 +49,9 @@ async def pod_cm(
     }
     if annotations is not None:
         payload["metadata"]["annotations"] = annotations  # type: ignore[index]
+
+    if labels is not None:
+        payload["metadata"]["labels"] = labels  # type: ignore[index]
 
     url = f"{kube_client.namespace_url}/pods"
     response = await kube_client.post(url=url, json=payload, )
@@ -131,13 +139,19 @@ async def test_inject_single_storage(
     Creates a POD with the proper annotations,
     and expect that a storage will be mounted
     """
+    org, project = "org", "proj"
+
     async with pod_cm(
         kube_client,
         annotations={
             "platform.apolo.us/inject-storage": json.dumps([{
                 "mount_path": "/var/pod_mount",
-                "storage_path": "storage://org/proj"
+                "storage_uri": f"storage://default/{org}/{project}"
             }])
+        },
+        labels={
+            LABEL_APOLO_ORG_NAME: org,
+            LABEL_APOLO_PROJECT_NAME: project,
         }
     ) as response:
         spec = response["spec"]
@@ -151,8 +165,8 @@ async def test_inject_single_storage(
         # ensures it has a proper name and a proper mount path
         assert volume_name.startswith(INJECTED_VOLUME_NAME_PREFIX)
         actual_host_path = actual_host_path_volume["hostPath"]["path"]
-        expected_host_path = f"{ACTUAL_HOST_PATH}/org/proj"
-        assert actual_host_path  == expected_host_path
+        expected_host_path = f"{ACTUAL_HOST_PATH}/{org}/{project}"
+        assert actual_host_path == expected_host_path
 
         actual_host_path_volume_mount = next(
             iter(
@@ -169,19 +183,25 @@ async def test_inject_multiple_storages(
     """
     Creates a POD with the proper annotation, which includes two volume mounts
     """
+    org, project = "org", "proj"
+
     async with pod_cm(
         kube_client,
         annotations={
             "platform.apolo.us/inject-storage": json.dumps([
                 {
                     "mount_path": "/var/pod_mount",
-                    "storage_path": "storage://org/proj"
+                    "storage_uri": f"storage://default/{org}/{project}/1"
                 },
                 {
                     "mount_path": "/var/pod_mount_2",
-                    "storage_path": "storage://org_2/proj_2"
+                    "storage_uri": f"storage://default/{org}/{project}/2"
                 },
             ]),
+        },
+        labels={
+            LABEL_APOLO_ORG_NAME: org,
+            LABEL_APOLO_PROJECT_NAME: project,
         }
     ) as response:
 

@@ -8,6 +8,7 @@ from apolo_kube_client.client import kube_client_from_config
 
 from platform_storage_api.admission_controller.api import AdmissionControllerApi
 from platform_storage_api.admission_controller.app_keys import (
+    STORAGE_KEY,
     VOLUME_RESOLVER_KEY,
 )
 from platform_storage_api.admission_controller.volume_resolver import (
@@ -16,7 +17,7 @@ from platform_storage_api.admission_controller.volume_resolver import (
 )
 from platform_storage_api.config import Config, KubeConfig
 from platform_storage_api.fs.local import LocalFileSystem
-from platform_storage_api.storage import create_path_resolver
+from platform_storage_api.storage import Storage, create_path_resolver
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ async def create_app(config: Config) -> web.Application:
                 )
             )
             path_resolver = create_path_resolver(config, fs)
+            storage = Storage(path_resolver, fs)
 
             kube_config = cast(KubeConfig, config.kube)
             kube_client = await exit_stack.enter_async_context(
@@ -49,6 +51,7 @@ async def create_app(config: Config) -> web.Application:
                 )
             )
             app[VOLUME_RESOLVER_KEY] = volume_resolver
+            app[STORAGE_KEY] = storage
 
             yield
 

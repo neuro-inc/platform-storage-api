@@ -1,3 +1,6 @@
+import os
+import tempfile
+from collections.abc import Iterator
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
@@ -9,12 +12,18 @@ from platform_storage_api.admission_controller.volume_resolver import (
     VolumeBackend,
 )
 from platform_storage_api.config import AdmissionControllerConfig
-from platform_storage_api.storage import SingleStoragePathResolver, StoragePathResolver
+from platform_storage_api.fs.local import FileSystem
+from platform_storage_api.storage import (
+    SingleStoragePathResolver,
+    Storage,
+    StoragePathResolver,
+)
 
 
 @pytest.fixture
-def local_mount_path() -> str:
-    return "/var/storage"
+def local_mount_path() -> Iterator[str]:
+    with tempfile.TemporaryDirectory() as d:
+        yield os.path.realpath(d)
 
 
 @pytest.fixture
@@ -168,6 +177,14 @@ def config() -> AdmissionControllerConfig:
     return AdmissionControllerConfig(
         cert_secret_name='secret',
     )
+
+
+@pytest.fixture
+def storage(
+    path_resolver: StoragePathResolver,
+    local_fs: FileSystem
+) -> Storage:
+    return Storage(path_resolver, local_fs)
 
 
 @pytest.fixture
