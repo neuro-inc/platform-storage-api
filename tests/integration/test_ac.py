@@ -54,7 +54,10 @@ async def pod_cm(
         payload["metadata"]["labels"] = labels  # type: ignore[index]
 
     url = f"{kube_client.namespace_url}/pods"
-    response = await kube_client.post(url=url, json=payload, )
+    response = await kube_client.post(
+        url=url,
+        json=payload,
+    )
 
     yield response
 
@@ -76,7 +79,7 @@ async def test__not_a_pod_will_be_ignored(
             "name": job_name,
             "annotations": {
                 "platform.apolo.us/inject-storage": "INVALID",
-            }
+            },
         },
         "spec": {
             "template": {
@@ -88,18 +91,32 @@ async def test__not_a_pod_will_be_ignored(
                             "image": "busybox",
                             "command": ["sh", "-c", "sleep 1"],
                         }
-                    ]
+                    ],
                 }
             }
-        }
+        },
     }
 
-    url = \
+    url = (
         f"{kube_client._base_url}/apis/batch/v1/namespaces/{kube_client.namespace}/jobs"
-    response = await kube_client.post(url, json=payload, )
+    )
+    response = await kube_client.post(
+        url,
+        json=payload,
+    )
     assert response["kind"] == "Job"
 
     await kube_client.delete(f"{url}/{job_name}")
+
+
+async def test__pod_without_labels_will_be_ignored(
+    kube_client: KubeClient,
+) -> None:
+    """
+    Ensures that POD will be created if it doesn't define a necessary labels.
+    """
+    async with pod_cm(kube_client) as response:
+        assert response["kind"] == "Pod"
 
 
 async def test__pod_without_annotation_will_be_ignored(
@@ -108,7 +125,13 @@ async def test__pod_without_annotation_will_be_ignored(
     """
     Ensures that POD will be created if it doesn't define a necessary annotation.
     """
-    async with pod_cm(kube_client) as response:
+    async with pod_cm(
+        kube_client,
+        labels={
+            LABEL_APOLO_ORG_NAME: "org",
+            LABEL_APOLO_PROJECT_NAME: "project",
+        },
+    ) as response:
         assert response["kind"] == "Pod"
 
 
@@ -122,19 +145,21 @@ async def test__pod_invalid_annotation_will_prohibit_pod_creation(
     with pytest.raises(ResourceInvalid) as e:
         async with pod_cm(
             kube_client,
-            annotations={"platform.apolo.us/inject-storage": "invalid"}
+            labels={
+                LABEL_APOLO_ORG_NAME: "org",
+                LABEL_APOLO_PROJECT_NAME: "project",
+            },
+            annotations={"platform.apolo.us/inject-storage": "invalid"},
         ):
             pass
 
     assert str(e.value) == (
-        "admission webhook \"admission-controller.apolo.us\" denied the request: "
+        'admission webhook "admission-controller.apolo.us" denied the request: '
         "injection spec is invalid"
     )
 
 
-async def test_inject_single_storage(
-    kube_client: KubeClient
-) -> None:
+async def test_inject_single_storage(kube_client: KubeClient) -> None:
     """
     Creates a POD with the proper annotations,
     and expect that a storage will be mounted
@@ -144,15 +169,19 @@ async def test_inject_single_storage(
     async with pod_cm(
         kube_client,
         annotations={
-            "platform.apolo.us/inject-storage": json.dumps([{
-                "mount_path": "/var/pod_mount",
-                "storage_uri": f"storage://default/{org}/{project}"
-            }])
+            "platform.apolo.us/inject-storage": json.dumps(
+                [
+                    {
+                        "mount_path": "/var/pod_mount",
+                        "storage_uri": f"storage://default/{org}/{project}",
+                    }
+                ]
+            )
         },
         labels={
             LABEL_APOLO_ORG_NAME: org,
             LABEL_APOLO_PROJECT_NAME: project,
-        }
+        },
     ) as response:
         spec = response["spec"]
         volumes = spec["volumes"]
@@ -169,17 +198,13 @@ async def test_inject_single_storage(
         assert actual_host_path == expected_host_path
 
         actual_host_path_volume_mount = next(
-            iter(
-                v for v in container["volumeMounts"] if v["name"] == volume_name
-            )
+            iter(v for v in container["volumeMounts"] if v["name"] == volume_name)
         )
         assert actual_host_path_volume_mount["name"] == volume_name
         assert actual_host_path_volume_mount["mountPath"] == "/var/pod_mount"
 
 
-async def test_inject_multiple_storages(
-    kube_client: KubeClient
-) -> None:
+async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
     """
     Creates a POD with the proper annotation, which includes two volume mounts
     """
@@ -188,32 +213,29 @@ async def test_inject_multiple_storages(
     async with pod_cm(
         kube_client,
         annotations={
-            "platform.apolo.us/inject-storage": json.dumps([
-                {
-                    "mount_path": "/var/pod_mount",
-                    "storage_uri": f"storage://default/{org}/{project}/1"
-                },
-                {
-                    "mount_path": "/var/pod_mount_2",
-                    "storage_uri": f"storage://default/{org}/{project}/2"
-                },
-            ]),
+            "platform.apolo.us/inject-storage": json.dumps(
+                [
+                    {
+                        "mount_path": "/var/pod_mount",
+                        "storage_uri": f"storage://default/{org}/{project}/1",
+                    },
+                    {
+                        "mount_path": "/var/pod_mount_2",
+                        "storage_uri": f"storage://default/{org}/{project}/2",
+                    },
+                ]
+            ),
         },
         labels={
             LABEL_APOLO_ORG_NAME: org,
             LABEL_APOLO_PROJECT_NAME: project,
-        }
+        },
     ) as response:
-
         spec = response["spec"]
         volumes = spec["volumes"]
         container = spec["containers"][0]
 
-        volume_by_name = {
-            v["name"]: v
-            for v in volumes
-            if "hostPath" in v
-        }
+        volume_by_name = {v["name"]: v for v in volumes if "hostPath" in v}
         volume_mount_by_name = {
             v["name"]: v
             for v in container["volumeMounts"]

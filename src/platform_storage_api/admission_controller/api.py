@@ -35,11 +35,7 @@ INJECTED_VOLUME_NAME_PREFIX = "storage-auto-injected-volume"
 class AdmissionControllerError(Exception):
     """Base admission controller error"""
 
-    def __init__(
-        self,
-        status_code: int,
-        message: str
-    ):
+    def __init__(self, status_code: int, message: str):
         self.status_code = status_code
         self.message = message
 
@@ -51,12 +47,14 @@ class Forbidden(AdmissionControllerError):
 
 class ValidationError(AdmissionControllerError):
     """Unable to prepare a proper injection spec"""
+
     def __init__(self, message: str):
         super().__init__(status_code=422, message=message)
 
 
 class MutationError(AdmissionControllerError):
     """Unable to mutate"""
+
     def __init__(self, message: str):
         super().__init__(status_code=400, message=message)
 
@@ -67,7 +65,6 @@ def create_injection_volume_name() -> str:
 
 
 class AdmissionControllerApi:
-
     def __init__(
         self,
         app: web.Application,
@@ -83,9 +80,11 @@ class AdmissionControllerApi:
         return self._app[STORAGE_KEY]
 
     def register(self, app: web.Application) -> None:
-        app.add_routes([
-            web.post("/mutate", self.handle_post_mutate)
-        ])
+        app.add_routes(
+            [
+                web.post("/mutate", self.handle_post_mutate),
+            ]
+        )
 
     async def handle_post_mutate(self, request: web.Request) -> Any:
         logger.info("mutate call")
@@ -98,7 +97,7 @@ class AdmissionControllerApi:
 
         admission_review = AdmissionReviewResponse(uid=uid)
 
-        if not self._should_mutate(pod, annotations):
+        if not self._should_mutate(pod, labels=labels, annotations=annotations):
             return admission_review.allow()
 
         try:
@@ -116,12 +115,12 @@ class AdmissionControllerApi:
         except AdmissionControllerError as e:
             return admission_review.decline(
                 status_code=e.status_code,
-                message=e.message
+                message=e.message,
             )
         except Exception:
             return admission_review.decline(
                 status_code=400,
-                message="storage injector unhandled error"
+                message="storage injector unhandled error",
             )
         else:
             return admission_review.allow()
@@ -129,6 +128,7 @@ class AdmissionControllerApi:
     @staticmethod
     def _should_mutate(
         pod: dict[str, Any],
+        labels: dict[str, str],
         annotations: dict[str, str],
     ) -> bool:
         """
@@ -139,11 +139,19 @@ class AdmissionControllerApi:
         if kind != "Pod":
             return False
 
+        # ensure labels are present
+        if LABEL_APOLO_ORG_NAME not in labels:
+            logger.info("Pod is not ready, missing label %s", LABEL_APOLO_ORG_NAME)
+            return False
+        if LABEL_APOLO_PROJECT_NAME not in labels:
+            logger.info("Pod is not ready, missing label %s", LABEL_APOLO_PROJECT_NAME)
+            return False
+
         if ANNOTATION_APOLO_INJECT_STORAGE not in annotations:
             # a pod does not request storage. we can do early-exit here
             logger.info(
                 "POD won't be mutated, "
-                "because doesnt define a storage-request annotation"
+                "because doesn't define a storage-request annotation"
             )
             return False
 
@@ -177,28 +185,17 @@ class AdmissionControllerApi:
             logger.exception(error_message)
             raise ValidationError(error_message) from e
 
-        # ensure labels are present
-        if LABEL_APOLO_ORG_NAME not in labels:
-            error_message = f"Missing label {LABEL_APOLO_ORG_NAME}"
-            logger.error(error_message)
-            raise ValidationError(error_message)
-        if LABEL_APOLO_PROJECT_NAME not in labels:
-            error_message = f"Missing label {LABEL_APOLO_PROJECT_NAME}"
-            logger.error(error_message)
-            raise ValidationError(error_message)
-
         expected_org = labels[LABEL_APOLO_ORG_NAME]
         expected_project = labels[LABEL_APOLO_PROJECT_NAME]
 
         for injection_schema in injection_spec:
-
             if injection_schema.org != expected_org:
-                error_message = f"org missmatch: `{injection_schema.org}`"
+                error_message = f"org mismatch: `{injection_schema.org}`"
                 logger.error(error_message)
                 raise Forbidden(error_message)
 
             if injection_schema.project != expected_project:
-                error_message = f"project missmatch: `{injection_schema.project}`"
+                error_message = f"project mismatch: `{injection_schema.project}`"
                 logger.error(error_message)
                 raise Forbidden(error_message)
 
@@ -227,7 +224,7 @@ class AdmissionControllerApi:
         if "volumes" not in pod_spec:
             admission_review.add_patch(
                 path="/spec/volumes",
-                value=[]
+                value=[],
             )
 
         # and ensure that each container has a volume mounts
@@ -235,7 +232,7 @@ class AdmissionControllerApi:
             if "volumeMounts" not in container:
                 admission_review.add_patch(
                     path=f"/spec/containers/{idx}/volumeMounts",
-                    value=[]
+                    value=[],
                 )
 
         for injection_schema in injection_spec:
@@ -262,7 +259,7 @@ class AdmissionControllerApi:
                 value={
                     "name": future_volume_name,
                     **volume_spec.to_kube(),
-                }
+                },
             )
 
             # add a volumeMount with mount path for all the POD containers
