@@ -144,7 +144,12 @@ async def test__pod_invalid_annotation_will_prohibit_pod_creation(
     """
     with pytest.raises(ResourceInvalid) as e:
         async with pod_cm(
-            kube_client, annotations={"platform.apolo.us/inject-storage": "invalid"}
+            kube_client,
+            labels={
+                LABEL_APOLO_ORG_NAME: "org",
+                LABEL_APOLO_PROJECT_NAME: "project",
+            },
+            annotations={"platform.apolo.us/inject-storage": "invalid"},
         ):
             pass
 
