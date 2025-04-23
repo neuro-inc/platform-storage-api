@@ -405,21 +405,21 @@ class TestMutateApi:
             expected_message=f"Missing label {LABEL_APOLO_PROJECT_NAME}"
         )
 
-    async def test__nfs__pod_org_label_missmatch(
+    async def test__nfs__pod_org_label_mismatch(
         self,
         nfs_api: ApiConfig,
         logger_mock: Mock,
     ) -> None:
-        await self._test__pod_org_label_missmatch(nfs_api, logger_mock)
+        await self._test__pod_org_label_mismatch(nfs_api, logger_mock)
 
-    async def test__host_path__pod_org_label_missmatch(
+    async def test__host_path__pod_org_label_mismatch(
         self,
         host_path_api: ApiConfig,
         logger_mock: Mock,
     ) -> None:
-        await self._test__pod_org_label_missmatch(host_path_api, logger_mock)
+        await self._test__pod_org_label_mismatch(host_path_api, logger_mock)
 
-    async def _test__pod_org_label_missmatch(
+    async def _test__pod_org_label_mismatch(
         self,
         api: ApiConfig,
         logger_mock: Mock,
@@ -467,24 +467,24 @@ class TestMutateApi:
         await self._ensure_not_allowed(
             response,
             code=403,
-            expected_message="org missmatch: `org`"
+            expected_message="org mismatch: `org`"
         )
 
-    async def test__nfs__pod_project_label_missmatch(
+    async def test__nfs__pod_project_label_mismatch(
         self,
         nfs_api: ApiConfig,
         logger_mock: Mock,
     ) -> None:
-        await self._test__pod_org_label_missmatch(nfs_api, logger_mock)
+        await self._test__pod_org_label_mismatch(nfs_api, logger_mock)
 
-    async def test__host_path__pod_project_label_missmatch(
+    async def test__host_path__pod_project_label_mismatch(
         self,
         host_path_api: ApiConfig,
         logger_mock: Mock,
     ) -> None:
-        await self._test__pod_org_label_missmatch(host_path_api, logger_mock)
+        await self._test__pod_org_label_mismatch(host_path_api, logger_mock)
 
-    async def _test__pod_project_label_missmatch(
+    async def _test__pod_project_label_mismatch(
         self,
         api: ApiConfig,
         logger_mock: Mock,
@@ -532,7 +532,7 @@ class TestMutateApi:
         await self._ensure_not_allowed(
             response,
             code=403,
-            expected_message="project missmatch: `invalid-proj`"
+            expected_message="project mismatch: `invalid-proj`"
         )
 
     async def test__nfs__ensure_volumes_will_be_added(
