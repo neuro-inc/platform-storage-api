@@ -25,9 +25,7 @@ jobs:
     - name: Install dependencies
       run: make setup
     - name: Lint
-      run: |
-        echo "::add-matcher::.github/actionlint-matcher.json"
-        make lint
+      run: make lint
 
   unit:
     name: Unit tests
