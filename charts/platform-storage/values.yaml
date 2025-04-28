@@ -92,5 +92,6 @@ admissionController:
     matchLabels:
       platform.apolo.us/inject-storage: "true"
   failurePolicy: "Fail"
+  reinvocationPolicy: "IfNeeded"
   service:
     port: 8080
