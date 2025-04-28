@@ -10,56 +10,9 @@ on:
   - cron: 0 4 * * *
 
 jobs:
-
   test:
-    name: Run tests
-    runs-on: ubuntu-latest
-    env:
-      MINIKUBE_DRIVER: none
-    steps:
-    - name: Checkout commit
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0
-    - name: Install python
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.9
-    - name: Cache packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-py-3.9-${{ hashFiles('setup.cfg') }}
-    - name: Install dependencies
-      run: make setup
-    - name: Login to ghcr.io
-      uses: docker/login-action@v3.3.0
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ github.token }}
-    - name: Lint
-      run: make lint
-    - name: Run unit tests
-      run: make test_unit
-    - name: Start minikube
-      run: |
-        make install_k8s
-        make start_k8s
-    - name: Pull test images
-      run: make docker_pull_test_images
-    - name: Setup services in minikube
-      run: make apply_configuration_k8s
-    - name: Run integration tests
-      run: make test_integration
-    - name: Build Docker image
-      run: make build/image
-    - name: Upload image artifact
-      uses: neuro-inc/upload-image-action@v24.4.0
-      with:
-        image: platformstorageapi
-        token: ${{ secrets.GITHUB_TOKEN }}
+    name: All checks are passed
+    uses: ./.github/workflows/test.yaml
 
   approve:
     name: Approve bot PR
@@ -88,7 +41,7 @@ jobs:
     name: Create release
     needs: test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
-    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v24.10.0
+    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v25.4.0
     with:
       image: platformstorageapi
       helm_charts: platform-storage
@@ -97,7 +50,7 @@ jobs:
     name: Deploy
     needs: release
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    uses: neuro-inc/reuse/.github/workflows/deploy-service.yaml@v24.10.0
+    uses: neuro-inc/reuse/.github/workflows/deploy-service.yaml@v25.4.0
     secrets:
       tf_api_token: ${{ secrets.TF_API_TOKEN }}
     with:
