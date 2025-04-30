@@ -84,7 +84,8 @@ class TestStorageWebSocket:
         rel_path = f"path/to/file-{uuid.uuid4()}"
 
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers, timeout=10
+            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers,
+            timeout=aiohttp.ClientWSTimeout(ws_receive=10, ws_close=10)
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
