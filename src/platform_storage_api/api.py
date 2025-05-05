@@ -12,7 +12,7 @@ from functools import partial
 from importlib.metadata import version
 from pathlib import PurePath
 from typing import Any, Optional
-from platform_reports import __version__
+from platform_storage_api import __version__
 
 import aiohttp
 import aiohttp.web
