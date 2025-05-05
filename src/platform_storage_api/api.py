@@ -12,6 +12,7 @@ from functools import partial
 from importlib.metadata import version
 from pathlib import PurePath
 from typing import Any, Optional
+from platform_reports import __version__
 
 import aiohttp
 import aiohttp.web
@@ -849,11 +850,8 @@ def _get_bool_param(request: Request, name: str, default: bool = False) -> bool:
     raise ValueError(msg)
 
 
-package_version = version(__package__)
-
-
 async def add_version_to_header(request: Request, response: web.StreamResponse) -> None:
-    response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
+    response.headers["X-Service-Version"] = f"platform-storage-api/{__version__}"
 
 
 async def create_app(config: Config) -> web.Application:
