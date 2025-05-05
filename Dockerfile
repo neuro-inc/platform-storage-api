@@ -10,7 +10,7 @@ COPY requirements.txt /tmp/
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 COPY dist /tmp/dist/
-RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-storage-api && \
+RUN pip install --no-cache-dir --find-links /tmp/dist platform-storage-api && \
     rm -rf /tmp/dist
 
 FROM python:${PY_VERSION}-slim-bookworm AS runtime
