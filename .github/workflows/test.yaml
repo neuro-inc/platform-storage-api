@@ -65,6 +65,10 @@ jobs:
       run: make test_unit
 
   integration:
+    env:
+      # keep Minikube state out of /home/runner
+      MINIKUBE_HOME: ${{ github.workspace }}/.minikube
+      MINIKUBE_DRIVER: none
     name: Integration tests
     runs-on: ubuntu-latest
     steps:
@@ -99,15 +103,13 @@ jobs:
         password: ${{ github.token }}
     - name: Fix minikube home permissions
       run: |
-        mkdir -p $HOME/.minikube
-        sudo chown -R $USER:$USER $HOME/.minikube
-        chmod -R u+rwX $HOME/.minikube
+        mkdir -p "$MINIKUBE_HOME"
+        sudo chown -R "$USER:$USER" "$MINIKUBE_HOME"
+        chmod -R u+rwX "$MINIKUBE_HOME"
     - name: Start minikube
       run: |
         make install_k8s
         make start_k8s
-        kubectl --context=minikube wait --for=condition=Ready pod --all --all-namespaces --timeout=120s || true
-        kubectl config use-context minikube
     - name: Pull test images
       run: make docker_pull_test_images
     - name: Setup services in minikube
