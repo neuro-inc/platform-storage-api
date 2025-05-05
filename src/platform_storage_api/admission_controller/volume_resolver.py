@@ -5,30 +5,28 @@ from copy import deepcopy
 from enum import Enum
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 from apolo_kube_client.client import KubeClient
 
 from platform_storage_api.config import AdmissionControllerConfig
 from platform_storage_api.storage import StoragePathResolver
 
-
 logger = logging.getLogger(__name__)
 
 
-class VolumeResolverError(Exception):
-    ...
+class VolumeResolverError(Exception): ...
 
 
 class VolumeBackend(str, Enum):
     """Supported volume backends"""
+
     NFS = "nfs"
     HOST_PATH = "hostPath"
 
 
 @dataclasses.dataclass
 class BaseVolumeSpec:
-
     def to_kube(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
 
@@ -45,7 +43,7 @@ class NfsVolumeSpec(BaseVolumeSpec):
         """
         return cls(
             server=pv["spec"][VolumeBackend.NFS]["server"],
-            path=pv["spec"][VolumeBackend.NFS]["path"]
+            path=pv["spec"][VolumeBackend.NFS]["path"],
         )
 
 
@@ -72,7 +70,7 @@ class HostPathVolumeSpec(BaseVolumeSpec):
         """
         return cls(
             path=spec[VolumeBackend.HOST_PATH]["path"],
-            type=spec[VolumeBackend.HOST_PATH].get("type") or HostPathType.EMPTY
+            type=spec[VolumeBackend.HOST_PATH].get("type") or HostPathType.EMPTY,
         )
 
 
@@ -91,37 +89,29 @@ class KubeVolume:
     spec: T_VolumeSpec
 
     def to_kube(self) -> dict[str, Any]:
-        return {
-            self.backend.value: self.spec.to_kube()
-        }
+        return {self.backend.value: self.spec.to_kube()}
 
 
 class KubeApi:
     """
     Kube methods used by a volume resolver
     """
-    def __init__(
-        self,
-        kube_client: KubeClient
-    ):
+
+    def __init__(self, kube_client: KubeClient):
         self._kube = kube_client
 
     def generate_namespace_url(self) -> str:
         return self._kube.generate_namespace_url()
 
     async def get_pod(
-        self,
-        pod_name: str,
-        namespace_url: Optional[str] = None
+        self, pod_name: str, namespace_url: str | None = None
     ) -> dict[str, Any]:
         namespace_url = namespace_url or self.generate_namespace_url()
         url = f"{namespace_url}/pods/{pod_name}"
         return await self._kube.get(url)
 
     async def get_pvc(
-        self,
-        pvc_name: str,
-        namespace_url: Optional[str] = None
+        self, pvc_name: str, namespace_url: str | None = None
     ) -> dict[str, Any]:
         namespace_url = namespace_url or self.generate_namespace_url()
         url = f"{namespace_url}/persistentvolumeclaims/{pvc_name}"
@@ -133,7 +123,6 @@ class KubeApi:
 
 
 class KubeVolumeResolver:
-
     def __init__(
         self,
         kube_api: KubeApi,
@@ -173,9 +162,9 @@ class KubeVolumeResolver:
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> bool:
         return exc_type is None
 
@@ -194,42 +183,36 @@ class KubeVolumeResolver:
 
         # go over volumes to identify linked PVCs
         for volume in pod["spec"]["volumes"]:
-
             # host-path-based volume
             if VolumeBackend.HOST_PATH in volume:
                 kube_volume_mapping = self._kube_volume_from_host_path(
-                    volume, containers)
+                    volume, containers
+                )
 
             # potentially might be an NFS volume
             elif "persistentVolumeClaim" in volume:
                 kube_volume_mapping = await self._kube_volume_from_pvc(
-                    volume, containers)
+                    volume, containers
+                )
 
             else:
                 logger.info("volume is unsupported")
                 continue
 
             if not kube_volume_mapping:
-                logger.info(
-                    "volume did not produce any valid mapping: %s", volume)
+                logger.info("volume did not produce any valid mapping: %s", volume)
                 continue
 
             logger.info("created a volume mapping: %s", kube_volume_mapping)
             self._local_fs_prefix_to_kube_volume.update(kube_volume_mapping)
 
-    async def to_local_path(
-        self,
-        storage_path: str
-    ) -> Path:
+    async def to_local_path(self, storage_path: str) -> Path:
         """
         Resolves a storage path to a local path
         """
         return Path(await self._path_resolver.resolve_path(PurePath(storage_path)))
 
-    async def resolve_to_mount_volume(
-        self,
-        path: str
-    ) -> KubeVolume:
+    async def resolve_to_mount_volume(self, path: str) -> KubeVolume:
         """
         resolves a path to a proper mount volume, so later it can be used
         in a kube spec of a POD.
@@ -271,7 +254,7 @@ class KubeVolumeResolver:
                 local_path = volume_mount["mountPath"]
                 kube_volume = KubeVolume(
                     backend=VolumeBackend.HOST_PATH,
-                    spec=HostPathVolumeSpec.from_spec(spec=volume)
+                    spec=HostPathVolumeSpec.from_spec(spec=volume),
                 )
                 kube_volume_mapping[local_path] = kube_volume
         return kube_volume_mapping
@@ -315,7 +298,7 @@ class KubeVolumeResolver:
             if VolumeBackend.NFS not in pv["spec"]:
                 logger.info(
                     "storage `%s` doesn't define supported volume backends",
-                    storage_name
+                    storage_name,
                 )
                 continue
 

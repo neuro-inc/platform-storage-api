@@ -38,7 +38,7 @@ def test__not_an_absolute_mount_path(
     valid_storage_uri: str,
     valid_mount_mode: str,
 ) -> None:
-    mount_path = 'tmp'
+    mount_path = "tmp"
 
     with pytest.raises(ValidationError) as e:
         _deserialize(mount_path, valid_storage_uri, valid_mount_mode)
@@ -51,7 +51,7 @@ def test__invalid_storage_schema(
     valid_mount_path: str,
     valid_mount_mode: str,
 ) -> None:
-    storage_path = '/org/proj'
+    storage_path = "/org/proj"
 
     with pytest.raises(ValidationError) as e:
         _deserialize(valid_mount_path, storage_path, valid_mount_mode)
@@ -64,7 +64,7 @@ def test__storage_schema_doesnt_have_org_and_proj(
     valid_mount_path: str,
     valid_mount_mode: str,
 ) -> None:
-    storage_uri = f'{SCHEMA_STORAGE}org'
+    storage_uri = f"{SCHEMA_STORAGE}org"
 
     with pytest.raises(ValidationError) as e:
         _deserialize(valid_mount_path, storage_uri, valid_mount_mode)
@@ -80,7 +80,7 @@ def test__invalid_mount_mode(
     valid_mount_path: str,
     valid_storage_uri: str,
 ) -> None:
-    mount_mode = 'X'
+    mount_mode = "X"
 
     with pytest.raises(ValidationError) as e:
         _deserialize(valid_mount_path, valid_storage_uri, mount_mode)
@@ -99,9 +99,7 @@ def test__valid_mount_schema(
     Provide proper values and validate using both MountSchema,
     and a type-adapter version - InjectionSchema
     """
-    deserialized = _deserialize(
-        valid_mount_path, valid_storage_uri, valid_mount_mode
-    )
+    deserialized = _deserialize(valid_mount_path, valid_storage_uri, valid_mount_mode)
 
     assert deserialized.mount_path == valid_mount_path
     assert deserialized.storage_uri == valid_storage_uri
@@ -109,17 +107,13 @@ def test__valid_mount_schema(
     assert deserialized.storage_path == valid_storage_path
 
 
-def _deserialize(
-    mount_path: str,
-    storage_path: str,
-    mount_mode: str
-) -> MountSchema:
+def _deserialize(mount_path: str, storage_path: str, mount_mode: str) -> MountSchema:
     return MountSchema.model_validate_json(
         json.dumps(
             {
                 "mount_path": mount_path,
                 "storage_uri": storage_path,
-                "mount_mode": mount_mode
+                "mount_mode": mount_mode,
             }
         )
     )

@@ -1,6 +1,5 @@
 import functools
 from collections.abc import Sequence
-from typing import Optional, Union
 
 import aiobotocore.client
 import botocore.client
@@ -8,7 +7,6 @@ import pydantic
 from botocore.exceptions import ClientError
 
 from .storage_usage import StorageUsage
-
 
 _S3_STORAGE_USAGE_KEY = "storage_usage.json"
 
@@ -19,7 +17,7 @@ class _StorageUsage:
     class Project:
         project_name: str
         used: int
-        org_name: Optional[str] = None
+        org_name: str | None = None
 
     projects: Sequence[Project]
 
@@ -42,7 +40,7 @@ class _PayloadFactory:
 
 class _EntityFactory:
     @classmethod
-    def create_storage_usage(cls, payload: Union[str, bytes]) -> StorageUsage:
+    def create_storage_usage(cls, payload: str | bytes) -> StorageUsage:
         storage_usage = pydantic.TypeAdapter(_StorageUsage).validate_json(payload)
         return StorageUsage(
             projects=[

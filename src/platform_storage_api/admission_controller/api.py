@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Union
+from typing import Any
 from uuid import uuid4
 
 from aiohttp import web
@@ -20,7 +20,6 @@ from platform_storage_api.admission_controller.volume_resolver import (
 )
 from platform_storage_api.storage import Storage
 
-
 logger = logging.getLogger(__name__)
 
 ANNOTATION_APOLO_INJECT_STORAGE = "platform.apolo.us/inject-storage"
@@ -40,7 +39,7 @@ class AdmissionControllerError(Exception):
         self.message = message
 
 
-class Forbidden(AdmissionControllerError):
+class ForbiddenError(AdmissionControllerError):
     def __init__(self, message: str):
         super().__init__(status_code=403, message=message)
 
@@ -192,12 +191,12 @@ class AdmissionControllerApi:
             if injection_schema.org != expected_org:
                 error_message = f"org mismatch: `{injection_schema.org}`"
                 logger.error(error_message)
-                raise Forbidden(error_message)
+                raise ForbiddenError(error_message)
 
             if injection_schema.project != expected_project:
                 error_message = f"project mismatch: `{injection_schema.project}`"
                 logger.error(error_message)
-                raise Forbidden(error_message)
+                raise ForbiddenError(error_message)
 
         # here we are already confident that paths are valid,
         # so in addition, we try to create them
@@ -264,7 +263,7 @@ class AdmissionControllerApi:
 
             # add a volumeMount with mount path for all the POD containers
             for container_idx in range(len(containers)):
-                patch_value: dict[str, Union[str, bool]] = {
+                patch_value: dict[str, str | bool] = {
                     "name": future_volume_name,
                     "mountPath": mount_path,
                 }

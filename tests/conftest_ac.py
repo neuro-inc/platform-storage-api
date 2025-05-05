@@ -62,9 +62,9 @@ def pod_spec_with_nfs(
                     "name": volume_name,
                     "persistentVolumeClaim": {
                         "claimName": "pvc-claim-name",
-                    }
+                    },
                 },
-            ]
+            ],
         }
     }
 
@@ -91,14 +91,7 @@ def pod_spec_with_host_path(
                     ]
                 }
             ],
-            "volumes": [
-                {
-                    "name": volume_name,
-                    "hostPath": {
-                        "path": volume_path
-                    }
-                }
-            ]
+            "volumes": [{"name": volume_name, "hostPath": {"path": volume_path}}],
         }
     }
 
@@ -175,15 +168,12 @@ def path_resolver(local_mount_path: str) -> StoragePathResolver:
 @pytest.fixture
 def config() -> AdmissionControllerConfig:
     return AdmissionControllerConfig(
-        cert_secret_name='secret',
+        cert_secret_name="secret",
     )
 
 
 @pytest.fixture
-def storage(
-    path_resolver: StoragePathResolver,
-    local_fs: FileSystem
-) -> Storage:
+def storage(path_resolver: StoragePathResolver, local_fs: FileSystem) -> Storage:
     return Storage(path_resolver, local_fs)
 
 

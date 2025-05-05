@@ -114,14 +114,6 @@ jobs:
       run: make docker_pull_test_images
     - name: Setup services in minikube
       run: make apply_configuration_k8s
-    - name: Wait for admission-controller to serve
-      run: |
-        # Block until at least one replica is Available
-        kubectl rollout status deployment/platform-storage-injector \
-          -n default --timeout=120s
-        # Then ensure the Pod’s endpoint really exists
-        kubectl wait --for=condition=Ready pod \
-          -l app=admission-controller -n default --timeout=120s
     - name: Run integration tests
       run: make test_integration
 

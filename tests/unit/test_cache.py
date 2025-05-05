@@ -16,7 +16,6 @@ from platform_storage_api.cache import (
     TimeFactory,
 )
 
-
 P = PurePath
 
 
