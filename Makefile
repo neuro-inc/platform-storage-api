@@ -32,11 +32,11 @@ endif
 
 .PHONY: test_unit
 test_unit:
-	poetry run pytest -vv --log-level=INFO --cov-config=pyproject.toml --cov=platform_storage --cov-report xml:.coverage.unit.xml tests/unit
+	poetry run pytest -vv tests/unit
 
 .PHONY: test_integration
 test_integration:
-	poetry run pytest -vv --log-level=INFO --cov-config=pyproject.toml --cov=platform_storage --cov-report xml:.coverage.integration.xml
+	poetry run pytest -vv tests/integration
 
 .PHONY: clean-dist
 clean-dist:
