@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from itertools import islice
 from pathlib import Path, PurePath
 from types import TracebackType
@@ -29,7 +30,7 @@ class FileSystemException(Exception):  # noqa: N818
 
 
 # TODO (A Danshyn 04/23/18): likely should be revisited
-class StorageType(str, enum.Enum):
+class StorageType(StrEnum):
     LOCAL = "local"
     S3 = "s3"
 
