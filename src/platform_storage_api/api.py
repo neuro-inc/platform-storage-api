@@ -6,12 +6,11 @@ import struct
 import time
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable
 from contextlib import AsyncExitStack
-from enum import Enum
+from enum import Enum, StrEnum
 from errno import errorcode
 from functools import partial
 from pathlib import PurePath
 from typing import Any
-from enum import StrEnum
 
 import aiohttp
 import aiohttp.web
