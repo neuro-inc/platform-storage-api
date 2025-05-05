@@ -99,13 +99,13 @@ jobs:
         password: ${{ github.token }}
     - name: Fix minikube home permissions
       run: |
+        mkdir -p $HOME/.minikube
         sudo chown -R $USER:$USER $HOME/.minikube
         chmod -R u+rwX $HOME/.minikube
     - name: Start minikube
       run: |
         make install_k8s
         make start_k8s
-        # wait for the API server to be healthy
         kubectl --context=minikube wait --for=condition=Ready pod --all --all-namespaces --timeout=120s || true
         kubectl config use-context minikube
     - name: Pull test images
