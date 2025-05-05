@@ -12,6 +12,7 @@ from functools import partial
 from importlib.metadata import version
 from pathlib import PurePath
 from typing import Any
+from enum import StrEnum
 
 import aiohttp
 import aiohttp.web
@@ -70,7 +71,7 @@ class ApiHandler:
         return web.Response()
 
 
-class StorageOperation(str, Enum):
+class StorageOperation(StrEnum):
     """Represent all available operations on storage that are exposed via API.
 
     The CREATE operation handles opening files for writing.
