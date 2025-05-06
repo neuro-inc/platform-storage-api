@@ -9,6 +9,7 @@ from unittest import mock
 
 import aiohttp
 import cbor
+from aiohttp import ClientWSTimeout
 
 from platform_storage_api.api import WSStorageOperation
 from platform_storage_api.fs.local import FileStatusType
@@ -83,8 +84,9 @@ class TestStorageWebSocket:
         base_path = f"/{user.name}/root-{uuid.uuid4()}"
         rel_path = f"path/to/file-{uuid.uuid4()}"
 
+        ws_timeout = ClientWSTimeout(ws_receive=None, ws_close=10.0)
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers, timeout=10
+            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers, timeout=ws_timeout
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()

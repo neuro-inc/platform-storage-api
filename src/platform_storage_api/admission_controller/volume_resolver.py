@@ -80,7 +80,7 @@ VOLUME_BACKEND_SPEC = {
 }
 
 
-T_VolumeSpec = Union[NfsVolumeSpec, HostPathVolumeSpec]
+T_VolumeSpec = Union[NfsVolumeSpec, HostPathVolumeSpec]  # noqa: UP007
 
 
 @dataclasses.dataclass
