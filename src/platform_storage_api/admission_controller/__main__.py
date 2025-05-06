@@ -12,8 +12,6 @@ from neuro_logging import init_logging, setup_sentry
 from platform_storage_api.admission_controller.app import create_app
 from platform_storage_api.config import Config
 
-uvloop.run()
-
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +69,7 @@ async def run() -> None:
 
 def main() -> None:
     try:
-        asyncio.run(run())
+        uvloop.run(run())
     except KeyboardInterrupt:
         pass
 

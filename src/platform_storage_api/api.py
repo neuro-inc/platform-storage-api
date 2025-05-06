@@ -46,9 +46,6 @@ from .storage import (
     create_path_resolver,
 )
 
-uvloop.run()
-
-
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
 
 logger = logging.getLogger(__name__)
@@ -927,6 +924,5 @@ def main() -> None:
         ignore_errors=[FileNotFoundError, web.HTTPBadRequest, web.HTTPNotFound],
     )
 
-    loop = asyncio.get_event_loop()
-    app = loop.run_until_complete(create_app(config))
+    app = uvloop.run(create_app(config))
     web.run_app(app, host=config.server.host, port=config.server.port)
