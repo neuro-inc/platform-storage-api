@@ -46,7 +46,7 @@ from .storage import (
     create_path_resolver,
 )
 
-uvloop.install()
+uvloop.run()
 
 
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
