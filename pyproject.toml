@@ -94,6 +94,7 @@ filterwarnings = [
     "ignore::DeprecationWarning:jose.jws",
     "ignore::DeprecationWarning:pkg_resources._vendor.pyparsing",
     "ignore:The loop argument is deprecated:DeprecationWarning:",
+    "ignore:datetime\\.datetime\\.utcnow\\(\\) is deprecated.*:DeprecationWarning:"
 ]
 
 [tool.mypy]
