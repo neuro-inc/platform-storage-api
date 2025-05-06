@@ -11,7 +11,7 @@ from errno import errorcode
 from functools import partial
 from importlib.metadata import version
 from pathlib import PurePath
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import aiohttp.web
@@ -335,7 +335,7 @@ class StorageHandler:
 
         raise web.HTTPOk
 
-    def _parse_operation(self, request: web.Request) -> Optional[StorageOperation]:
+    def _parse_operation(self, request: web.Request) -> StorageOperation | None:
         ops = []
 
         if "op" in request.query:
@@ -442,7 +442,7 @@ class StorageHandler:
         write: bool,  # noqa: FBT001
         op: str,
         reqid: int,
-        path: str,
+        path: PurePath | str,
         payload: dict[str, Any],
         data: bytes,
     ) -> None:
@@ -508,7 +508,7 @@ class StorageHandler:
         op: str,
         reqid: int,
         *,
-        result: Optional[dict[str, Any]] = None,
+        result: dict[str, Any] | None = None,
         data: bytes = b"",
     ) -> None:
         result = result or {}
@@ -521,7 +521,7 @@ class StorageHandler:
         op: str,
         reqid: int,
         errmsg: str,
-        errno: Optional[int] = None,
+        errno: int | None = None,
     ) -> None:
         payload = {
             "rop": op,
@@ -560,7 +560,7 @@ class StorageHandler:
             start = size = 0
         else:
             response.set_status(web.HTTPPartialContent.status_code)
-            response.headers["Content-Range"] = f"bytes {start}-{stop-1}/{fstat.size}"
+            response.headers["Content-Range"] = f"bytes {start}-{stop - 1}/{fstat.size}"
             response.content_length = size
         await response.prepare(request)
         await self._storage.retrieve(response, storage_path, start, size or None)
@@ -707,7 +707,7 @@ class StorageHandler:
         except IsADirectoryError as e:
             await handle_error("Target is a directory", e.errno)
         except OSError as e:
-            await handle_error(e.strerror, e.errno)
+            await handle_error(e.strerror or str(e), e.errno)
         except Exception as e:
             msg_str = _unknown_error_message(e, request)
             logging.exception(msg_str)
@@ -775,7 +775,7 @@ class StorageHandler:
 async def handle_error_if_streamed(
     response: web.StreamResponse,
     str_error: str,
-    errno: Optional[int] = None,
+    errno: int | None = None,
     error_class: type[web.HTTPError] = web.HTTPBadRequest,
 ) -> None:
     if response.prepared:
@@ -793,7 +793,7 @@ async def handle_error_if_streamed(
 def _http_exception(
     error_class: type[web.HTTPError],
     message: str,
-    errno: Optional[int] = None,
+    errno: int | None = None,
     **kwargs: Any,
 ) -> web.HTTPError:
     error_payload: dict[str, Any] = {"error": message, **kwargs}

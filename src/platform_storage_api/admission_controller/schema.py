@@ -4,7 +4,7 @@ import json
 from enum import Enum
 from functools import cached_property
 from pathlib import Path, PurePosixPath
-from typing import Any, Optional
+from typing import Any
 
 from aiohttp import web
 from pydantic import BaseModel, TypeAdapter, field_validator
@@ -46,7 +46,7 @@ class MountSchema(BaseModel):
     def storage_path(self) -> str:
         return "/".join(["", self.org, self.project, *self.path_parts])
 
-    @field_validator('mount_path', mode='after')
+    @field_validator("mount_path", mode="after")
     @classmethod
     def is_mount_path(cls, value: str) -> str:
         if not Path(value).is_absolute():
@@ -54,7 +54,7 @@ class MountSchema(BaseModel):
             raise ValueError(err)
         return value
 
-    @field_validator('storage_uri', mode='after')
+    @field_validator("storage_uri", mode="after")
     @classmethod
     def is_storage_uri(cls, value: str) -> str:
         if not value.startswith(SCHEMA_STORAGE):
@@ -80,17 +80,19 @@ class AdmissionReviewPatchType(str, Enum):
 @dataclasses.dataclass
 class AdmissionReviewResponse:
     uid: str
-    patch: Optional[list[dict[str, Any]]] = None
+    patch: list[dict[str, Any]] | None = None
 
     def add_patch(self, path: str, value: Any) -> None:
         if self.patch is None:
             self.patch = []
 
-        self.patch.append({
-            "op": "add",
-            "path": path,
-            "value": value,
-        })
+        self.patch.append(
+            {
+                "op": "add",
+                "path": path,
+                "value": value,
+            }
+        )
 
     def allow(self) -> web.Response:
         response = {
@@ -101,16 +103,18 @@ class AdmissionReviewResponse:
             # convert patch changes to a b64
             dumped = json.dumps(self.patch).encode()
             patch = base64.b64encode(dumped).decode()
-            response.update({
-                "patch": patch,
-                "patchType": AdmissionReviewPatchType.JSON.value,
-            })
+            response.update(
+                {
+                    "patch": patch,
+                    "patchType": AdmissionReviewPatchType.JSON.value,
+                }
+            )
 
         return web.json_response(
             {
                 "apiVersion": "admission.k8s.io/v1",
                 "kind": "AdmissionReview",
-                "response": response
+                "response": response,
             }
         )
 
@@ -126,7 +130,6 @@ class AdmissionReviewResponse:
                         "code": status_code,
                         "message": message,
                     },
-
-                }
+                },
             }
         )

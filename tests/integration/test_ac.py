@@ -1,7 +1,7 @@
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -23,8 +23,8 @@ ACTUAL_VOLUME_MOUNT_PATH = "/var/storage"
 @asynccontextmanager
 async def pod_cm(
     kube_client: KubeClient,
-    annotations: Optional[dict[str, Any]] = None,
-    labels: Optional[dict[str, Any]] = None,
+    annotations: dict[str, Any] | None = None,
+    labels: dict[str, Any] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """
     A context manager for creating the pod, returning the response,
