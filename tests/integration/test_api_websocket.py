@@ -8,7 +8,7 @@ from typing import Any
 from unittest import mock
 
 import aiohttp
-import cbor
+import cbor2
 from aiohttp import ClientWSTimeout
 
 from platform_storage_api.api import WSStorageOperation
@@ -28,13 +28,13 @@ def ws_request(
     payload = {"op": op, "id": id_, **kwargs}
     if path is not None:
         payload["path"] = path
-    header = cbor.dumps(payload)
+    header = cbor2.dumps(payload)
     return struct.pack("!I", len(header) + 4) + header
 
 
 def parse_ws_response(resp: bytes) -> dict[str, Any]:
     (hsize,) = struct.unpack("!I", resp[:4])
-    return cbor.loads(resp[4:hsize])
+    return cbor2.loads(resp[4:hsize])
 
 
 def get_ws_response_data(resp: bytes) -> bytes:

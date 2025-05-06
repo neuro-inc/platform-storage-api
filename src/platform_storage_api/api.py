@@ -14,7 +14,7 @@ from typing import Any
 
 import aiohttp
 import aiohttp.web
-import cbor
+import cbor2
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
@@ -403,7 +403,7 @@ class StorageHandler:
                     break
                 try:
                     (hsize,) = struct.unpack("!I", msg.data[:4])
-                    payload = cbor.loads(msg.data[4:hsize])
+                    payload = cbor2.loads(msg.data[4:hsize])
                     op = payload["op"]
                     reqid = payload["id"]
                 except Exception as e:
@@ -499,7 +499,7 @@ class StorageHandler:
         data: bytes = b"",
     ) -> None:
         payload = {"op": op.value, **payload}
-        header = cbor.dumps(payload)
+        header = cbor2.dumps(payload)
         await ws.send_bytes(struct.pack("!I", len(header) + 4) + header + data)
 
     async def _ws_send_ack(
