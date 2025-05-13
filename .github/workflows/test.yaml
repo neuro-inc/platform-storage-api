@@ -68,7 +68,7 @@ jobs:
     env:
       # keep Minikube state out of /home/runner
       MINIKUBE_HOME: ${{ github.workspace }}/.minikube
-      MINIKUBE_DRIVER: docker
+      MINIKUBE_DRIVER: none
     name: Integration tests
     runs-on: ubuntu-latest
     steps:
@@ -110,6 +110,26 @@ jobs:
       run: |
         make install_k8s
         make start_k8s
+    - name: Show Minikube status and logs
+      if: failure()
+      run: |
+        echo "🧪 Minikube status:"
+        minikube status || true
+
+        echo "📄 Minikube logs:"
+        minikube logs || true
+
+        echo "📁 Kube config:"
+        kubectl config view || true
+
+        echo "🔍 Kubectl current context:"
+        kubectl config current-context || true
+
+        echo "📡 Kubectl cluster-info:"
+        kubectl cluster-info || true
+
+        echo "🔧 Docker containers:"
+        docker ps -a || true
     - name: Pull test images
       run: make docker_pull_test_images
     - name: Setup services in minikube
