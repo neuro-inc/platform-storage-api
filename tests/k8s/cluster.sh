@@ -14,36 +14,33 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    # Force HOME into the repo so ~/.kube/config == $GITHUB_WORKSPACE/.kube/config
+    # 1) Force HOME into the workspace so ~/.kube/config == $GITHUB_WORKSPACE/.kube/config
     local WS="${GITHUB_WORKSPACE:-$PWD}"
     export HOME="$WS"
 
-    # Tell kubectl (and Minikube via HOME) where to find the config
+    # 2) Tell kubectl (and minikube via HOME) where to write/read the kubeconfig
     export KUBECONFIG="$WS/.kube/config"
     mkdir -p "$(dirname "$KUBECONFIG")"
 
-    # Ensure conntrack is installed
+    # 3) Install conntrack (still required by minikube)
     sudo apt-get update && sudo apt-get install -y conntrack
 
-    # Start Minikube un-privileged, Docker driver, pointing at our KUBECONFIG
+    # 4) Start minikube *unprivileged* with the Docker driver
     minikube start \
       --driver=docker \
       --kubernetes-version=stable \
+      --kubeconfig="$KUBECONFIG" \
       --wait=all \
       --wait-timeout=5m
 
-    # Now dump the merged kube-config to be absolutely sure it’s in place
-    kubectl config view --raw > "$KUBECONFIG"
-
-    # (Optional) load your test images if needed:
-    minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
-
-    # Label the node for your tests
+    # 5) Ensure the context is set
     kubectl config use-context minikube
+
+    # 6) Label the node for your tests
     kubectl get nodes -o name \
       | xargs -I {} kubectl label {} --overwrite \
           platform.neuromation.io/nodepool=minikube
-}
+ }
 
 function k8s::apply_all_configurations {
     echo "Applying configurations..."
