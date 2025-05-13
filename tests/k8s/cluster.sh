@@ -7,7 +7,7 @@ set -o verbose
 function k8s::install_minikube {
     local minikube_version="v1.25.2"
     sudo apt-get update
-    sudo apt-get install -y conntrack socat ebtables iptables docker.io
+    sudo apt-get install -y conntrack socat ebtables iptables containerd
     # ✅ Symlink conntrack to a location visible in root’s PATH
     if ! command -v conntrack >/dev/null; then
       echo "conntrack not found, something is wrong"
