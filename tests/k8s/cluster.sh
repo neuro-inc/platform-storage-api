@@ -7,7 +7,7 @@ set -o verbose
 function k8s::install_minikube {
     local minikube_version="v1.25.2"
     sudo apt-get update
-    sudo apt-get install -y conntrack
+    sudo apt-get install -y conntrack socat ebtables iptables docker.io
     curl -Lo minikube https://storage.googleapis.com/minikube/releases/${minikube_version}/minikube-linux-amd64
     chmod +x minikube
     sudo mv minikube /usr/local/bin/
@@ -29,6 +29,14 @@ function k8s::start {
         --vm-driver=none \
         --wait=all \
         --wait-timeout=5m
+
+    # 🔥 Immediately fail if minikube failed
+    if ! minikube status | grep -q "host: Running"; then
+        echo "❌ Minikube did not start successfully"
+        minikube status
+        exit 1
+    fi
+
     kubectl config use-context minikube
     kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
         platform.neuromation.io/nodepool=minikube
