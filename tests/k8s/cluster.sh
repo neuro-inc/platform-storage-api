@@ -26,9 +26,11 @@ function k8s::start {
     export CHANGE_MINIKUBE_NONE_USER=true
 
     sudo -E minikube start \
-        --vm-driver=none \
+        --driver=none \
         --wait=all \
         --wait-timeout=5m
+    # make sure the runner can read the file minikube just wrote
+    sudo chown -R "$(id -u):$(id -g)" "$HOME/.kube" "$HOME/.minikube"
     kubectl config use-context minikube
     kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
         platform.neuromation.io/nodepool=minikube
