@@ -67,8 +67,6 @@ jobs:
   integration:
     name: Integration tests
     runs-on: ubuntu-latest
-    env:
-      KUBECONFIG: /home/runner/.kube/config
     steps:
     - name: Checkout commit
       uses: actions/checkout@v4
@@ -103,6 +101,8 @@ jobs:
       run: |
         make install_k8s
         make start_k8s
+    - name: Expose kube-config to following steps
+      run: echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
     - name: Pull test images
       run: make docker_pull_test_images
     - name: Setup services in minikube
