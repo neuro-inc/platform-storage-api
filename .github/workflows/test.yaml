@@ -65,11 +65,11 @@ jobs:
       run: make test_unit
 
   integration:
-    env:
-      # keep Minikube state out of /home/runner
-      MINIKUBE_HOME: ${{ github.workspace }}/.minikube
     name: Integration tests
     runs-on: ubuntu-latest
+    env:
+      # point pytest (and kubectl) at this file
+      KUBECONFIG: ${{ github.workspace }}/.kube/config
     steps:
     - name: Checkout commit
       uses: actions/checkout@v4
@@ -100,15 +100,27 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ github.token }}
-    - name: Fix minikube home permissions
-      run: |
-        mkdir -p "$MINIKUBE_HOME"
-        sudo chown -R "$USER:$USER" "$MINIKUBE_HOME"
-        chmod -R u+rwX "$MINIKUBE_HOME"
     - name: Start minikube
       run: |
         make install_k8s
         make start_k8s
+    - name: Debug kubeconfig locations
+      run: |
+        # Show what HOME really is and list runner’s kube folder
+        echo "Runner HOME: $HOME"
+        echo "--- Runner ~/.kube dir ---"
+        ls -la "$HOME/.kube" || true
+
+        # Show the workspace path you’ve been using
+        echo "Workspace KUBECONFIG: $KUBECONFIG"
+        echo "--- Workspace .kube dir ---"
+        ls -la "$(dirname "$KUBECONFIG")" || true
+
+        # Dump both files if they exist
+        echo "--- cat runner ~/.kube/config ---"
+        cat "$HOME/.kube/config" || true
+        echo "--- cat workspace kubeconfig ---"
+        cat "$KUBECONFIG" || true
     - name: Dump kubeconfig for debugging
       run: |
         echo "KUBECONFIG=$KUBECONFIG"

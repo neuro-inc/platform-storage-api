@@ -14,22 +14,26 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    export KUBECONFIG=$HOME/.kube/config
-    mkdir -p $(dirname $KUBECONFIG)
-    touch $KUBECONFIG
+    # 1) Where we want the kubeconfig to live
+    export KUBECONFIG="${GITHUB_WORKSPACE:-$PWD}/.kube/config"
+    mkdir -p "$(dirname "$KUBECONFIG")"
 
-    export MINIKUBE_WANTUPDATENOTIFICATION=false
-    export MINIKUBE_WANTREPORTERRORPROMPT=false
-    export MINIKUBE_HOME=$HOME
-    export CHANGE_MINIKUBE_NONE_USER=true
+    # 2) Make sure conntrack is installed
+    sudo apt-get update && sudo apt-get install -y conntrack
 
-    sudo -E minikube start \
-        --vm-driver=none \
-        --wait=all \
-        --wait-timeout=5m
-    kubectl config use-context minikube
-    kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
-        platform.neuromation.io/nodepool=minikube
+    # 3) Start Minikube as the runner user (Docker driver)
+    minikube start \
+      --driver=docker \
+      --kubernetes-version=stable \
+      --wait=all \
+      --wait-timeout=5m
+
+    # 4) **Use Minikube’s own kubectl** to dump a merged kubeconfig into the exact file pytest will read
+    minikube kubectl -- config view --raw > "$KUBECONFIG"
+
+    # 5) And use *that* same kubectl to label your node(s)
+    minikube kubectl -- get nodes -o name \
+      | xargs -I {} minikube kubectl -- label {} platform.neuromation.io/nodepool=minikube --overwrite
 }
 
 function k8s::apply_all_configurations {
