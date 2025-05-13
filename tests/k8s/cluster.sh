@@ -16,28 +16,39 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-     : "${MINIKUBE_HOME:=${GITHUB_WORKSPACE:-$PWD}/.minikube}"
-     export MINIKUBE_HOME
+    # 1) Define workspace‐local home
+    : "${MINIKUBE_HOME:=${GITHUB_WORKSPACE:-$PWD}/.minikube}"
+    export MINIKUBE_HOME
 
-     export KUBECONFIG=$MINIKUBE_HOME/.kube/config
-     mkdir -p "$(dirname "$KUBECONFIG")"
+    # 2) Point kubectl at the workspace file
+    export KUBECONFIG=$MINIKUBE_HOME/.kube/config
+    mkdir -p "$(dirname "$KUBECONFIG")"
 
-     export MINIKUBE_WANTUPDATENOTIFICATION=false
-     export MINIKUBE_WANTREPORTERRORPROMPT=false
-     export CHANGE_MINIKUBE_NONE_USER=true
+    export MINIKUBE_WANTUPDATENOTIFICATION=false
+    export MINIKUBE_WANTREPORTERRORPROMPT=false
+    export CHANGE_MINIKUBE_NONE_USER=true
 
-     sudo -E minikube start \
-         --home="$MINIKUBE_HOME" \
-         --kubeconfig="$KUBECONFIG" \
-         --driver=none \
-         --wait=all \
-         --wait-timeout=5m
+    # 3) Run minikube under sudo _and_ inject the two vars so it really writes into your workspace
+    sudo env \
+      MINIKUBE_HOME="$MINIKUBE_HOME" \
+      KUBECONFIG="$KUBECONFIG" \
+      minikube start \
+        --home="$MINIKUBE_HOME" \
+        --kubeconfig="$KUBECONFIG" \
+        --driver=none \
+        --wait=all \
+        --wait-timeout=5m
 
-     sudo chown -R "$(id -u):$(id -g)" "$MINIKUBE_HOME"
-     kubectl config use-context minikube
-     kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
-         platform.neuromation.io/nodepool=minikube
- }
+    # 4) Hand ownership of everything back to the runner
+    sudo chown -R "$(id -u):$(id -g)" "$MINIKUBE_HOME"
+
+    # 5) Finalize kubectl context
+    kubectl config use-context minikube
+    kubectl get nodes -o name | \
+      xargs -I {} kubectl label {} --overwrite \
+        platform.neuromation.io/nodepool=minikube
+}
+
 
 
 function k8s::apply_all_configurations {
