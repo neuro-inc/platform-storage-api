@@ -26,12 +26,11 @@ function k8s::start {
      export MINIKUBE_WANTREPORTERRORPROMPT=false
      export CHANGE_MINIKUBE_NONE_USER=true
 
-     sudo -E minikube start \
+     sudo minikube start \
+         --home="$MINIKUBE_HOME" \
          --driver=none \
          --wait=all \
          --wait-timeout=5m
-    # ← copy the real config that minikube wrote under /root into our workspace
-    sudo cp /root/.kube/config "$KUBECONFIG"
 
      sudo chown -R "$(id -u):$(id -g)" "$MINIKUBE_HOME"
      kubectl config use-context minikube
