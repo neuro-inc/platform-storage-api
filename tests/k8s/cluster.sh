@@ -16,29 +16,27 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    # 1) pick your workspace root
-    local WS=${GITHUB_WORKSPACE:-$PWD}
-
-    # 2) point both kubectl and (via HOME) minikube at WS/.kube/config
-    export KUBECONFIG=$WS/.kube/config
+    # 1) Tell kubectl where to look
+    export KUBECONFIG=${GITHUB_WORKSPACE:-$PWD}/.kube/config
     mkdir -p "$(dirname "$KUBECONFIG")"
 
-    # 3) ensure conntrack (required by minikube)
+    # 2) Install conntrack (still required)
     sudo apt-get update && sudo apt-get install -y conntrack
 
-    # 4) run minikube *as your runner user* but *with HOME=WS*,
-    #    so ~/.kube/config ends up in $WS/.kube/config
-    HOME="$WS" \
+    # 3) Start minikube as the runner user with Docker driver
     minikube start \
       --driver=docker \
       --kubernetes-version=stable \
       --wait=all \
       --wait-timeout=5m
 
-    # 5) load your test image
+    # 4) **Pull in the generated config** from the runner‐home into your workspace
+    cp "$HOME/.kube/config" "$KUBECONFIG"
+
+    # 5) Load your test image
     minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
 
-    # 6) set context & label
+    # 6) Finalize context & label nodes
     kubectl config use-context minikube
     kubectl get nodes -o name \
       | xargs -I {} kubectl label {} --overwrite \
