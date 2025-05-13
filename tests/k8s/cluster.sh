@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo verbose pipefail
+set -euo pipefail
 
 # based on
 # https://github.com/kubernetes/minikube#linux-continuous-integration-without-vm-support
@@ -16,28 +16,31 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    # 1) force HOME under the repo so ~/.kube/config == $GITHUB_WORKSPACE/.kube/config
-    local WS=${GITHUB_WORKSPACE:-$PWD}
-    export HOME=$WS
+    # Force HOME into the repo so ~/.kube/config == $GITHUB_WORKSPACE/.kube/config
+    local WS="${GITHUB_WORKSPACE:-$PWD}"
+    export HOME="$WS"
 
-    # 2) point kubectl (and minikube by HOME) at this path
-    export KUBECONFIG=$WS/.kube/config
+    # Tell kubectl (and Minikube via HOME) where to find the config
+    export KUBECONFIG="$WS/.kube/config"
     mkdir -p "$(dirname "$KUBECONFIG")"
 
-    # 3) ensure conntrack (required by minikube)
+    # Ensure conntrack is installed
     sudo apt-get update && sudo apt-get install -y conntrack
 
-    # 4) start minikube as the runner user in Docker mode
+    # Start Minikube un-privileged, Docker driver, pointing at our KUBECONFIG
     minikube start \
       --driver=docker \
       --kubernetes-version=stable \
       --wait=all \
       --wait-timeout=5m
 
-    # 5) load your test image into minikube’s Docker daemon
+    # Now dump the merged kube-config to be absolutely sure it’s in place
+    kubectl config view --raw > "$KUBECONFIG"
+
+    # (Optional) load your test images if needed:
     minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
 
-    # 6) finalize kubectl context & label the node
+    # Label the node for your tests
     kubectl config use-context minikube
     kubectl get nodes -o name \
       | xargs -I {} kubectl label {} --overwrite \
