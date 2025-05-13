@@ -16,7 +16,7 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-+    # runner’s home (kept for later, $HOME will change under sudo)
+     # runner’s home (kept for later, $HOME will change under sudo)
      local RUNNER_HOME=$HOME
      export KUBECONFIG=$RUNNER_HOME/.kube/config
      mkdir -p "$(dirname "$KUBECONFIG")"
