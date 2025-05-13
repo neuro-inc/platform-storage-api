@@ -8,6 +8,14 @@ function k8s::install_minikube {
     local minikube_version="v1.25.2"
     sudo apt-get update
     sudo apt-get install -y conntrack socat ebtables iptables docker.io
+    # ✅ Symlink conntrack to a location visible in root’s PATH
+    if ! command -v conntrack >/dev/null; then
+      echo "conntrack not found, something is wrong"
+      exit 1
+    fi
+
+    CONNTRACK_PATH=$(command -v conntrack)
+    sudo ln -s "$CONNTRACK_PATH" /usr/bin/conntrack 2>/dev/null || true
     curl -Lo minikube https://storage.googleapis.com/minikube/releases/${minikube_version}/minikube-linux-amd64
     chmod +x minikube
     sudo mv minikube /usr/local/bin/
