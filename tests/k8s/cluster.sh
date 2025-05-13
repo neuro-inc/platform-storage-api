@@ -1,33 +1,25 @@
 #!/usr/bin/env bash
-#
-# tests/k8s/cluster.sh ─ Minikube helper for CI and local dev (“none” driver only)
-# Usage: ./cluster.sh {install|start|apply|clean|stop}
 set -euo pipefail
 [[ "${DEBUG:-}" == 1 ]] && set -x
 
-# ────────────────────────────  Configuration  ────────────────────────────────
-MINIKUBE_VERSION="${MINIKUBE_VERSION:-v1.35.0}"   # Jan-2025 LTS
+MINIKUBE_VERSION="${MINIKUBE_VERSION:-v1.35.0}"
 K8S_VERSION="${K8S_VERSION:-v1.32.0}"
 CRICTL_VERSION="${CRICTL_VERSION:-v1.32.0}"
-CRID_VERSION="${CRID_VERSION:-0.3.13}"            # cri-dockerd tag (v0.3.13)
+CRID_VERSION="${CRID_VERSION:-0.3.13}"
 PROFILE="${MINIKUBE_PROFILE:-minikube}"
 WAIT_TIMEOUT="${MINIKUBE_WAIT_TIMEOUT:-5m}"
 DRIVER="none"
 CRI_SOCKET="/var/run/cri-dockerd.sock"
 
-# Home / UID juggling so kubeconfig ends up owned by the invoking user
 REAL_USER="${SUDO_USER:-$USER}"
 REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
 export MINIKUBE_HOME="$REAL_HOME"
 export CHANGE_MINIKUBE_NONE_USER=true
 export KUBECONFIG="$REAL_HOME/.kube/config"
 
-# ─────────────────────────────  Helpers  ─────────────────────────────────────
 log()       { printf '\e[1;34m▶ %s\e[0m\n' "$*"; }
 with_sudo() { if [[ "$(id -u)" -ne 0 ]]; then sudo "$@"; else "$@"; fi; }
-
-# ───────────────────────────  Download helpers  ─────────────────────────────
-_dl() { curl -sSL --retry 3 --fail -o "$1" "$2"; }
+_dl()       { curl -sSL --retry 3 --fail -o "$1" "$2"; }
 
 install_crictl() {
   command -v crictl >/dev/null && return
@@ -51,19 +43,16 @@ install_cri_dockerd() {
 install_minikube() {
   if ! command -v minikube >/dev/null || [[ "$(minikube version --short)" != "$MINIKUBE_VERSION" ]]; then
     log "Installing Minikube $MINIKUBE_VERSION"
-    _dl /tmp/minikube \
-      "https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64"
+    _dl /tmp/minikube "https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64"
     chmod +x /tmp/minikube
     with_sudo mv /tmp/minikube /usr/local/bin/minikube
   fi
 }
 
-# ───────────────────────────  OS-level prep  ────────────────────────────────
 install_packages() {
   log "Installing system packages…"
   with_sudo apt-get update -y
-  with_sudo apt-get install -y \
-        conntrack socat iptables bridge-utils containernetworking-plugins || true
+  with_sudo apt-get install -y conntrack socat iptables bridge-utils containernetworking-plugins || true
   install_crictl
   install_cri_dockerd
 }
@@ -83,12 +72,11 @@ start_cri_dockerd() {
     with_sudo nohup /usr/local/bin/cri-dockerd \
         --container-runtime-endpoint unix:///var/run/docker.sock \
         --cri-dockerd-endpoint "$CRI_SOCKET" \
-        >/var/log/cri-dockerd.log 2>&1 &
+        >/tmp/cri-dockerd.log 2>&1 &
     for _ in {1..10}; do [[ -S $CRI_SOCKET ]] && break || sleep 0.5; done
   fi
 }
 
-# ─────────────────────────  Minikube lifecycle  ─────────────────────────────
 start_minikube() {
   prepare_kernel
   start_cri_dockerd
@@ -97,7 +85,7 @@ start_minikube() {
       --profile="$PROFILE" \
       --driver="$DRIVER" \
       --kubernetes-version="$K8S_VERSION" \
-      --container-runtime=cri-dockerd \
+      --container-runtime=docker \
       --cri-socket="unix://$CRI_SOCKET" \
       --wait=all \
       --wait-timeout="$WAIT_TIMEOUT"
@@ -107,20 +95,17 @@ start_minikube() {
   kubectl get nodes -o wide
 }
 
-# ───────────────────────  Apply / wait helpers  ─────────────────────────────
 wait_job() { kubectl wait --for=condition=complete "job/$1" --timeout=60s; }
 
 apply_manifests() {
   docker build -t admission-controller-tests:latest .
   minikube image load admission-controller-tests:latest --profile="$PROFILE"
-
   kubectl apply -f tests/k8s/rbac.yaml
   kubectl apply -f tests/k8s/preinstall-job.yaml;            wait_job admission-controller-lib-preinstall
   kubectl apply -f tests/k8s/admission-controller-deployment.yaml
   kubectl apply -f tests/k8s/postinstall-job.yaml;           wait_job admission-controller-lib-postinstall
 }
 
-# ─────────────────────────────  Cleanup  ────────────────────────────────────
 clean_manifests() {
   kubectl delete -f tests/k8s/postinstall-job.yaml               || true
   kubectl delete -f tests/k8s/admission-controller-deployment.yaml || true
@@ -134,7 +119,6 @@ stop_minikube() {
   with_sudo rm -rf "$REAL_HOME/.minikube" "$REAL_HOME/.kube"
 }
 
-# ───────────────────────────  CLI entry-point  ─────────────────────────────
 case "${1:-}" in
   install) install_packages; install_minikube ;;
   start)   start_minikube ;;
