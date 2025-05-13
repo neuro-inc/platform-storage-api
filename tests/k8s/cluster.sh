@@ -26,8 +26,9 @@ function k8s::start {
      export MINIKUBE_WANTREPORTERRORPROMPT=false
      export CHANGE_MINIKUBE_NONE_USER=true
 
-     sudo minikube start \
+     sudo -E minikube start \
          --home="$MINIKUBE_HOME" \
+         --kubeconfig="$KUBECONFIG" \
          --driver=none \
          --wait=all \
          --wait-timeout=5m
