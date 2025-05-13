@@ -1,119 +1,140 @@
 #!/usr/bin/env bash
-set -o verbose
+#
+# Start, manage and clean a Minikube cluster that always uses --driver=none.
+# Works on:
+#   • GitHub Actions ubuntu-latest runners (root via sudo is available)
+#   • Any local Linux box (run the script with sudo, or let it sudo itself)
+#
+# Docs: https://minikube.sigs.k8s.io/docs/drivers/none/          ▲ marked “advanced users”
+# None-driver with K8s ≥ 1.24 also needs containernetworking-plugins           :contentReference[oaicite:1]{index=1}
+set -euo pipefail
+[[ "${DEBUG:-}" == 1 ]] && set -x
 
-# based on
-# https://github.com/kubernetes/minikube#linux-continuous-integration-without-vm-support
+# -------------------------------------------------------------------------------------------------
+# Configuration knobs (feel free to override with env vars)
+# -------------------------------------------------------------------------------------------------
+MINIKUBE_VERSION="${MINIKUBE_VERSION:-v1.35.0}"   # 2025-01 LTS
+K8S_VERSION="${K8S_VERSION:-v1.32.0}"
+PROFILE="${MINIKUBE_PROFILE:-minikube}"
+WAIT_TIMEOUT="${MINIKUBE_WAIT_TIMEOUT:-5m}"
 
-function k8s::install_minikube {
-    local minikube_version="v1.25.2"
-    sudo apt-get update
-    sudo apt-get install -y conntrack
-    curl -Lo minikube https://storage.googleapis.com/minikube/releases/${minikube_version}/minikube-linux-amd64
-    chmod +x minikube
-    sudo mv minikube /usr/local/bin/
-    sudo -E minikube config set WantReportErrorPrompt false
-    sudo -E minikube config set WantNoneDriverWarning false
+# Always the none driver
+DRIVER=none
+
+# The unprivileged user that invoked the script (works in sudo context, too)
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
+
+# Minikube must use the caller’s home so kubeconfig is readable after chown
+export MINIKUBE_HOME="$REAL_HOME"
+export CHANGE_MINIKUBE_NONE_USER=true
+export KUBECONFIG="$REAL_HOME/.kube/config"
+
+# -------------------------------------------------------------------------------------------------
+# Utility helpers
+# -------------------------------------------------------------------------------------------------
+log() { printf '\e[1;34m▶ %s\e[0m\n' "$*"; }
+need() { command -v "$1" >/dev/null 2>&1 || { echo "❌ $1 is required"; exit 1; }; }
+
+with_sudo() {
+  if [[ "$(id -u)" -ne 0 ]]; then sudo "$@"; else "$@"; fi
 }
 
-function k8s::start {
-    export KUBECONFIG=$HOME/.kube/config
-    mkdir -p $(dirname $KUBECONFIG)
-    touch $KUBECONFIG
+# -------------------------------------------------------------------------------------------------
+# 1 – Install prerequisites
+# -------------------------------------------------------------------------------------------------
+k8s::install_minikube() {
+  need curl
+  log "Installing Linux packages needed for the bare-metal driver…"
+  with_sudo apt-get update -y
+  with_sudo apt-get install -y conntrack socat iptables bridge-utils \
+                               containernetworking-plugins >/dev/null
 
-    export MINIKUBE_WANTUPDATENOTIFICATION=false
-    export MINIKUBE_WANTREPORTERRORPROMPT=false
-    export MINIKUBE_HOME=$HOME
-    export CHANGE_MINIKUBE_NONE_USER=true
-
-    sudo -E minikube start \
-        --vm-driver=none \
-        --wait=all \
-        --wait-timeout=5m
-
-    if ! minikube status | grep -q "host: Running"; then
-        echo "❌ Minikube did not start successfully"
-        minikube status
-        exit 1
-    fi
-
-    kubectl config use-context minikube
-    kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
-        platform.neuromation.io/nodepool=minikube
-}
-
-function k8s::apply_all_configurations {
-    echo "Applying configurations..."
-    kubectl config use-context minikube
-    make dist
-    docker build -t admission-controller-tests:latest .
-    docker image save -o ac.tar admission-controller-tests:latest
-    minikube image load ac.tar
-    kubectl apply -f tests/k8s/rbac.yaml
-    kubectl apply -f tests/k8s/preinstall-job.yaml
-    wait_job admission-controller-lib-preinstall
-    kubectl apply -f tests/k8s/admission-controller-deployment.yaml
-    kubectl apply -f tests/k8s/postinstall-job.yaml
-    wait_job admission-controller-lib-postinstall
-}
-
-
-function k8s::clean {
-    echo "Cleaning up..."
-    kubectl config use-context minikube
-    kubectl delete -f tests/k8s/postinstall-job.yaml
-    kubectl delete -f tests/k8s/admission-controller-deployment.yaml
-    kubectl delete -f tests/k8s/preinstall-job.yaml
-    kubectl delete -f tests/k8s/rbac.yaml
-}
-
-
-function k8s::stop {
-  echo "Stopping minikube..."
-    sudo -E minikube stop || :
-    sudo -E minikube delete || :
-    sudo -E rm -rf ~/.minikube
-    sudo rm -rf /root/.minikube
-}
-
-
-function wait_job() {
-  local JOB_NAME=$1
-  echo "Waiting up to 60 seconds for $JOB_NAME job to succeed..."
-  if ! kubectl wait \
-       --for=condition=complete \
-       job/$JOB_NAME \
-       --timeout="60s"
-  then
-    echo "ERROR: Job '$JOB_NAME' did not complete within 60 seconds."
-    echo "----- Displaying all Kubernetes events: -----"
-    kubectl get events --sort-by=.metadata.creationTimestamp
-    exit 1
+  if ! command -v minikube >/dev/null; then
+    log "Downloading Minikube ${MINIKUBE_VERSION}"
+    curl -Lo /tmp/minikube "https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64"
+    chmod +x /tmp/minikube
+    with_sudo mv /tmp/minikube /usr/local/bin/minikube
   fi
-
-  echo "job/$JOB_NAME succeeded"
-  kubectl logs -l app=admission-controller
+  log "Minikube $(minikube version -o short) installed."
 }
 
+# -------------------------------------------------------------------------------------------------
+# 2 – Start cluster
+# -------------------------------------------------------------------------------------------------
+k8s::start() {
+  # Kernel & sysctl tweaks kubeadm pre-flight requires
+  with_sudo modprobe br_netfilter
+  echo "net.bridge.bridge-nf-call-iptables=1" | with_sudo tee /etc/sysctl.d/99-k8s.conf >/dev/null
+  with_sudo sysctl --system >/dev/null
 
-function k8s::apply {
-    minikube status
-    k8s::apply_all_configurations
+  # None-driver must run as root
+  CMD=(minikube start
+        --profile="$PROFILE"
+        --driver="$DRIVER"
+        --kubernetes-version="$K8S_VERSION"
+        --wait=all --timeout="$WAIT_TIMEOUT")
+
+  log "Starting Minikube (driver=none)…"
+  with_sudo env "MINIKUBE_HOME=$MINIKUBE_HOME" "${CMD[@]}"
+
+  # Give the config & profile dirs back to the real user
+  with_sudo chown -R "$REAL_USER":"$REAL_USER" "$REAL_HOME/.kube" "$REAL_HOME/.minikube"
+
+  log "Cluster is up"
+  kubectl config use-context "$PROFILE"
+  kubectl get nodes -o wide
 }
 
+# -------------------------------------------------------------------------------------------------
+# 3 – Load image & apply test manifests
+# -------------------------------------------------------------------------------------------------
+wait_job() {
+  local job="$1"
+  log "Waiting for job/$job to succeed (60 s)…"
+  kubectl wait --for=condition=complete "job/$job" --timeout=60s
+}
+
+k8s::apply() {
+  log "Building admission-controller test image…"
+  docker build -t admission-controller-tests:latest .
+  minikube image load admission-controller-tests:latest --profile="$PROFILE"
+
+  log "Applying manifests…"
+  kubectl apply -f tests/k8s/rbac.yaml
+  kubectl apply -f tests/k8s/preinstall-job.yaml
+  wait_job admission-controller-lib-preinstall
+  kubectl apply -f tests/k8s/admission-controller-deployment.yaml
+  kubectl apply -f tests/k8s/postinstall-job.yaml
+  wait_job admission-controller-lib-postinstall
+}
+
+# -------------------------------------------------------------------------------------------------
+# 4 – Cleanup helpers
+# -------------------------------------------------------------------------------------------------
+k8s::clean() {
+  log "Deleting manifests…"
+  kubectl delete -f tests/k8s/postinstall-job.yaml || true
+  kubectl delete -f tests/k8s/admission-controller-deployment.yaml || true
+  kubectl delete -f tests/k8s/preinstall-job.yaml || true
+  kubectl delete -f tests/k8s/rbac.yaml || true
+}
+
+k8s::stop() {
+  log "Stopping / deleting Minikube profile $PROFILE"
+  with_sudo minikube stop --profile="$PROFILE" || true
+  with_sudo minikube delete --profile="$PROFILE" || true
+  with_sudo rm -rf "$REAL_HOME/.minikube" "$REAL_HOME/.kube"
+}
+
+# -------------------------------------------------------------------------------------------------
+# CLI
+# -------------------------------------------------------------------------------------------------
 case "${1:-}" in
-    install)
-        k8s::install_minikube
-        ;;
-    start)
-        k8s::start
-        ;;
-    apply)
-        k8s::apply
-        ;;
-    clean)
-        k8s::clean
-        ;;
-    stop)
-        k8s::stop
-        ;;
+  install) k8s::install_minikube ;;
+  start)   k8s::start ;;
+  apply)   k8s::apply ;;
+  clean)   k8s::clean ;;
+  stop)    k8s::stop ;;
+  *) echo "Usage: $0 {install|start|apply|clean|stop}"; exit 1 ;;
 esac
