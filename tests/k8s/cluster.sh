@@ -16,36 +16,28 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    # 1) Pick a workspace‐local Minikube home (so root and runner share it)
-    : "${MINIKUBE_HOME:=${GITHUB_WORKSPACE:-$PWD}/.minikube}"
-    export MINIKUBE_HOME
-    mkdir -p "$MINIKUBE_HOME"
+     : "${MINIKUBE_HOME:=${GITHUB_WORKSPACE:-$PWD}/.minikube}"
+     export MINIKUBE_HOME
 
-    # 2) Tell kubectl where to read/write its config
-    export KUBECONFIG=$MINIKUBE_HOME/.kube/config
-    mkdir -p "$(dirname "$KUBECONFIG")"
+     export KUBECONFIG=$MINIKUBE_HOME/.kube/config
+     mkdir -p "$(dirname "$KUBECONFIG")"
 
-    # 3) Disable update prompts
-    export MINIKUBE_WANTUPDATENOTIFICATION=false
-    export MINIKUBE_WANTREPORTERRORPROMPT=false
-    export CHANGE_MINIKUBE_NONE_USER=true
+     export MINIKUBE_WANTUPDATENOTIFICATION=false
+     export MINIKUBE_WANTREPORTERRORPROMPT=false
+     export CHANGE_MINIKUBE_NONE_USER=true
 
-    # 4) Start minikube **passing --home** (so we don’t rely on preserving env under sudo)
-    sudo minikube start \
-         --home "$MINIKUBE_HOME" \
+     sudo -E minikube start \
          --driver=none \
          --wait=all \
          --wait-timeout=5m
+    # ← copy the real config that minikube wrote under /root into our workspace
+    sudo cp /root/.kube/config "$KUBECONFIG"
 
-    # 5) Fix ownership so the runner user (pytest) can read the config
-    sudo chown -R "$(id -u):$(id -g)" "$MINIKUBE_HOME"
-
-    # 6) Wire up kubectl
-    kubectl config use-context minikube
-    kubectl get nodes -o name \
-      | xargs -I {} kubectl label {} --overwrite \
-          platform.neuromation.io/nodepool=minikube
-}
+     sudo chown -R "$(id -u):$(id -g)" "$MINIKUBE_HOME"
+     kubectl config use-context minikube
+     kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
+         platform.neuromation.io/nodepool=minikube
+ }
 
 
 function k8s::apply_all_configurations {
