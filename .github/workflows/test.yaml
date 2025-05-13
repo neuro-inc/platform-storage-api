@@ -68,8 +68,8 @@ jobs:
     name: Integration tests
     runs-on: ubuntu-latest
     env:
-      # keep Minikube state out of /home/runner
-      MINIKUBE_HOME: ${{ github.workspace }}/.minikube
+      # point pytest (and kubectl) at this file
+      KUBECONFIG: ${{ github.workspace }}/.kube/config
     steps:
     - name: Checkout commit
       uses: actions/checkout@v4
@@ -128,10 +128,9 @@ jobs:
         cat "$KUBECONFIG" || true
     - name: Dump kubeconfig for debugging
       run: |
-        echo ">>> KUBECONFIG=$KUBECONFIG"
-        echo "--- start of kubeconfig ---"
+        echo "KUBECONFIG=$KUBECONFIG"
+        echo "--- contents ---"
         cat "$KUBECONFIG" || true
-        echo "---- end of kubeconfig ----"
     - name: Pull test images
       run: make docker_pull_test_images
     - name: Setup services in minikube
