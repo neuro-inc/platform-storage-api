@@ -16,37 +16,29 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    # 1) Define workspace‐local home
-    : "${MINIKUBE_HOME:=${GITHUB_WORKSPACE:-$PWD}/.minikube}"
-    export MINIKUBE_HOME
-
-    # 2) Point kubectl at the workspace file
-    export KUBECONFIG=$MINIKUBE_HOME/.kube/config
+    # point kubectl (and minikube) at a workspace-local kubeconfig
+    export KUBECONFIG=${GITHUB_WORKSPACE:-$PWD}/.kube/config
     mkdir -p "$(dirname "$KUBECONFIG")"
 
-    export MINIKUBE_WANTUPDATENOTIFICATION=false
-    export MINIKUBE_WANTREPORTERRORPROMPT=false
-    export CHANGE_MINIKUBE_NONE_USER=true
+    # ensure conntrack is present (needed by minikube)
+    sudo apt-get update && sudo apt-get install -y conntrack
 
-    # 3) Run minikube under sudo _and_ inject the two vars so it really writes into your workspace
-    sudo env \
-      MINIKUBE_HOME="$MINIKUBE_HOME" \
-      KUBECONFIG="$KUBECONFIG" \
-      minikube start \
-        --home="$MINIKUBE_HOME" \
-        --kubeconfig="$KUBECONFIG" \
-        --driver=none \
-        --wait=all \
-        --wait-timeout=5m
+    # start Minikube in Docker mode (no sudo, no permission tricks)
+    minikube start \
+      --driver=docker \
+      --kubernetes-version=stable \
+      --kubeconfig="$KUBECONFIG" \
+      --wait=all \
+      --wait-timeout=5m
 
-    # 4) Hand ownership of everything back to the runner
-    sudo chown -R "$(id -u):$(id -g)" "$MINIKUBE_HOME"
+    # load your test image into Minikube’s Docker daemon
+    minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
 
-    # 5) Finalize kubectl context
+    # set the kubectl context
     kubectl config use-context minikube
-    kubectl get nodes -o name | \
-      xargs -I {} kubectl label {} --overwrite \
-        platform.neuromation.io/nodepool=minikube
+    kubectl get nodes -o name \
+      | xargs -I {} kubectl label {} --overwrite \
+          platform.neuromation.io/nodepool=minikube
 }
 
 
