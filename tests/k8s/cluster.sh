@@ -24,7 +24,6 @@ function k8s::start {
     export KUBECONFIG=$MINIKUBE_HOME/.kube/config
     mkdir -p "$(dirname "$KUBECONFIG")"
 
-
     export MINIKUBE_WANTUPDATENOTIFICATION=false
     export MINIKUBE_WANTREPORTERRORPROMPT=false
     export CHANGE_MINIKUBE_NONE_USER=true
