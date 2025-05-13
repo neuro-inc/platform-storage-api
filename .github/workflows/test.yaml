@@ -68,7 +68,7 @@ jobs:
     env:
       # keep Minikube state out of /home/runner
       MINIKUBE_HOME: ${{ github.workspace }}/.minikube
-      MINIKUBE_DRIVER: none
+      MINIKUBE_DRIVER: docker
     name: Integration tests
     runs-on: ubuntu-latest
     steps:
