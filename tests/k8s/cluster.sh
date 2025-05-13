@@ -6,8 +6,8 @@ set -euo pipefail
 # Config – override with env vars if you need
 # ---------------------------------------------------------------------------
 MINIKUBE_VERSION="${MINIKUBE_VERSION:-v1.35.0}"   # Jan 2025 LTS
-K8S_VERSION="${K8S_VERSION:-v1.32.0}"
-CRICTL_VERSION="${CRICTL_VERSION:-v1.32.0}"        # match K8s minor
+K8S_VERSION="${K8S_VERSION:-v1.32.0}"              # bundled with v1.35
+CRICTL_VERSION="${CRICTL_VERSION:-v1.32.0}"
 PROFILE="${MINIKUBE_PROFILE:-minikube}"
 WAIT_TIMEOUT="${MINIKUBE_WAIT_TIMEOUT:-5m}"
 DRIVER="none"
@@ -32,23 +32,27 @@ install_crictl() {
   fi
 
   log "Downloading crictl ${CRICTL_VERSION}"
-  ARCH=$(uname -m)
+  ARCH="$(uname -m)"
+  case "$ARCH" in
+    x86_64) ARCH=amd64 ;;
+    aarch64|arm64) ARCH=arm64 ;;
+  esac
   TAR="crictl-${CRICTL_VERSION}-linux-${ARCH}.tar.gz"
   URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/${TAR}"
-  curl -L "$URL" -o "/tmp/${TAR}"
-  with_sudo tar -C /usr/local/bin -xzf "/tmp/${TAR}"
+
+  curl -L --retry 3 -o "/tmp/${TAR}" "$URL"
+  with_sudo tar -C /usr/local/bin -xzf "/tmp/${TAR}" crictl
 }
 
 k8s::install_minikube() {
   need curl
   log "Installing Linux packages needed for the bare-metal driver…"
-  # Try to install cri-tools; ignore if the package is missing (Ubuntu 24.04)
   with_sudo apt-get update -y
   with_sudo apt-get install -y \
         conntrack socat iptables bridge-utils \
-        containernetworking-plugins cri-tools || true
+        containernetworking-plugins cri-tools || true   # cri-tools absent on 24.04
 
-  install_crictl
+  install_crictl                                          # fallback binary drop
 
   # Replace any older minikube binary
   if command -v minikube >/dev/null 2>&1; then
@@ -64,7 +68,8 @@ k8s::install_minikube() {
   fi
 
   log "Downloading Minikube $MINIKUBE_VERSION…"
-  curl -Lo /tmp/minikube "https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64"
+  curl -Lo /tmp/minikube \
+       "https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64"
   chmod +x /tmp/minikube
   with_sudo mv /tmp/minikube /usr/local/bin/minikube
   log "Minikube $(minikube version --short) installed."
@@ -126,10 +131,10 @@ k8s::apply() {
 # ---------------------------------------------------------------------------
 k8s::clean() {
   log "Deleting manifests…"
-  kubectl delete -f tests/k8s/postinstall-job.yaml           || true
+  kubectl delete -f tests/k8s/postinstall-job.yaml            || true
   kubectl delete -f tests/k8s/admission-controller-deployment.yaml || true
-  kubectl delete -f tests/k8s/preinstall-job.yaml            || true
-  kubectl delete -f tests/k8s/rbac.yaml                      || true
+  kubectl delete -f tests/k8s/preinstall-job.yaml             || true
+  kubectl delete -f tests/k8s/rbac.yaml                       || true
 }
 
 k8s::stop() {
@@ -140,7 +145,7 @@ k8s::stop() {
 }
 
 # ---------------------------------------------------------------------------
-# CLI entry-point
+# CLI
 # ---------------------------------------------------------------------------
 case "${1:-}" in
   install) k8s::install_minikube ;;
