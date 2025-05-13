@@ -100,11 +100,6 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ github.token }}
-    - name: Fix minikube home permissions
-      run: |
-        mkdir -p "$MINIKUBE_HOME"
-        sudo chown -R "$USER:$USER" "$MINIKUBE_HOME"
-        chmod -R u+rwX "$MINIKUBE_HOME"
     - name: Start minikube
       run: |
         make install_k8s
