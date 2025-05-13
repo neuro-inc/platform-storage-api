@@ -42,14 +42,7 @@ async def test__pod_without_volumes_will_raise_an_error(
     No volumes mounted to a pod
     """
     pod_spec: dict[str, Any] = {
-        "spec": {
-            "containers": [
-                {
-                    "volumeMounts": []
-                }
-            ],
-            "volumes": []
-        }
+        "spec": {"containers": [{"volumeMounts": []}], "volumes": []}
     }
     kube_api_with_nfs.get_pod = AsyncMock(return_value=pod_spec)
     with pytest.raises(VolumeResolverError) as e:
@@ -79,11 +72,7 @@ async def test__unsupported_volume_type_will_raise_an_error(
         }
     )
     kube_api_with_nfs.get_pv = AsyncMock(
-        return_value={
-            "spec": {
-                non_supported_backend: {}
-            }
-        }
+        return_value={"spec": {non_supported_backend: {}}}
     )
 
     with pytest.raises(VolumeResolverError) as e:
@@ -93,8 +82,10 @@ async def test__unsupported_volume_type_will_raise_an_error(
     expected_err = "No eligible volumes are mounted to this pod"
     assert expected_err == str(e.value)
 
-    assert logger_mock.info.call_args[0][0] == \
-           "volume did not produce any valid mapping: %s"
+    assert (
+        logger_mock.info.call_args[0][0]
+        == "volume did not produce any valid mapping: %s"
+    )
     assert logger_mock.info.call_args[0][1]["name"] == volume_name
 
 

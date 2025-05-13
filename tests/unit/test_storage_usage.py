@@ -44,7 +44,7 @@ def config() -> Config:
         ),
         kube=KubeConfig(
             endpoint_url="https://localhost:8443",
-        )
+        ),
     )
 
 

@@ -3,7 +3,7 @@ import json
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from itertools import count
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -38,9 +38,7 @@ async def _api(
 
     async def _init_app(app: web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
-            vr = await exit_stack.enter_async_context(
-                volume_resolver
-            )
+            vr = await exit_stack.enter_async_context(volume_resolver)
             app[VOLUME_RESOLVER_KEY] = vr
             app[STORAGE_KEY] = storage
             yield
@@ -74,8 +72,7 @@ async def host_path_api(
     storage: Storage,
 ) -> AsyncIterator[ApiConfig]:
     async with _api(
-        volume_resolver=volume_resolver_with_host_path,
-        storage=storage
+        volume_resolver=volume_resolver_with_host_path, storage=storage
     ) as api:
         yield api
 
@@ -120,20 +117,11 @@ class TestMutateApi:
         """
         Ensure a webhook will react only to a PODs requests.
         """
-        url = (
-            f"http://{api.host}:{api.port}/admission-controller/mutate"
-        )
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
 
         response = await self.http.post(
             url,
-            json={
-                "request": {
-                    "uid": str(uuid4()),
-                    "object": {
-                        "kind": "not-a-pod"
-                    }
-                }
-            }
+            json={"request": {"uid": str(uuid4()), "object": {"kind": "not-a-pod"}}},
         )
         await self._ensure_allowed(response)
 
@@ -156,20 +144,15 @@ class TestMutateApi:
         """
         No injection spec provided - this should be allowed.
         """
-        url = (
-            f"http://{api.host}:{api.port}/admission-controller/mutate"
-        )
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
             url,
             json={
                 "request": {
                     "uid": str(uuid4()),
-                    "object": {
-                        "kind": "Pod",
-                        "metadata": {}
-                    }
+                    "object": {"kind": "Pod", "metadata": {}},
                 }
-            }
+            },
         )
         await self._ensure_allowed(response)
 
@@ -212,20 +195,20 @@ class TestMutateApi:
                                 LABEL_APOLO_ORG_NAME: "org",
                                 LABEL_APOLO_PROJECT_NAME: "project",
                             },
-                            "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: "spec"
-                            }
+                            "annotations": {ANNOTATION_APOLO_INJECT_STORAGE: "spec"},
                         },
                         "spec": {
                             "containers": [],
-                        }
-                    }
+                        },
+                    },
                 }
-            }
+            },
         )
         await self._ensure_allowed(response)
-        assert logger_mock.info.call_args[0][0] == \
-               "POD won't be mutated because doesnt define containers"
+        assert (
+            logger_mock.info.call_args[0][0]
+            == "POD won't be mutated because doesnt define containers"
+        )
 
     async def test__nfs__pod_invalid_injection_spec(
         self,
@@ -250,9 +233,7 @@ class TestMutateApi:
         Ensure we'll disallow a creation of a POD if it defines the
         annotation, but such an annotation couldn't be properly validated
         """
-        url = (
-            f"http://{api.host}:{api.port}/admission-controller/mutate"
-        )
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
             url,
             json={
@@ -265,26 +246,18 @@ class TestMutateApi:
                                 LABEL_APOLO_ORG_NAME: "org",
                                 LABEL_APOLO_PROJECT_NAME: "project",
                             },
-                            "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: "spec"
-                            }
+                            "annotations": {ANNOTATION_APOLO_INJECT_STORAGE: "spec"},
                         },
                         "spec": {
-                            "containers": [
-                                {
-                                    "name": "container"
-                                }
-                            ],
-                        }
-                    }
+                            "containers": [{"name": "container"}],
+                        },
+                    },
                 }
-            }
+            },
         )
         expected_message = "injection spec is invalid"
         await self._ensure_not_allowed(
-            response,
-            code=422,
-            expected_message=expected_message
+            response, code=422, expected_message=expected_message
         )
         assert logger_mock.exception.call_args[0][0] == "injection spec is invalid"
 
@@ -311,9 +284,7 @@ class TestMutateApi:
         Ensure we'll disallow a creation of a POD if the org/proj pair
         doesn't correlate with the mounted path
         """
-        url = (
-            f"http://{api.host}:{api.port}/admission-controller/mutate"
-        )
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
             url,
             json={
@@ -324,33 +295,29 @@ class TestMutateApi:
                         "metadata": {
                             "labels": {
                                 LABEL_APOLO_ORG_NAME: "invalid-org",
-                                LABEL_APOLO_PROJECT_NAME: "invalid-proj"
+                                LABEL_APOLO_PROJECT_NAME: "invalid-proj",
                             },
                             "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
-                                    {
-                                        "mount_path": "/var/mount-volume",
-                                        "storage_uri": "storage://default/org/proj",
-                                        "mount_mode": "rw"
-                                    }
-                                ])
-                            }
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
+                                    [
+                                        {
+                                            "mount_path": "/var/mount-volume",
+                                            "storage_uri": "storage://default/org/proj",
+                                            "mount_mode": "rw",
+                                        }
+                                    ]
+                                )
+                            },
                         },
                         "spec": {
-                            "containers": [
-                                {
-                                    "name": "container"
-                                }
-                            ],
-                        }
-                    }
+                            "containers": [{"name": "container"}],
+                        },
+                    },
                 }
-            }
+            },
         )
         await self._ensure_not_allowed(
-            response,
-            code=403,
-            expected_message="org mismatch: `org`"
+            response, code=403, expected_message="org mismatch: `org`"
         )
 
     async def test__nfs__pod_project_label_mismatch(
@@ -376,9 +343,7 @@ class TestMutateApi:
         Ensure we'll disallow a creation of a POD if the org/proj pair
         doesn't correlate with the mounted path
         """
-        url = (
-            f"http://{api.host}:{api.port}/admission-controller/mutate"
-        )
+        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
             url,
             json={
@@ -389,33 +354,29 @@ class TestMutateApi:
                         "metadata": {
                             "labels": {
                                 LABEL_APOLO_ORG_NAME: "org",
-                                LABEL_APOLO_PROJECT_NAME: "invalid-proj"
+                                LABEL_APOLO_PROJECT_NAME: "invalid-proj",
                             },
                             "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
-                                    {
-                                        "mount_path": "/var/mount-volume",
-                                        "storage_uri": "storage://default/org/proj",
-                                        "mount_mode": "rw"
-                                    }
-                                ])
-                            }
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
+                                    [
+                                        {
+                                            "mount_path": "/var/mount-volume",
+                                            "storage_uri": "storage://default/org/proj",
+                                            "mount_mode": "rw",
+                                        }
+                                    ]
+                                )
+                            },
                         },
                         "spec": {
-                            "containers": [
-                                {
-                                    "name": "container"
-                                }
-                            ],
-                        }
-                    }
+                            "containers": [{"name": "container"}],
+                        },
+                    },
                 }
-            }
+            },
         )
         await self._ensure_not_allowed(
-            response,
-            code=403,
-            expected_message="project mismatch: `invalid-proj`"
+            response, code=403, expected_message="project mismatch: `invalid-proj`"
         )
 
     async def test__nfs__ensure_volumes_will_be_added(
@@ -427,8 +388,8 @@ class TestMutateApi:
             nfs_api,
             uuid_mock,
             volume_expected={
-                'nfs': {'path': '/var/exports/org/proj', 'server': '0.0.0.0'}
-            }
+                "nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}
+            },
         )
 
     async def test__host_path__ensure_volumes_will_be_added(
@@ -439,7 +400,7 @@ class TestMutateApi:
         return await self._test__ensure_volumes_will_be_added(
             host_path_api,
             uuid_mock,
-            volume_expected={'hostPath': {'path': '/var/exports/org/proj', 'type': ''}},
+            volume_expected={"hostPath": {"path": "/var/exports/org/proj", "type": ""}},
         )
 
     async def _test__ensure_volumes_will_be_added(
@@ -466,47 +427,43 @@ class TestMutateApi:
                                 LABEL_APOLO_PROJECT_NAME: "proj",
                             },
                             "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
-                                    {
-                                        "mount_path": "/var/mount-volume",
-                                        "storage_uri": "storage://default/org/proj",
-                                        "mount_mode": "rw"
-                                    }
-                                ])
-                            }
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
+                                    [
+                                        {
+                                            "mount_path": "/var/mount-volume",
+                                            "storage_uri": "storage://default/org/proj",
+                                            "mount_mode": "rw",
+                                        }
+                                    ]
+                                )
+                            },
                         },
                         "spec": {
-                            "containers": [
-                                {"name": "container"}
-                            ],
-                        }
-                    }
+                            "containers": [{"name": "container"}],
+                        },
+                    },
                 }
-            }
+            },
         )
         data = await self._ensure_allowed(response)
         expected_ops = [
             # add a blank volumes and a blank volume mounts for the first container.
             {"op": "add", "path": "/spec/volumes", "value": []},
-            {'op': 'add', 'path': '/spec/containers/0/volumeMounts', 'value': []},
-
+            {"op": "add", "path": "/spec/containers/0/volumeMounts", "value": []},
             # add an actual volumes and volumeMounts.
             {
-                'op': 'add',
-                'path': '/spec/volumes/-',
-                'value': {
-                    'name': 'storage-auto-injected-volume-1',
-                    **volume_expected
-                }
+                "op": "add",
+                "path": "/spec/volumes/-",
+                "value": {"name": "storage-auto-injected-volume-1", **volume_expected},
             },
             {
-                'op': 'add',
-                'path': '/spec/containers/0/volumeMounts/-',
-                'value': {
-                    'mountPath': '/var/mount-volume',
-                    'name': 'storage-auto-injected-volume-1'
-                }
-            }
+                "op": "add",
+                "path": "/spec/containers/0/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume",
+                    "name": "storage-auto-injected-volume-1",
+                },
+            },
         ]
 
         assert data["patch"] == expected_ops
@@ -520,8 +477,8 @@ class TestMutateApi:
             nfs_api,
             uuid_mock,
             volume_expected={
-                'nfs': {'path': '/var/exports/org/proj', 'server': '0.0.0.0'}
-            }
+                "nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}
+            },
         )
 
     async def test__host_path__resolve_single_volume(
@@ -532,7 +489,7 @@ class TestMutateApi:
         return await self._test__resolve_single_volume(
             host_path_api,
             uuid_mock,
-            volume_expected={'hostPath': {'path': '/var/exports/org/proj', 'type': ''}}
+            volume_expected={"hostPath": {"path": "/var/exports/org/proj", "type": ""}},
         )
 
     async def _test__resolve_single_volume(
@@ -561,46 +518,43 @@ class TestMutateApi:
                                 LABEL_APOLO_PROJECT_NAME: "proj",
                             },
                             "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
-                                    {
-                                        "mount_path": "/var/mount-volume",
-                                        "storage_uri": "storage://default/org/proj",
-                                        "mount_mode": "rw"
-                                    }
-                                ])
-                            }
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
+                                    [
+                                        {
+                                            "mount_path": "/var/mount-volume",
+                                            "storage_uri": "storage://default/org/proj",
+                                            "mount_mode": "rw",
+                                        }
+                                    ]
+                                )
+                            },
                         },
                         "spec": {
-                            "containers": [
-                                {
-                                    "name": "container",
-                                    "volumeMounts": []
-                                }
-                            ],
+                            "containers": [{"name": "container", "volumeMounts": []}],
                             "volumes": [],
-                        }
-                    }
+                        },
+                    },
                 }
-            }
+            },
         )
         data = await self._ensure_allowed(response)
         expected_ops = [
             {
-                'op': 'add',
-                'path': '/spec/volumes/-',
-                'value': {
-                    'name': 'storage-auto-injected-volume-1',
+                "op": "add",
+                "path": "/spec/volumes/-",
+                "value": {
+                    "name": "storage-auto-injected-volume-1",
                     **volume_expected,
-                }
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/containers/0/volumeMounts/-',
-                'value': {
-                    'mountPath': '/var/mount-volume',
-                    'name': 'storage-auto-injected-volume-1'
-                }
-            }
+                "op": "add",
+                "path": "/spec/containers/0/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume",
+                    "name": "storage-auto-injected-volume-1",
+                },
+            },
         ]
         assert data["patch"] == expected_ops
 
@@ -613,11 +567,11 @@ class TestMutateApi:
             nfs_api,
             uuid_mock,
             first_volume_expected={
-                'nfs': {'path': '/var/exports/org/proj/data1', 'server': '0.0.0.0'}
+                "nfs": {"path": "/var/exports/org/proj/data1", "server": "0.0.0.0"}
             },
             second_volume_expected={
-                'nfs': {'path': '/var/exports/org/proj/data2', 'server': '0.0.0.0'}
-            }
+                "nfs": {"path": "/var/exports/org/proj/data2", "server": "0.0.0.0"}
+            },
         )
 
     async def test__host_path__resolve_multiple_volumes(
@@ -629,10 +583,10 @@ class TestMutateApi:
             host_path_api,
             uuid_mock,
             first_volume_expected={
-                'hostPath': {'path': '/var/exports/org/proj/data1', 'type': ''}
+                "hostPath": {"path": "/var/exports/org/proj/data1", "type": ""}
             },
             second_volume_expected={
-                'hostPath': {'path': '/var/exports/org/proj/data2', 'type': ''}
+                "hostPath": {"path": "/var/exports/org/proj/data2", "type": ""}
             },
         )
 
@@ -661,72 +615,69 @@ class TestMutateApi:
                                 LABEL_APOLO_PROJECT_NAME: "proj",
                             },
                             "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
-                                    {
-                                        "mount_path": "/var/mount-volume",
-                                        "storage_uri": "storage://default/org/proj/data1",
-                                        "mount_mode": "rw"
-                                    },
-                                    {
-                                        "mount_path": "/var/mount-volume-2",
-                                        "storage_uri":
-                                            "storage://default/org/proj/data2",
-                                        "mount_mode": "r"
-                                    },
-                                ])
-                            }
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
+                                    [
+                                        {
+                                            "mount_path": "/var/mount-volume",
+                                            "storage_uri": "storage://default/org/proj/data1",
+                                            "mount_mode": "rw",
+                                        },
+                                        {
+                                            "mount_path": "/var/mount-volume-2",
+                                            "storage_uri": "storage://default/org/proj/data2",
+                                            "mount_mode": "r",
+                                        },
+                                    ]
+                                )
+                            },
                         },
                         "spec": {
-                            "containers": [
-                                {"name": "container"}
-                            ],
-                        }
-                    }
+                            "containers": [{"name": "container"}],
+                        },
+                    },
                 }
-            }
+            },
         )
 
         data = await self._ensure_allowed(response)
         expected_ops = [
-
             # since pod doesn't define volumes and mounts,
             # we expect to see those ops here
             {"op": "add", "path": "/spec/volumes", "value": []},
-            {'op': 'add', 'path': '/spec/containers/0/volumeMounts', 'value': []},
-
+            {"op": "add", "path": "/spec/containers/0/volumeMounts", "value": []},
             {
-                'op': 'add',
-                'path': '/spec/volumes/-',
-                'value': {
-                    'name': 'storage-auto-injected-volume-1',
-                    **first_volume_expected
-                }
+                "op": "add",
+                "path": "/spec/volumes/-",
+                "value": {
+                    "name": "storage-auto-injected-volume-1",
+                    **first_volume_expected,
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/containers/0/volumeMounts/-',
-                'value': {
-                    'mountPath': '/var/mount-volume',
-                    'name': 'storage-auto-injected-volume-1'
-                }
+                "op": "add",
+                "path": "/spec/containers/0/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume",
+                    "name": "storage-auto-injected-volume-1",
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/volumes/-',
-                'value': {
-                    'name': 'storage-auto-injected-volume-2',
+                "op": "add",
+                "path": "/spec/volumes/-",
+                "value": {
+                    "name": "storage-auto-injected-volume-2",
                     **second_volume_expected,
-                }
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/containers/0/volumeMounts/-',
-                'value': {
-                    'mountPath': '/var/mount-volume-2',
-                    'name': 'storage-auto-injected-volume-2',
-                    'readOnly': True
-                }
-            }
+                "op": "add",
+                "path": "/spec/containers/0/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume-2",
+                    "name": "storage-auto-injected-volume-2",
+                    "readOnly": True,
+                },
+            },
         ]
 
         assert data["patch"] == expected_ops
@@ -740,11 +691,11 @@ class TestMutateApi:
             nfs_api,
             uuid_mock,
             first_volume_expected={
-                'nfs': {'path': '/var/exports/org/proj/data1', 'server': '0.0.0.0'}
+                "nfs": {"path": "/var/exports/org/proj/data1", "server": "0.0.0.0"}
             },
             second_volume_expected={
-                'nfs': {'path': '/var/exports/org/proj/data2', 'server': '0.0.0.0'}
-            }
+                "nfs": {"path": "/var/exports/org/proj/data2", "server": "0.0.0.0"}
+            },
         )
 
     async def test__host_path__resolve_multiple_volumes_to_multiple_containers(
@@ -756,10 +707,10 @@ class TestMutateApi:
             host_path_api,
             uuid_mock,
             first_volume_expected={
-                'hostPath': {'path': '/var/exports/org/proj/data1', 'type': ''}
+                "hostPath": {"path": "/var/exports/org/proj/data1", "type": ""}
             },
             second_volume_expected={
-                'hostPath': {'path': '/var/exports/org/proj/data2', 'type': ''}
+                "hostPath": {"path": "/var/exports/org/proj/data2", "type": ""}
             },
         )
 
@@ -788,91 +739,89 @@ class TestMutateApi:
                                 LABEL_APOLO_PROJECT_NAME: "proj",
                             },
                             "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps([
-                                    {
-                                        "mount_path": "/var/mount-volume",
-                                        "storage_uri":
-                                            "storage://default/org/proj/data1",
-                                        "mount_mode": "rw"
-                                    },
-                                    {
-                                        "mount_path": "/var/mount-volume-2",
-                                        "storage_uri":
-                                            "storage://default/org/proj/data2",
-                                        "mount_mode": "r"
-                                    },
-                                ])
-                            }
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
+                                    [
+                                        {
+                                            "mount_path": "/var/mount-volume",
+                                            "storage_uri": "storage://default/org/proj/data1",
+                                            "mount_mode": "rw",
+                                        },
+                                        {
+                                            "mount_path": "/var/mount-volume-2",
+                                            "storage_uri": "storage://default/org/proj/data2",
+                                            "mount_mode": "r",
+                                        },
+                                    ]
+                                )
+                            },
                         },
                         "spec": {
                             "containers": [
                                 {"name": "container-1"},
                                 {"name": "container-2"},
                             ],
-                        }
-                    }
+                        },
+                    },
                 }
-            }
+            },
         )
 
         data = await self._ensure_allowed(response)
         expected_ops = [
-
             # volume mounts should be added to both containers
             {"op": "add", "path": "/spec/volumes", "value": []},
-            {'op': 'add', 'path': '/spec/containers/0/volumeMounts', 'value': []},
-            {'op': 'add', 'path': '/spec/containers/1/volumeMounts', 'value': []},
-
+            {"op": "add", "path": "/spec/containers/0/volumeMounts", "value": []},
+            {"op": "add", "path": "/spec/containers/1/volumeMounts", "value": []},
             {
-                'op': 'add',
-                'path': '/spec/volumes/-',
-                'value': {
-                    'name': 'storage-auto-injected-volume-1',
-                    **first_volume_expected
-                }
+                "op": "add",
+                "path": "/spec/volumes/-",
+                "value": {
+                    "name": "storage-auto-injected-volume-1",
+                    **first_volume_expected,
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/containers/0/volumeMounts/-',
-                'value': {
-                    'mountPath': '/var/mount-volume',
-                    'name': 'storage-auto-injected-volume-1'
-                }
+                "op": "add",
+                "path": "/spec/containers/0/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume",
+                    "name": "storage-auto-injected-volume-1",
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/containers/1/volumeMounts/-',
-                'value': {
-                    'mountPath': '/var/mount-volume',
-                    'name': 'storage-auto-injected-volume-1'
-                }
+                "op": "add",
+                "path": "/spec/containers/1/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume",
+                    "name": "storage-auto-injected-volume-1",
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/volumes/-',
-                'value': {
-                    'name': 'storage-auto-injected-volume-2',
-                    **second_volume_expected
-                }
+                "op": "add",
+                "path": "/spec/volumes/-",
+                "value": {
+                    "name": "storage-auto-injected-volume-2",
+                    **second_volume_expected,
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/containers/0/volumeMounts/-',
-                'value': {
-                    'mountPath': '/var/mount-volume-2',
-                    'name': 'storage-auto-injected-volume-2',
-                    'readOnly': True
-                }
+                "op": "add",
+                "path": "/spec/containers/0/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume-2",
+                    "name": "storage-auto-injected-volume-2",
+                    "readOnly": True,
+                },
             },
             {
-                'op': 'add',
-                'path': '/spec/containers/1/volumeMounts/-',
-                'value': {
-                    'mountPath': '/var/mount-volume-2',
-                    'name': 'storage-auto-injected-volume-2',
-                    'readOnly': True
-                }
-            }
+                "op": "add",
+                "path": "/spec/containers/1/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume-2",
+                    "name": "storage-auto-injected-volume-2",
+                    "readOnly": True,
+                },
+            },
         ]
 
         assert data["patch"] == expected_ops
@@ -895,8 +844,8 @@ class TestMutateApi:
     @staticmethod
     async def __ensure_success_response(
         response: ClientResponse,
-        code: Optional[int] = None,
-        expected_message: Optional[str] = None,
+        code: int | None = None,
+        expected_message: str | None = None,
     ) -> dict[str, Any]:
         assert response.status == 200
         data = await response.json()

@@ -80,9 +80,7 @@ class TestConfig:
         assert config.s3.bucket_name == "test-bucket"
 
     def test_from_environ_custom(
-        self,
-        cert_authority_path: str,
-        token_path: str
+        self, cert_authority_path: str, token_path: str
     ) -> None:
         environ = {
             "NP_STORAGE_MODE": "multiple",

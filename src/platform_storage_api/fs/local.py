@@ -12,10 +12,11 @@ from collections.abc import AsyncIterator, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from itertools import islice
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 import aiofiles
 
@@ -25,12 +26,12 @@ SCANDIR_CHUNK_SIZE = 100
 logger = logging.getLogger()
 
 
-class FileSystemException(Exception):
+class FileSystemException(Exception):  # noqa: N818
     pass
 
 
 # TODO (A Danshyn 04/23/18): likely should be revisited
-class StorageType(str, enum.Enum):
+class StorageType(StrEnum):
     LOCAL = "local"
     S3 = "s3"
 
@@ -55,13 +56,13 @@ class FileStatus:
     path: PurePath
     type: FileStatusType
     size: int
-    modification_time: Optional[int] = None
+    modification_time: int | None = None
     permission: FileStatusPermission = FileStatusPermission.READ
-    target: Optional[str] = None
+    target: str | None = None
 
     @classmethod
     def create_file_status(
-        cls, path: PurePath, size: int, modification_time: Optional[int] = None
+        cls, path: PurePath, size: int, modification_time: int | None = None
     ) -> "FileStatus":
         return cls(
             path=path,
@@ -72,7 +73,7 @@ class FileStatus:
 
     @classmethod
     def create_dir_status(
-        cls, path: PurePath, modification_time: Optional[int] = None
+        cls, path: PurePath, modification_time: int | None = None
     ) -> "FileStatus":
         return cls(
             path=path,
@@ -85,8 +86,8 @@ class FileStatus:
     def create_link_status(
         cls,
         path: PurePath,
-        modification_time: Optional[int] = None,
-        target: Optional[str] = None,
+        modification_time: int | None = None,
+        target: str | None = None,
     ) -> "FileStatus":
         return cls(
             path=path,
@@ -133,10 +134,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> Optional[bool]:
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         await self.close()
         return None
 
@@ -207,12 +208,12 @@ class LocalFileSystem(FileSystem):
     def __init__(
         self,
         *,
-        executor_max_workers: Optional[int] = None,
-        loop: Optional[asyncio.AbstractEventLoop] = None,
+        executor_max_workers: int | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
         **kwargs: Any,
     ) -> None:
         self._executor_max_workers = executor_max_workers
-        self._executor: Optional[ThreadPoolExecutor] = None
+        self._executor: ThreadPoolExecutor | None = None
 
         self._loop = loop or asyncio.get_event_loop()
 
@@ -233,7 +234,7 @@ class LocalFileSystem(FileSystem):
     def _open_safe_fd(
         self,
         name: str,
-        dirfd: Optional[int],
+        dirfd: int | None,
         orig_st: os.stat_result,
         flags: int = os.O_RDONLY,
     ) -> int:
@@ -248,7 +249,7 @@ class LocalFileSystem(FileSystem):
 
     @contextlib.contextmanager
     def _resolve_dir_fd(
-        self, path: PurePath, dirfd: Optional[int] = None
+        self, path: PurePath, dirfd: int | None = None
     ) -> Iterator[int]:
         try:
             for name in path.parts:
@@ -366,7 +367,7 @@ class LocalFileSystem(FileSystem):
         cls,
         path: PurePath,
         stat: os.stat_result,
-        target: Optional[str] = None,
+        target: str | None = None,
     ) -> "FileStatus":
         mod_time = int(stat.st_mtime)  # converting float to int
         return FileStatus.create_link_status(
@@ -456,7 +457,7 @@ class LocalFileSystem(FileSystem):
         except OSError:
             path_mode = "?"
 
-        parent_path = os.path.dirname(failed_path)
+        parent_path = os.path.dirname(failed_path)  # noqa: PTH120
         parent_path_access_ok = os.access(parent_path, os.W_OK)
         try:
             parent_path_mode = f"{os.stat(parent_path).st_mode:03o}"
@@ -473,7 +474,7 @@ class LocalFileSystem(FileSystem):
             parent_path_mode,
             parent_path_access_ok,
             str(e),
-            errno.errorcode.get(e.errno, e.errno),
+            errno.errorcode.get(e.errno, e.errno) if e.errno else "UNKNOWN",
         )
 
     def _iterremovechildren(
@@ -671,7 +672,7 @@ async def copy_streams(
     outstream: Any,
     instream: Any,
     *,
-    size: Optional[int] = None,
+    size: int | None = None,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
 ) -> None:
     """perform chunked copying of data between two streams.
@@ -698,7 +699,7 @@ _T = TypeVar("_T")
 
 async def sync_iterator_to_async(
     loop: asyncio.AbstractEventLoop,
-    executor: Optional[ThreadPoolExecutor],
+    executor: ThreadPoolExecutor | None,
     iter_: Iterable[_T],
     queue_size: int = 5000,
 ) -> AsyncIterator[_T]:
@@ -707,14 +708,14 @@ async def sync_iterator_to_async(
 
     chunk_size = max(queue_size / 20, 50)
 
-    queue: asyncio.Queue[Union[_T, EndMark, Exception]] = asyncio.Queue(queue_size)
+    queue: asyncio.Queue[_T | EndMark | Exception] = asyncio.Queue(queue_size)
 
-    async def put_to_queue(chunk: list[Union[_T, EndMark, Exception]]) -> None:
+    async def put_to_queue(chunk: list[_T | EndMark | Exception]) -> None:
         for item in chunk:
             await queue.put(item)
 
     def sync_runner() -> None:
-        chunk: list[Union[_T, EndMark, Exception]] = []
+        chunk: list[_T | EndMark | Exception] = []
         try:
             try:
                 for item in iter_:

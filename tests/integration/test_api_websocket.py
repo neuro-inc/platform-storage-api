@@ -4,7 +4,7 @@ import struct
 import uuid
 from collections.abc import Awaitable, Callable
 from time import time as current_time
-from typing import Any, Optional
+from typing import Any
 from unittest import mock
 
 import aiohttp
@@ -22,7 +22,7 @@ from .conftest_auth import _User, _UserFactory
 
 
 def ws_request(
-    op: WSStorageOperation, id_: int, path: Optional[str] = None, **kwargs: Any
+    op: WSStorageOperation, id_: int, path: str | None = None, **kwargs: Any
 ) -> bytes:
     payload = {"op": op, "id": id_, **kwargs}
     if path is not None:
@@ -239,7 +239,6 @@ class TestStorageWebSocket:
         client: aiohttp.ClientSession,
         regular_user_factory: _UserFactory,
     ) -> None:
-
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         base_path = f"/{user.name}/root-{uuid.uuid4()}"
