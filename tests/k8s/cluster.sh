@@ -1,34 +1,23 @@
 #!/usr/bin/env bash
-#
-# tests/k8s/cluster.sh – manage a bare-metal (“none” driver) Minikube cluster
-# Works both in GitHub Actions (Ubuntu 24.04 runners) and on a local Linux box.
-# Requires root for driver=none – the script sudo-es itself where required.
-#
-# Usage: ./cluster.sh {install|start|apply|clean|stop}
 set -euo pipefail
 [[ "${DEBUG:-}" == 1 ]] && set -x
 
 # ---------------------------------------------------------------------------
-# Configuration (override with env vars if you need a different version)
+# Config – override with env vars if you need
 # ---------------------------------------------------------------------------
-MINIKUBE_VERSION="${MINIKUBE_VERSION:-v1.35.0}"   # latest LTS (Jan 2025)
-K8S_VERSION="${K8S_VERSION:-v1.32.0}"             # newest supported by v1.35
+MINIKUBE_VERSION="${MINIKUBE_VERSION:-v1.35.0}"   # Jan 2025 LTS
+K8S_VERSION="${K8S_VERSION:-v1.32.0}"
+CRICTL_VERSION="${CRICTL_VERSION:-v1.32.0}"        # match K8s minor
 PROFILE="${MINIKUBE_PROFILE:-minikube}"
 WAIT_TIMEOUT="${MINIKUBE_WAIT_TIMEOUT:-5m}"
-DRIVER="none"                                     # hard-coded
+DRIVER="none"
 
-# Real user info (so we can chown kubeconfig back after sudo runs)
 REAL_USER="${SUDO_USER:-$USER}"
 REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
-
-# Minikube env required for driver=none
 export MINIKUBE_HOME="$REAL_HOME"
 export CHANGE_MINIKUBE_NONE_USER=true
 export KUBECONFIG="$REAL_HOME/.kube/config"
 
-# ---------------------------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------------------------
 log()       { printf '\e[1;34m▶ %s\e[0m\n' "$*"; }
 need()      { command -v "$1" >/dev/null 2>&1 || { echo "❌ $1 is required"; exit 1; }; }
 with_sudo() { if [[ "$(id -u)" -ne 0 ]]; then sudo "$@"; else "$@"; fi; }
@@ -36,13 +25,30 @@ with_sudo() { if [[ "$(id -u)" -ne 0 ]]; then sudo "$@"; else "$@"; fi; }
 # ---------------------------------------------------------------------------
 # 1 – Install / upgrade Minikube + runtime deps
 # ---------------------------------------------------------------------------
+install_crictl() {
+  if command -v crictl >/dev/null 2>&1; then
+    log "crictl $(crictl --version | awk '{print $3}')" already present
+    return 0
+  fi
+
+  log "Downloading crictl ${CRICTL_VERSION}"
+  ARCH=$(uname -m)
+  TAR="crictl-${CRICTL_VERSION}-linux-${ARCH}.tar.gz"
+  URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/${TAR}"
+  curl -L "$URL" -o "/tmp/${TAR}"
+  with_sudo tar -C /usr/local/bin -xzf "/tmp/${TAR}"
+}
+
 k8s::install_minikube() {
   need curl
   log "Installing Linux packages needed for the bare-metal driver…"
+  # Try to install cri-tools; ignore if the package is missing (Ubuntu 24.04)
   with_sudo apt-get update -y
   with_sudo apt-get install -y \
-      conntrack socat iptables bridge-utils \
-      containernetworking-plugins cri-tools >/dev/null
+        conntrack socat iptables bridge-utils \
+        containernetworking-plugins cri-tools || true
+
+  install_crictl
 
   # Replace any older minikube binary
   if command -v minikube >/dev/null 2>&1; then
@@ -85,7 +91,6 @@ k8s::start() {
       --wait=all \
       --wait-timeout="$WAIT_TIMEOUT"
 
-  # Give config dirs back to the invoking user
   with_sudo chown -R "$REAL_USER":"$REAL_USER" "$REAL_HOME/.kube" "$REAL_HOME/.minikube"
 
   log "Cluster is up"
@@ -121,10 +126,10 @@ k8s::apply() {
 # ---------------------------------------------------------------------------
 k8s::clean() {
   log "Deleting manifests…"
-  kubectl delete -f tests/k8s/postinstall-job.yaml          || true
+  kubectl delete -f tests/k8s/postinstall-job.yaml           || true
   kubectl delete -f tests/k8s/admission-controller-deployment.yaml || true
-  kubectl delete -f tests/k8s/preinstall-job.yaml           || true
-  kubectl delete -f tests/k8s/rbac.yaml                     || true
+  kubectl delete -f tests/k8s/preinstall-job.yaml            || true
+  kubectl delete -f tests/k8s/rbac.yaml                      || true
 }
 
 k8s::stop() {
