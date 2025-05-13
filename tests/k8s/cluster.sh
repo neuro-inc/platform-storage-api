@@ -14,36 +14,23 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    # 1) Force HOME into the workspace so ~/.kube/config == $GITHUB_WORKSPACE/.kube/config
-    local WS="${GITHUB_WORKSPACE:-$PWD}"
-    export HOME="$WS"
+    export KUBECONFIG=$HOME/.kube/config
+    mkdir -p $(dirname $KUBECONFIG)
+    touch $KUBECONFIG
 
-    # 2) Tell pytest (and kubectl) where we want the config file
-    export KUBECONFIG="$WS/.kube/config"
-    mkdir -p "$(dirname "$KUBECONFIG")"
+    export MINIKUBE_WANTUPDATENOTIFICATION=false
+    export MINIKUBE_WANTREPORTERRORPROMPT=false
+    export MINIKUBE_HOME=$HOME
+    export CHANGE_MINIKUBE_NONE_USER=true
 
-    # 3) Ensure conntrack is present
-    sudo apt-get update && sudo apt-get install -y conntrack
-
-    # 4) Start Minikube unprivileged with the Docker driver
-    minikube start \
-      --driver=docker \
-      --kubernetes-version=stable \
-      --wait=all \
-      --wait-timeout=5m
-
-    # 5) Dump the merged, raw kubeconfig into the exact file pytest will read
-    kubectl config view --raw > "$KUBECONFIG"
-
-    # 6) Load your test image (if needed)
-    minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
-
-    # 7) Finalize context & label the node
+    sudo -E minikube start \
+        --vm-driver=none \
+        --wait=all \
+        --wait-timeout=5m
     kubectl config use-context minikube
-    kubectl get nodes -o name \
-      | xargs -I {} kubectl label {} --overwrite \
-          platform.neuromation.io/nodepool=minikube
- }
+    kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
+        platform.neuromation.io/nodepool=minikube
+}
 
 function k8s::apply_all_configurations {
     echo "Applying configurations..."
