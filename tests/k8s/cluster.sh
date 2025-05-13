@@ -33,8 +33,14 @@ function k8s::start {
     export MINIKUBE_HOME=$HOME
     export CHANGE_MINIKUBE_NONE_USER=true
 
+    # 🔧 Fix permissions
+    sudo mkdir -p "$MINIKUBE_HOME"
+    sudo chown -R "$USER:$USER" "$MINIKUBE_HOME"
+    chmod -R u+wrx "$MINIKUBE_HOME"
+
     sudo -E minikube start \
-        --vm-driver=none \
+        --driver=none \
+        --container-runtime=containerd \
         --wait=all \
         --wait-timeout=5m
 
