@@ -32,6 +32,9 @@ function k8s::start {
         --driver=none \
         --wait=all \
         --wait-timeout=5m
+
+    # ← copy the config that minikube wrote under /root back into our workspace
+    sudo cp /root/.kube/config "$KUBECONFIG"
     sudo chown -R "$(id -u):$(id -g)" "$MINIKUBE_HOME"
     kubectl config use-context minikube
     kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
