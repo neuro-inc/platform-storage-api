@@ -16,21 +16,23 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    export KUBECONFIG=$HOME/.kube/config
-    mkdir -p $(dirname $KUBECONFIG)
-    touch $KUBECONFIG
++    # runner’s home (kept for later, $HOME will change under sudo)
+     local RUNNER_HOME=$HOME
+     export KUBECONFIG=$RUNNER_HOME/.kube/config
+     mkdir -p "$(dirname "$KUBECONFIG")"
+
 
     export MINIKUBE_WANTUPDATENOTIFICATION=false
     export MINIKUBE_WANTREPORTERRORPROMPT=false
-    export MINIKUBE_HOME=$HOME
+    export MINIKUBE_HOME=$RUNNER_HOME
     export CHANGE_MINIKUBE_NONE_USER=true
 
     sudo -E minikube start \
         --driver=none \
         --wait=all \
         --wait-timeout=5m
-    # make sure the runner can read the file minikube just wrote
-    sudo chown -R "$(id -u):$(id -g)" "$HOME/.kube" "$HOME/.minikube"
+    sudo cp /root/.kube/config "$KUBECONFIG"
+    sudo chown -R "$(id -u):$(id -g)" "$RUNNER_HOME/.kube" "$RUNNER_HOME/.minikube"
     kubectl config use-context minikube
     kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
         platform.neuromation.io/nodepool=minikube
