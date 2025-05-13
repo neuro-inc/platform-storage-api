@@ -1,53 +1,91 @@
 #!/usr/bin/env bash
+#
+# tests/k8s/cluster.sh – manage a bare-metal (“none” driver) Minikube cluster
+# Works both in GitHub Actions (Ubuntu 24.04 runners) and on a local Linux box.
+# Requires root for driver=none – the script sudo-es itself where required.
+#
+# Usage: ./cluster.sh {install|start|apply|clean|stop}
 set -euo pipefail
 [[ "${DEBUG:-}" == 1 ]] && set -x
 
-MINIKUBE_VERSION="${MINIKUBE_VERSION:-v1.35.0}"
-K8S_VERSION="${K8S_VERSION:-v1.32.0}"
+# ---------------------------------------------------------------------------
+# Configuration (override with env vars if you need a different version)
+# ---------------------------------------------------------------------------
+MINIKUBE_VERSION="${MINIKUBE_VERSION:-v1.35.0}"   # latest LTS (Jan 2025)
+K8S_VERSION="${K8S_VERSION:-v1.32.0}"             # newest supported by v1.35
 PROFILE="${MINIKUBE_PROFILE:-minikube}"
 WAIT_TIMEOUT="${MINIKUBE_WAIT_TIMEOUT:-5m}"
-DRIVER=none
+DRIVER="none"                                     # hard-coded
 
+# Real user info (so we can chown kubeconfig back after sudo runs)
 REAL_USER="${SUDO_USER:-$USER}"
 REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
+
+# Minikube env required for driver=none
 export MINIKUBE_HOME="$REAL_HOME"
 export CHANGE_MINIKUBE_NONE_USER=true
 export KUBECONFIG="$REAL_HOME/.kube/config"
 
-log() { printf '\e[1;34m▶ %s\e[0m\n' "$*"; }
-need() { command -v "$1" >/dev/null 2>&1 || { echo "❌ $1 is required"; exit 1; }; }
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+log()       { printf '\e[1;34m▶ %s\e[0m\n' "$*"; }
+need()      { command -v "$1" >/dev/null 2>&1 || { echo "❌ $1 is required"; exit 1; }; }
 with_sudo() { if [[ "$(id -u)" -ne 0 ]]; then sudo "$@"; else "$@"; fi; }
 
+# ---------------------------------------------------------------------------
+# 1 – Install / upgrade Minikube + runtime deps
+# ---------------------------------------------------------------------------
 k8s::install_minikube() {
   need curl
   log "Installing Linux packages needed for the bare-metal driver…"
   with_sudo apt-get update -y
-  with_sudo apt-get install -y conntrack socat iptables bridge-utils containernetworking-plugins >/dev/null
+  with_sudo apt-get install -y \
+      conntrack socat iptables bridge-utils \
+      containernetworking-plugins cri-tools >/dev/null
 
-  if ! command -v minikube >/dev/null; then
-    log "Downloading Minikube ${MINIKUBE_VERSION}"
-    curl -Lo /tmp/minikube "https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64"
-    chmod +x /tmp/minikube
-    with_sudo mv /tmp/minikube /usr/local/bin/minikube
+  # Replace any older minikube binary
+  if command -v minikube >/dev/null 2>&1; then
+    CURRENT="$(minikube version --short | sed 's/^v//')"
+    TARGET="$(echo "$MINIKUBE_VERSION" | sed 's/^v//')"
+    if [[ "$CURRENT" != "$TARGET" ]]; then
+      log "Replacing minikube $CURRENT → $TARGET"
+      with_sudo rm -f "$(command -v minikube)"
+    else
+      log "Minikube $CURRENT already present"
+      return 0
+    fi
   fi
+
+  log "Downloading Minikube $MINIKUBE_VERSION…"
+  curl -Lo /tmp/minikube "https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64"
+  chmod +x /tmp/minikube
+  with_sudo mv /tmp/minikube /usr/local/bin/minikube
   log "Minikube $(minikube version --short) installed."
 }
 
-k8s::start() {
+# ---------------------------------------------------------------------------
+# 2 – Kernel tweaks + cluster start
+# ---------------------------------------------------------------------------
+k8s::prepare_kernel() {
   with_sudo modprobe br_netfilter
   echo "net.bridge.bridge-nf-call-iptables=1" | with_sudo tee /etc/sysctl.d/99-k8s.conf >/dev/null
   with_sudo sysctl --system >/dev/null
+  with_sudo swapoff -a || true
+}
 
-  SUDO=(with_sudo)
+k8s::start() {
+  k8s::prepare_kernel
 
   log "Starting Minikube (driver=none)…"
-  "${SUDO[@]}" env "MINIKUBE_HOME=$MINIKUBE_HOME" minikube start \
-      --profile="${PROFILE}" \
-      --driver="${DRIVER}" \
-      --kubernetes-version="${K8S_VERSION}" \
+  with_sudo env "MINIKUBE_HOME=$MINIKUBE_HOME" minikube start \
+      --profile="$PROFILE" \
+      --driver="$DRIVER" \
+      --kubernetes-version="$K8S_VERSION" \
       --wait=all \
-      --wait-timeout="${WAIT_TIMEOUT}"
+      --wait-timeout="$WAIT_TIMEOUT"
 
+  # Give config dirs back to the invoking user
   with_sudo chown -R "$REAL_USER":"$REAL_USER" "$REAL_HOME/.kube" "$REAL_HOME/.minikube"
 
   log "Cluster is up"
@@ -55,6 +93,9 @@ k8s::start() {
   kubectl get nodes -o wide
 }
 
+# ---------------------------------------------------------------------------
+# 3 – Load test image & apply manifests
+# ---------------------------------------------------------------------------
 wait_job() {
   local job="$1"
   log "Waiting for job/$job to succeed (60 s)…"
@@ -75,26 +116,32 @@ k8s::apply() {
   wait_job admission-controller-lib-postinstall
 }
 
+# ---------------------------------------------------------------------------
+# 4 – Cleanup helpers
+# ---------------------------------------------------------------------------
 k8s::clean() {
   log "Deleting manifests…"
-  kubectl delete -f tests/k8s/postinstall-job.yaml || true
+  kubectl delete -f tests/k8s/postinstall-job.yaml          || true
   kubectl delete -f tests/k8s/admission-controller-deployment.yaml || true
-  kubectl delete -f tests/k8s/preinstall-job.yaml || true
-  kubectl delete -f tests/k8s/rbac.yaml || true
+  kubectl delete -f tests/k8s/preinstall-job.yaml           || true
+  kubectl delete -f tests/k8s/rbac.yaml                     || true
 }
 
 k8s::stop() {
   log "Stopping Minikube…"
-  with_sudo minikube stop --profile="$PROFILE" || true
+  with_sudo minikube stop   --profile="$PROFILE" || true
   with_sudo minikube delete --profile="$PROFILE" || true
   with_sudo rm -rf "$REAL_HOME/.minikube" "$REAL_HOME/.kube"
 }
 
+# ---------------------------------------------------------------------------
+# CLI entry-point
+# ---------------------------------------------------------------------------
 case "${1:-}" in
   install) k8s::install_minikube ;;
   start)   k8s::start ;;
   apply)   k8s::apply ;;
   clean)   k8s::clean ;;
   stop)    k8s::stop ;;
-  *) echo "Usage: $0 {install|start|apply|clean|stop}"; exit 1 ;;
+  *) echo "Usage: $0 {install|start|apply|clean|stop}" >&2; exit 1 ;;
 esac
