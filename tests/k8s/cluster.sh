@@ -16,6 +16,12 @@ function k8s::install_minikube {
 
     CONNTRACK_PATH=$(command -v conntrack)
     sudo ln -s "$CONNTRACK_PATH" /usr/bin/conntrack 2>/dev/null || true
+
+    # Install crictl (required for containerd)
+    curl -LO "https://github.com/kubernetes-sigs/cri-tools/releases/download/${crictl_version}/crictl-${crictl_version}-linux-amd64.tar.gz"
+    sudo tar -C /usr/local/bin -xzf "crictl-${crictl_version}-linux-amd64.tar.gz"
+    rm "crictl-${crictl_version}-linux-amd64.tar.gz"
+
     curl -Lo minikube https://storage.googleapis.com/minikube/releases/${minikube_version}/minikube-linux-amd64
     chmod +x minikube
     sudo mv minikube /usr/local/bin/
@@ -33,16 +39,23 @@ function k8s::start {
     export MINIKUBE_HOME=$HOME
     export CHANGE_MINIKUBE_NONE_USER=true
 
-    # 🔧 Fix permissions
-    sudo mkdir -p "$MINIKUBE_HOME"
-    sudo chown -R "$USER:$USER" "$MINIKUBE_HOME"
-    chmod -R u+wrx "$MINIKUBE_HOME"
-
-    sudo -E minikube start \
+    echo "Starting minikube..."
+    if ! sudo -E minikube start \
         --driver=none \
         --container-runtime=containerd \
         --wait=all \
-        --wait-timeout=5m
+        --wait-timeout=5m; then
+
+        echo "🔧 First start failed, fixing permissions and retrying..."
+        sudo chown -R "$USER:$USER" "$HOME/.minikube"
+        chmod -R u+rwX "$HOME/.minikube"
+
+        sudo -E minikube start \
+            --driver=none \
+            --container-runtime=containerd \
+            --wait=all \
+            --wait-timeout=5m
+    fi
 
     # 🔥 Immediately fail if minikube failed
     if ! minikube status | grep -q "host: Running"; then
