@@ -16,33 +16,23 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-    # 1) Force HOME into the workspace so ~/.kube/config ends up under $GITHUB_WORKSPACE
-    local WS=${GITHUB_WORKSPACE:-$PWD}
-    export HOME=$WS
+    export KUBECONFIG=$HOME/.kube/config
+    mkdir -p $(dirname $KUBECONFIG)
+    touch $KUBECONFIG
 
-    # 2) Tell kubectl and minikube where to put/read the config
-    export KUBECONFIG=$WS/.kube/config
-    mkdir -p "$(dirname "$KUBECONFIG")"
+    export MINIKUBE_WANTUPDATENOTIFICATION=false
+    export MINIKUBE_WANTREPORTERRORPROMPT=false
+    export MINIKUBE_HOME=$HOME
+    export CHANGE_MINIKUBE_NONE_USER=true
 
-    sudo apt-get update && sudo apt-get install -y conntrack
-
-    # 4) Start minikube in Docker mode (no sudo, writes to HOME/.kube/config)
-    minikube start \
-      --driver=docker \
-      --kubernetes-version=stable \
-      --wait=all \
-      --wait-timeout=5m
-
-    minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
-
+    sudo -E minikube start \
+        --vm-driver=none \
+        --wait=all \
+        --wait-timeout=5m
     kubectl config use-context minikube
-    kubectl get nodes -o name \
-      | xargs -I {} kubectl label {} --overwrite \
-          platform.neuromation.io/nodepool=minikube
+    kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
+        platform.neuromation.io/nodepool=minikube
 }
-
-
-
 
 function k8s::apply_all_configurations {
     echo "Applying configurations..."

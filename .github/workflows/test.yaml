@@ -68,7 +68,8 @@ jobs:
     name: Integration tests
     runs-on: ubuntu-latest
     env:
-      KUBECONFIG: ${{ github.workspace }}/.kube/config
+      # keep Minikube state out of /home/runner
+      MINIKUBE_HOME: ${{ github.workspace }}/.minikube
     steps:
     - name: Checkout commit
       uses: actions/checkout@v4
@@ -99,6 +100,11 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ github.token }}
+    - name: Fix minikube home permissions
+      run: |
+        mkdir -p "$MINIKUBE_HOME"
+        sudo chown -R "$USER:$USER" "$MINIKUBE_HOME"
+        chmod -R u+rwX "$MINIKUBE_HOME"
     - name: Start minikube
       run: |
         make install_k8s
