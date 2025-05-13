@@ -52,7 +52,7 @@ function k8s::start {
 
     echo "Starting minikube..."
     sudo -E minikube start \
-        --driver=none \
+        --driver=docker \
         --container-runtime=containerd \
         --wait=all \
         --wait-timeout=5m
