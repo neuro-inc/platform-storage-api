@@ -68,8 +68,7 @@ jobs:
     name: Integration tests
     runs-on: ubuntu-latest
     env:
-      # point pytest (and kubectl) at this file
-      KUBECONFIG: ${{ github.workspace }}/.kube/config
+      KUBECONFIG: $HOME/.kube/config
     steps:
     - name: Checkout commit
       uses: actions/checkout@v4
