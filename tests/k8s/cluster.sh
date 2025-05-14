@@ -13,7 +13,7 @@ MK="minikube kubectl --"                    # embedded kubectl shortcut
 # 1. Install Minikube + conntrack
 ###############################################################################
 k8s::install_minikube() {
-  local VER="v1.35.0"
+  local VER="v1.25.2"
   sudo apt-get update
   sudo apt-get install -y conntrack
   curl -Lo minikube "https://storage.googleapis.com/minikube/releases/${VER}/minikube-linux-amd64"
@@ -35,7 +35,7 @@ k8s::start() {
     --wait-timeout=5m
 
   # dump full kube-config for subsequent steps & pytest
-  $MK config view --raw > "$KUBECONFIG"
+  minikube -p minikube kubeconfig > "$KUBECONFIG"
 }
 
 ###############################################################################
