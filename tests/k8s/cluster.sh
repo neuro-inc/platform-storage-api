@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# shorthand for invoking Minikube’s embedded kubectl
-MK="minikube kubectl --"
-
+# Install Minikube in CI environment
 function k8s::install_minikube {
     local minikube_version="v1.25.2"
     sudo apt-get update
@@ -13,62 +11,47 @@ function k8s::install_minikube {
     sudo mv minikube /usr/local/bin/
 }
 
+# Start Minikube and make its kubeconfig available to tests
 function k8s::start {
-    # 1) write kubeconfig into the repo workspace
+    # Define where tests expect the kubeconfig
     export KUBECONFIG="${GITHUB_WORKSPACE:-$PWD}/.kube/config"
     mkdir -p "$(dirname "$KUBECONFIG")"
 
-    # 2) ensure conntrack
+    # Ensure conntrack is present
     sudo apt-get update && sudo apt-get install -y conntrack
 
-    # 3) start Minikube unprivileged with Docker driver
+    # Start Minikube unprivileged, Docker driver
     minikube start \
       --driver=docker \
       --kubernetes-version=stable \
       --wait=all \
       --wait-timeout=5m
 
-    # 4) dump the merged kubeconfig
-    $MK config view --raw > "$KUBECONFIG"
-
-    # 5) configure context & label node
-    $MK config use-context minikube
-    $MK get nodes -o name \
-      | xargs -I {} $MK label {} \
-          platform.neuromation.io/nodepool=minikube --overwrite
-
-    # 6) load test image
-    minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
+    # Copy the real config from the runner's home into the workspace file
+    cp "$HOME/.kube/config" "$KUBECONFIG"
 }
 
+# Apply all k8s manifests for integration tests
 function k8s::apply_all_configurations {
     echo "Applying Kubernetes configurations..."
-    # ensure we’re talking to the right cluster
-    $MK config use-context minikube
-
-    make dist
-    docker build -t admission-controller-tests:latest .
-    docker image save -o ac.tar admission-controller-tests:latest
-    minikube image load ac.tar
-
-    $MK apply -f tests/k8s/rbac.yaml
-    $MK apply -f tests/k8s/preinstall-job.yaml
+    kubectl --kubeconfig="$KUBECONFIG" apply -f tests/k8s/rbac.yaml
+    kubectl --kubeconfig="$KUBECONFIG" apply -f tests/k8s/preinstall-job.yaml
     wait_job admission-controller-lib-preinstall
-
-    $MK apply -f tests/k8s/admission-controller-deployment.yaml
-    $MK apply -f tests/k8s/postinstall-job.yaml
+    kubectl --kubeconfig="$KUBECONFIG" apply -f tests/k8s/admission-controller-deployment.yaml
+    kubectl --kubeconfig="$KUBECONFIG" apply -f tests/k8s/postinstall-job.yaml
     wait_job admission-controller-lib-postinstall
 }
 
+# Clean up k8s resources
 function k8s::clean {
     echo "Cleaning up Kubernetes resources..."
-    $MK config use-context minikube
-    $MK delete -f tests/k8s/postinstall-job.yaml
-    $MK delete -f tests/k8s/admission-controller-deployment.yaml
-    $MK delete -f tests/k8s/preinstall-job.yaml
-    $MK delete -f tests/k8s/rbac.yaml
+    kubectl --kubeconfig="$KUBECONFIG" delete -f tests/k8s/postinstall-job.yaml
+    kubectl --kubeconfig="$KUBECONFIG" delete -f tests/k8s/admission-controller-deployment.yaml
+    kubectl --kubeconfig="$KUBECONFIG" delete -f tests/k8s/preinstall-job.yaml
+    kubectl --kubeconfig="$KUBECONFIG" delete -f tests/k8s/rbac.yaml
 }
 
+# Stop and delete Minikube cluster data
 function k8s::stop {
     echo "Stopping Minikube..."
     minikube stop || true
@@ -77,24 +60,25 @@ function k8s::stop {
     rm -rf "${GITHUB_WORKSPACE:-$PWD}/.minikube"
 }
 
+# Wait for a job to complete
 function wait_job() {
     local JOB_NAME="$1"
     echo "Waiting up to 60s for job/$JOB_NAME to complete..."
-    if ! $MK wait \
+    if ! kubectl --kubeconfig="$KUBECONFIG" wait \
          --for=condition=complete \
          job/"$JOB_NAME" \
          --timeout=60s
     then
         echo "ERROR: Job '$JOB_NAME' did not complete in time."
-        echo "All events:"
-        $MK get events --sort-by=.metadata.creationTimestamp
+        echo "Events:"
+        kubectl --kubeconfig="$KUBECONFIG" get events --sort-by=.metadata.creationTimestamp
         exit 1
     fi
-
     echo "job/$JOB_NAME succeeded; logs:"
-    $MK logs -l app=admission-controller
+    kubectl --kubeconfig="$KUBECONFIG" logs -l app=admission-controller
 }
 
+# Entry point
 case "${1:-}" in
     install)
         k8s::install_minikube
