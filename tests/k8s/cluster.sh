@@ -119,7 +119,6 @@ function wait_job() {
 
 
 function k8s::apply {
-    export KUBECONFIG=$HOME/.kube/config
     minikube status
     k8s::apply_all_configurations
 }
