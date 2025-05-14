@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# k8s cluster management script for CI (GitHub Actions)
+# shorthand for invoking Minikube’s embedded kubectl
+MK="minikube kubectl --"
 
 # Install Minikube in CI environment
+echo "Installing Minikube..."
 function k8s::install_minikube {
     local minikube_version="v1.25.2"
     sudo apt-get update
@@ -13,62 +15,66 @@ function k8s::install_minikube {
     sudo mv minikube /usr/local/bin/
 }
 
-# Start Minikube cluster and expose kubeconfig for tests
+# Start Minikube cluster and write kubeconfig for tests
+echo "Starting Minikube..."
 function k8s::start {
-    # Force HOME into the workspace so Minikube writes config where we expect
+    # Force HOME into the workspace so Minikube writes ~/.kube/config there
     local WS="${GITHUB_WORKSPACE:-$PWD}"
     export HOME="$WS"
 
-    # Define kubeconfig path for pytest
+    # Define KUBECONFIG path for pytest and kubectl
     export KUBECONFIG="$WS/.kube/config"
     mkdir -p "$(dirname "$KUBECONFIG")"
 
     # Ensure conntrack is installed
     sudo apt-get update && sudo apt-get install -y conntrack
 
-    # Start Minikube unprivileged using Docker driver
+    # Start Minikube unprivileged with Docker driver
     minikube start \
       --driver=docker \
       --kubernetes-version=stable \
       --wait=all \
       --wait-timeout=5m
 
-    # Dump full kubeconfig via Minikube's embedded kubectl
-    minikube kubectl -- config view --raw > "$KUBECONFIG"
-
-    # Label the node for your tests
-    minikube kubectl -- label node minikube \
-        platform.neuromation.io/nodepool=minikube --overwrite
-
-    # Load test images into Minikube's Docker
-    minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
+    # Dump a full kubeconfig into the expected file
+    $MK config view --raw > "$KUBECONFIG"
 }
 
-# Apply all Kubernetes configurations for integration tests
+# Apply Kubernetes manifests for integration tests
+echo "Applying Kubernetes configurations..."
 function k8s::apply_all_configurations {
-    echo "Applying Kubernetes configurations..."
-    # Use Minikube's kubectl to operate against the cluster
-    minikube kubectl -- apply -f tests/k8s/rbac.yaml
-    minikube kubectl -- apply -f tests/k8s/preinstall-job.yaml
-    wait_job admission-controller-lib-preinstall
+    # Use the embedded kubectl to set context and label the node
+    $MK config use-context minikube
+    $MK label node minikube platform.neuromation.io/nodepool=minikube --overwrite
 
-    minikube kubectl -- apply -f tests/k8s/admission-controller-deployment.yaml
-    minikube kubectl -- apply -f tests/k8s/postinstall-job.yaml
+    # Load controller images into Minikube's Docker daemon and build test image
+    minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
+    make dist
+    docker build -t admission-controller-tests:latest .
+    docker image save -o ac.tar admission-controller-tests:latest
+    minikube image load ac.tar
+
+    # Apply RBAC, jobs, and deployments
+    $MK apply -f tests/k8s/rbac.yaml
+    $MK apply -f tests/k8s/preinstall-job.yaml
+    wait_job admission-controller-lib-preinstall
+    $MK apply -f tests/k8s/admission-controller-deployment.yaml
+    $MK apply -f tests/k8s/postinstall-job.yaml
     wait_job admission-controller-lib-postinstall
 }
 
 # Clean up Kubernetes resources
+echo "Cleaning up Kubernetes resources..."
 function k8s::clean {
-    echo "Cleaning up Kubernetes resources..."
-    minikube kubectl -- delete -f tests/k8s/postinstall-job.yaml || true
-    minikube kubectl -- delete -f tests/k8s/admission-controller-deployment.yaml || true
-    minikube kubectl -- delete -f tests/k8s/preinstall-job.yaml || true
-    minikube kubectl -- delete -f tests/k8s/rbac.yaml || true
+    $MK delete -f tests/k8s/postinstall-job.yaml || true
+    $MK delete -f tests/k8s/admission-controller-deployment.yaml || true
+    $MK delete -f tests/k8s/preinstall-job.yaml || true
+    $MK delete -f tests/k8s/rbac.yaml || true
 }
 
-# Stop and remove Minikube cluster
+# Stop and delete Minikube cluster
+echo "Stopping Minikube cluster..."
 function k8s::stop {
-    echo "Stopping Minikube..."
     minikube stop || true
     minikube delete || true
     rm -rf "${GITHUB_WORKSPACE:-$PWD}/.kube"
@@ -76,22 +82,22 @@ function k8s::stop {
 }
 
 # Wait for a Kubernetes Job to complete
+echo "Waiting for Kubernetes job completion..."
 function wait_job() {
     local JOB_NAME="$1"
     echo "Waiting up to 60s for job/$JOB_NAME to complete..."
-    if ! minikube kubectl -- wait \
+    if ! $MK wait \
          --for=condition=complete \
          job/"$JOB_NAME" \
          --timeout=60s
     then
         echo "ERROR: Job '$JOB_NAME' did not complete in time."
         echo "Events:"
-        minikube kubectl -- get events --sort-by=.metadata.creationTimestamp
+        $MK get events --sort-by=.metadata.creationTimestamp
         exit 1
     fi
-
     echo "job/$JOB_NAME succeeded; logs:"
-    minikube kubectl -- logs -l app=admission-controller
+    $MK logs -l app=admission-controller
 }
 
 # Entrypoint for k8s operations
