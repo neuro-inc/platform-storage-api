@@ -3,6 +3,14 @@ set -euo pipefail
 
 # k8s cluster management script for CI (GitHub Actions)
 
+# Define workspace and force HOME into the workspace so Minikube writes config there
+WS="${GITHUB_WORKSPACE:-$PWD}"
+export HOME="$WS"
+
+# Define kubeconfig path for pytest and kubectl
+export KUBECONFIG="$WS/.kube/config"
+mkdir -p "$(dirname "$KUBECONFIG")"
+
 # shorthand for invoking Minikube’s embedded kubectl
 MK="minikube kubectl --"
 
@@ -20,14 +28,8 @@ function k8s::install_minikube {
 # Start Minikube cluster and write kubeconfig for tests
 echo "Starting Minikube..."
 function k8s::start {
-    # Force HOME into the workspace so Minikube writes its config there
-    local WS="${GITHUB_WORKSPACE:-$PWD}"
-    export HOME="$WS"
-
-    # Prepare workspace kubeconfig path stub
-    local STUB="$WS/.kube/config"
-    rm -f "$STUB"
-    mkdir -p "$(dirname "$STUB")"
+    # Clean previous stub
+    rm -f "$KUBECONFIG"
 
     # Ensure conntrack is installed
     sudo apt-get update && sudo apt-get install -y conntrack
@@ -39,11 +41,8 @@ function k8s::start {
       --wait=all \
       --wait-timeout=5m
 
-    # Dump a complete kubeconfig using Minikube's embedded kubectl (ignore env KUBECONFIG)
-    (unset KUBECONFIG; $MK config view --raw > "$STUB")
-
-    # Export for downstream steps (pytest, kubectl)
-    export KUBECONFIG="$STUB"
+    # Dump a complete kubeconfig using Minikube's embedded kubectl
+    $MK config view --raw > "$KUBECONFIG"
 }
 
 # Apply Kubernetes manifests for integration tests
@@ -84,8 +83,8 @@ echo "Stopping Minikube cluster..."
 function k8s::stop {
     minikube stop || true
     minikube delete || true
-    rm -rf "${GITHUB_WORKSPACE:-$PWD}/.kube"
-    rm -rf "${GITHUB_WORKSPACE:-$PWD}/.minikube"
+    rm -rf "$WS/.kube"
+    rm -rf "$WS/.minikube"
 }
 
 # Wait for a Kubernetes Job to complete
