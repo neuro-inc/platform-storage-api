@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# k8s cluster management script for CI (GitHub Actions)
+
 # shorthand for invoking Minikube’s embedded kubectl
 MK="minikube kubectl --"
 
@@ -18,13 +20,14 @@ function k8s::install_minikube {
 # Start Minikube cluster and write kubeconfig for tests
 echo "Starting Minikube..."
 function k8s::start {
-    # Force HOME into the workspace so Minikube writes ~/.kube/config there
+    # Force HOME into the workspace so Minikube writes its config there
     local WS="${GITHUB_WORKSPACE:-$PWD}"
     export HOME="$WS"
 
-    # Define KUBECONFIG path for pytest and kubectl
-    export KUBECONFIG="$WS/.kube/config"
-    mkdir -p "$(dirname "$KUBECONFIG")"
+    # Prepare workspace kubeconfig path stub
+    local STUB="$WS/.kube/config"
+    rm -f "$STUB"
+    mkdir -p "$(dirname "$STUB")"
 
     # Ensure conntrack is installed
     sudo apt-get update && sudo apt-get install -y conntrack
@@ -36,28 +39,32 @@ function k8s::start {
       --wait=all \
       --wait-timeout=5m
 
-    # Dump a full kubeconfig into the expected file
-    $MK config view --raw > "$KUBECONFIG"
+    # Dump a complete kubeconfig using Minikube's embedded kubectl (ignore env KUBECONFIG)
+    (unset KUBECONFIG; $MK config view --raw > "$STUB")
+
+    # Export for downstream steps (pytest, kubectl)
+    export KUBECONFIG="$STUB"
 }
 
 # Apply Kubernetes manifests for integration tests
 echo "Applying Kubernetes configurations..."
 function k8s::apply_all_configurations {
-    # Use the embedded kubectl to set context and label the node
+    # Ensure context and label the node
     $MK config use-context minikube
     $MK label node minikube platform.neuromation.io/nodepool=minikube --overwrite
 
-    # Load controller images into Minikube's Docker daemon and build test image
+    # Load controller and test images
     minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
     make dist
     docker build -t admission-controller-tests:latest .
     docker image save -o ac.tar admission-controller-tests:latest
     minikube image load ac.tar
 
-    # Apply RBAC, jobs, and deployments
+    # Apply manifests and wait for jobs
     $MK apply -f tests/k8s/rbac.yaml
     $MK apply -f tests/k8s/preinstall-job.yaml
     wait_job admission-controller-lib-preinstall
+
     $MK apply -f tests/k8s/admission-controller-deployment.yaml
     $MK apply -f tests/k8s/postinstall-job.yaml
     wait_job admission-controller-lib-postinstall
