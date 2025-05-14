@@ -101,28 +101,6 @@ jobs:
       run: |
         make install_k8s
         make start_k8s
-    - name: Debug kubeconfig locations
-      run: |
-        # Show what HOME really is and list runner’s kube folder
-        echo "Runner HOME: $HOME"
-        echo "--- Runner ~/.kube dir ---"
-        ls -la "$HOME/.kube" || true
-
-        # Show the workspace path you’ve been using
-        echo "Workspace KUBECONFIG: $KUBECONFIG"
-        echo "--- Workspace .kube dir ---"
-        ls -la "$(dirname "$KUBECONFIG")" || true
-
-        # Dump both files if they exist
-        echo "--- cat runner ~/.kube/config ---"
-        cat "$HOME/.kube/config" || true
-        echo "--- cat workspace kubeconfig ---"
-        cat "$KUBECONFIG" || true
-    - name: Dump kubeconfig for debugging
-      run: |
-        echo "KUBECONFIG=$KUBECONFIG"
-        echo "--- contents ---"
-        cat "$KUBECONFIG" || true
     - name: Pull test images
       run: make docker_pull_test_images
     - name: Setup services in minikube
