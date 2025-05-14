@@ -1,106 +1,105 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-function k8s::install_minikube {
-    local minikube_version="v1.25.2"
-    sudo apt-get update
-    sudo apt-get install -y conntrack
-    curl -Lo minikube https://storage.googleapis.com/minikube/releases/${minikube_version}/minikube-linux-amd64
-    chmod +x minikube
-    sudo mv minikube /usr/local/bin/
+###############################################################################
+# Globals (shared across every function)
+###############################################################################
+WS="${GITHUB_WORKSPACE:-$PWD}"          # repo workspace
+export MINIKUBE_HOME="$WS/.minikube"    # keep state inside the repo dir
+export KUBECONFIG="$WS/.kube/config"    # pytest & kubectl will read this
+MK="minikube kubectl --"                # shortcut to embedded kubectl
+
+###############################################################################
+# 1. Install Minikube binary + conntrack
+###############################################################################
+k8s::install_minikube() {
+  local VER="v1.25.2"                   # pick a known-good version
+  sudo apt-get update
+  sudo apt-get install -y conntrack     # required by kubelet
+  curl -Lo minikube \
+    "https://storage.googleapis.com/minikube/releases/${VER}/minikube-linux-amd64"
+  chmod +x minikube
+  sudo mv minikube /usr/local/bin/
 }
 
-function k8s::start {
-    # Let Minikube manage the config by default
-    unset KUBECONFIG
+###############################################################################
+# 2. Start a Docker-driver Minikube cluster (no sudo)
+#    – writes ~/.kube/config inside $WS/.kube/config
+###############################################################################
+k8s::start() {
+  rm -rf "$MINIKUBE_HOME" "$WS/.kube"            # clean slate
+  mkdir -p  "$MINIKUBE_HOME" "$(dirname "$KUBECONFIG")"
 
-    # Optionally export if you want to use it later
-    export MINIKUBE_HOME="${GITHUB_WORKSPACE:-$PWD}/.minikube"
-    mkdir -p "$MINIKUBE_HOME"
+  # Spin up cluster unprivileged
+  minikube start \
+    --driver=docker \
+    --kubernetes-version=stable \
+    --wait=all \
+    --wait-timeout=5m
 
-    export MINIKUBE_WANTUPDATENOTIFICATION=false
-    export MINIKUBE_WANTREPORTERRORPROMPT=false
-    export CHANGE_MINIKUBE_NONE_USER=true
+  # Dump a complete kubeconfig for later steps / pytest
+  $MK config view --raw > "$KUBECONFIG"
 
-    sudo -E minikube start \
-        --driver=docker \
-        --wait=all \
-        --wait-timeout=5m
-
-    # Save kubeconfig for use in later steps
-    mkdir -p "$PWD/.kube"
-    minikube config view --format='{{.ConfigPath}}' | xargs cat > "$PWD/.kube/config"
-    export KUBECONFIG="$PWD/.kube/config"
-
-    kubectl config use-context minikube
-    kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
-        platform.neuromation.io/nodepool=minikube
+  # Label the single node (your tests expect this)
+  $MK label node minikube platform.neuromation.io/nodepool=minikube --overwrite
 }
 
-function k8s::apply_all_configurations {
-    echo "Applying configurations..."
-    kubectl config use-context minikube
+###############################################################################
+# 3. Apply all manifests & wait for pre/post-install jobs
+###############################################################################
+k8s::apply_all_configurations() {
+  echo "→ Loading test images into Minikube’s Docker ..."
+  minikube image load ghcr.io/neuro-inc/admission-controller-lib:latest
+  make dist                                 # your build step
+  docker build -t admission-controller-tests:latest .
+  docker image save -o ac.tar admission-controller-tests:latest
+  minikube image load ac.tar
 
-    make dist
-    docker build -t admission-controller-tests:latest .
-    docker image save -o ac.tar admission-controller-tests:latest
-    minikube image load ac.tar
-
-    kubectl apply -f tests/k8s/rbac.yaml
-    kubectl apply -f tests/k8s/preinstall-job.yaml
-    wait_job admission-controller-lib-preinstall
-    kubectl apply -f tests/k8s/admission-controller-deployment.yaml
-    kubectl apply -f tests/k8s/postinstall-job.yaml
-    wait_job admission-controller-lib-postinstall
+  echo "→ Applying RBAC + Jobs + Deployment ..."
+  $MK apply -f tests/k8s/rbac.yaml
+  $MK apply -f tests/k8s/preinstall-job.yaml
+  wait_job admission-controller-lib-preinstall
+  $MK apply -f tests/k8s/admission-controller-deployment.yaml
+  $MK apply -f tests/k8s/postinstall-job.yaml
+  wait_job admission-controller-lib-postinstall
 }
 
-function k8s::clean {
-    echo "Cleaning up..."
-    kubectl config use-context minikube
-    kubectl delete -f tests/k8s/postinstall-job.yaml || true
-    kubectl delete -f tests/k8s/admission-controller-deployment.yaml || true
-    kubectl delete -f tests/k8s/preinstall-job.yaml || true
-    kubectl delete -f tests/k8s/rbac.yaml || true
+###############################################################################
+# 4. Utility: wait for a Kubernetes Job to `Complete`
+###############################################################################
+wait_job() {
+  local JOB="$1"
+  echo "   waiting for job/$JOB ..."
+  if ! $MK wait --for=condition=complete job/"$JOB" --timeout=60s; then
+    echo "✖ job/$JOB did not finish in 60 s – dumping events"
+    $MK get events --sort-by=.metadata.creationTimestamp
+    exit 1
+  fi
+  echo "✓ job/$JOB succeeded"
 }
 
-function k8s::stop {
-    echo "Stopping Minikube..."
-    sudo -E minikube stop || true
-    sudo -E minikube delete || true
-    sudo rm -rf ~/.minikube
-    sudo rm -rf /root/.minikube
+###############################################################################
+# 5. Clean & Stop helpers (optional in CI but handy locally)
+###############################################################################
+k8s::clean() {
+  $MK delete -f tests/k8s/postinstall-job.yaml  || true
+  $MK delete -f tests/k8s/admission-controller-deployment.yaml || true
+  $MK delete -f tests/k8s/preinstall-job.yaml   || true
+  $MK delete -f tests/k8s/rbac.yaml             || true
 }
+k8s::stop()  { minikube stop  || true; minikube delete || true; }
 
-function wait_job() {
-    local job_name=$1
-    echo "Waiting for job $job_name to complete..."
-    if ! kubectl wait --for=condition=complete job/$job_name --timeout=60s; then
-        echo "ERROR: Job '$job_name' did not complete."
-        kubectl get events --sort-by=.metadata.creationTimestamp
-        exit 1
-    fi
-    echo "Job $job_name completed successfully"
-    kubectl logs -l app=admission-controller || true
-}
-
+###############################################################################
+# Dispatcher
+###############################################################################
 case "${1:-}" in
-    install)
-        k8s::install_minikube
-        ;;
-    start)
-        k8s::start
-        ;;
-    apply)
-        k8s::apply_all_configurations
-        ;;
-    clean)
-        k8s::clean
-        ;;
-    stop)
-        k8s::stop
-        ;;
-    *)
-        echo "Usage: $0 {install|start|apply|clean|stop}"
-        exit 1
-        ;;
+  install) k8s::install_minikube               ;;
+  start)   k8s::start                          ;;
+  apply)   k8s::apply_all_configurations       ;;
+  clean)   k8s::clean                          ;;
+  stop)    k8s::stop                           ;;
+  *)
+    echo "Usage: $0 {install|start|apply|clean|stop}" >&2
+    exit 1
+    ;;
 esac
