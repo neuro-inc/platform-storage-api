@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -o verbose
+set -o errexit
 
 # based on
 # https://github.com/kubernetes/minikube#linux-continuous-integration-without-vm-support
