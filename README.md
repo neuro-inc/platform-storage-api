@@ -53,4 +53,4 @@ make format
 
 Push new tag of form `vXX.XX.XX` where `XX.XX.XX` is semver version
 (please just use the date, like 20.12.31 for 31 December 2020).
-You can do this by using github "Create release" UI.
+You can do this by using GitHub "Create release" UI.
