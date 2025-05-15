@@ -38,7 +38,7 @@ export CLOUD_IMAGE_REPO=%link-to-docker-repo%
 The `%link-to-docker-repo%` links to repo with other services docker images.
 It depends on current setup. Please refer to onboarding guide to get it.
 
-Then you can run tests with next command:
+Then you can run tests with the next command:
 
 ```
 make test_integration
