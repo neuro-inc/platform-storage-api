@@ -66,13 +66,13 @@ select = [
     "G", "PIE", "T20", "PYI", "PT", "RET", "PTH"
 ]
 ignore = [
-    "PTH116",  # `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()
+    "PTH116", # `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()
     "PTH102", # `os.mkdir()` should be replaced by `Path.mkdir()
     "PTH104", # `os.rename()` should be replaced by `Path.rename()`
     "PTH106", # `os.rmdir()` should be replaced by `Path.rmdir()`
     "PTH108", # `os.unlink()` should be replaced by `Path.unlink()`
     "PTH115", # `os.readlink()` should be replaced by `Path.readlink()`
-    "FA100",  # Add `from __future__ import annotations` to simplify `typing.Union` (ignore until py 3.11)
+    "FA100", # Add `from __future__ import annotations` to simplify `typing.Union` (ignore until py 3.11)
     "UP007"   #  Use `X | Y` for type annotations (ignore until py 3.11)
 ]
 
@@ -150,8 +150,4 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "botocore.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "apolo_kube_client.*"
 ignore_missing_imports = true
