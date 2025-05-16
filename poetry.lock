@@ -273,14 +273,14 @@ trio = ["trio (>=0.26.1)"]
 
 [[package]]
 name = "apolo-kube-client"
-version = "25.2.6"
+version = "25.3.3"
 description = "Apolo internal client for kubernetes API"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "apolo_kube_client-25.2.6-py3-none-any.whl", hash = "sha256:c94d3349cf0b2e7c8e97cbac24c80942c00d9a36ec76c2fd27c245bb1014e507"},
-    {file = "apolo_kube_client-25.2.6.tar.gz", hash = "sha256:847d0a0e2eaf57e922edee3c9efe493f2ee0d4ebdad192b71d7bda6f3fc6c425"},
+    {file = "apolo_kube_client-25.3.3-py3-none-any.whl", hash = "sha256:cb1c0083e600647afdb54016955c38362912229d31ef3792dbd03ff3f592e6f2"},
+    {file = "apolo_kube_client-25.3.3.tar.gz", hash = "sha256:50ec3f17f975e369c98e4ebcc84c99a78a9cdaef8613e558026509bd04ace434"},
 ]
 
 [package.dependencies]
@@ -1147,14 +1147,14 @@ yarl = ">=1.10"
 
 [[package]]
 name = "neuro-auth-client"
-version = "22.6.1"
+version = "24.8.0"
 description = "Internal client for Neu.ro auth service"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "neuro-auth-client-22.6.1.tar.gz", hash = "sha256:706af001f5d7f7f5c8a1b82575b7caf8e399dd980d2dbf0413591f49520094dc"},
-    {file = "neuro_auth_client-22.6.1-py3-none-any.whl", hash = "sha256:39f408e9d8e8f73252d6ca353dd07d38380dff9c630f7653f92b2a834b98c26e"},
+    {file = "neuro_auth_client-24.8.0-py3-none-any.whl", hash = "sha256:913e64cfddb45243c2f616ed69a319d7d59385363606892bcb05d734b352d9cf"},
+    {file = "neuro_auth_client-24.8.0.tar.gz", hash = "sha256:b17d974955434f88edf4d30cac8f7ceadea4ede1919d41fa47f55907ac81a2c1"},
 ]
 
 [package.dependencies]
@@ -2528,4 +2528,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "a66d3fe51cbdb285f40d1b8080ac9c2ec1319338c006212eb46351cbcaa32524"
+content-hash = "8982281f82fb9524fba725556c8e40118be79939ebed2554ec639a47328d79f6"
