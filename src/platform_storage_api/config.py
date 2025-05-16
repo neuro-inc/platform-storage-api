@@ -82,7 +82,7 @@ class Config:
     platform: PlatformConfig
     s3: S3Config
     admission_controller_config: AdmissionControllerConfig
-    kube: KubeConfig
+    kube: KubeConfig | None = None
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
