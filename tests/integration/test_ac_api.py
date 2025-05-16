@@ -16,6 +16,7 @@ from platform_storage_api.admission_controller.api import (
     LABEL_APOLO_ORG_NAME,
     LABEL_APOLO_PROJECT_NAME,
     AdmissionControllerApi,
+    create_injection_volume_name,
 )
 from platform_storage_api.admission_controller.app_keys import (
     STORAGE_KEY,
@@ -557,6 +558,73 @@ class TestMutateApi:
             },
         ]
         assert data["patch"] == expected_ops
+
+    async def test__ensure_not_mutated_whenever_injected_volume_exists(
+        self,
+        nfs_api: ApiConfig,
+        uuid_mock: Mock,
+    ) -> None:
+        """
+        If container already defines an auto-injected volume,
+        such a pod shouldn't be mutated again
+        """
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+
+        existing_volume_name = create_injection_volume_name()
+
+        response = await self.http.post(
+            url,
+            json={
+                "request": {
+                    "uid": str(uuid4()),
+                    "object": {
+                        "kind": "Pod",
+                        "metadata": {
+                            "labels": {
+                                LABEL_APOLO_ORG_NAME: "org",
+                                LABEL_APOLO_PROJECT_NAME: "proj",
+                            },
+                            "annotations": {
+                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
+                                    [
+                                        {
+                                            "mount_path": "/var/mount-volume",
+                                            "storage_uri": "storage://default/org/proj",
+                                            "mount_mode": "rw",
+                                        }
+                                    ]
+                                )
+                            },
+                        },
+                        "spec": {
+                            "containers": [
+                                {
+                                    "name": "container",
+                                    "volumeMounts": [
+                                        {
+                                            "name": existing_volume_name,
+                                            "mountPath": "/var/mount-volume",
+                                            "readOnly": False,
+                                        }
+                                    ],
+                                }
+                            ],
+                            "volumes": [
+                                {
+                                    "name": existing_volume_name,
+                                    "nfs": {
+                                        "server": "0.0.0.0",
+                                        "path": "/share/org/proj",
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                }
+            },
+        )
+        data = await self._ensure_allowed(response)
+        assert "patch" not in data
 
     async def test__nfs__resolve_multiple_volumes(
         self,
