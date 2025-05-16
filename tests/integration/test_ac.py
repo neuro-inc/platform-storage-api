@@ -1,7 +1,8 @@
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -14,7 +15,6 @@ from platform_storage_api.admission_controller.api import (
     LABEL_APOLO_PROJECT_NAME,
 )
 
-
 # values are also defined at `tests/k8s/admission-controller-deployment.yaml`
 ACTUAL_HOST_PATH = "/tmp/mnt"
 ACTUAL_VOLUME_MOUNT_PATH = "/var/storage"
@@ -23,8 +23,8 @@ ACTUAL_VOLUME_MOUNT_PATH = "/var/storage"
 @asynccontextmanager
 async def pod_cm(
     kube_client: KubeClient,
-    annotations: Optional[dict[str, Any]] = None,
-    labels: Optional[dict[str, Any]] = None,
+    annotations: dict[str, Any] | None = None,
+    labels: dict[str, Any] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """
     A context manager for creating the pod, returning the response,
@@ -42,7 +42,7 @@ async def pod_cm(
                 {
                     "name": "hello",
                     "image": "busybox",
-                    "command": ["sh", "-c", "sleep 1"],
+                    "command": ["sh", "-c", "sleep 5"],
                 }
             ]
         },
@@ -58,6 +58,13 @@ async def pod_cm(
         url=url,
         json=payload,
     )
+
+    # wait until a POD is running
+    async with asyncio.timeout(60):
+        while (await kube_client.get(f"{url}/{pod_name}"))["status"][  # noqa ASYNC110
+            "phase"
+        ] != "Running":
+            await asyncio.sleep(0.1)
 
     yield response
 

@@ -3,11 +3,9 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path, PurePath
-from typing import Optional, Union
 
 from apolo_kube_client.client import KubeClientAuthType, KubeConfig
 from yarl import URL
-
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +23,15 @@ class StorageServerConfig(ServerConfig):
 
     @classmethod
     def from_environ(
-        cls, environ: Optional[dict[str, str]] = None
+        cls, environ: dict[str, str] | None = None
     ) -> "StorageServerConfig":
         return EnvironConfigFactory(environ).create_storage_server()
 
 
 @dataclass(frozen=True)
 class PlatformConfig:
-    auth_url: Optional[URL]
-    admin_url: Optional[URL]
+    auth_url: URL | None
+    admin_url: URL | None
     token: str = field(repr=False)
     cluster_name: str
 
@@ -51,7 +49,7 @@ class StorageConfig:
     mode: StorageMode = StorageMode.SINGLE
 
     @classmethod
-    def from_environ(cls, environ: Optional[dict[str, str]] = None) -> "StorageConfig":
+    def from_environ(cls, environ: dict[str, str] | None = None) -> "StorageConfig":
         return EnvironConfigFactory(environ).create_storage()
 
 
@@ -60,9 +58,9 @@ class S3Config:
     region: str
     bucket_name: str
     key_prefix: str = ""
-    access_key_id: Optional[str] = field(repr=False, default=None)
-    secret_access_key: Optional[str] = field(repr=False, default=None)
-    endpoint_url: Optional[str] = None
+    access_key_id: str | None = field(repr=False, default=None)
+    secret_access_key: str | None = field(repr=False, default=None)
+    endpoint_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -72,7 +70,7 @@ class AdmissionControllerConfig:
     @classmethod
     def from_environ(
         cls,
-        environ: Optional[dict[str, str]] = None,
+        environ: dict[str, str] | None = None,
     ) -> "AdmissionControllerConfig":
         return EnvironConfigFactory(environ).create_admission_controller()
 
@@ -84,12 +82,12 @@ class Config:
     platform: PlatformConfig
     s3: S3Config
     admission_controller_config: AdmissionControllerConfig
-    kube: Optional[KubeConfig] = None
+    kube: KubeConfig | None = None
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
 
     @classmethod
-    def from_environ(cls, environ: Optional[dict[str, str]] = None) -> "Config":
+    def from_environ(cls, environ: dict[str, str] | None = None) -> "Config":
         return EnvironConfigFactory(environ).create()
 
 
@@ -100,7 +98,7 @@ class MetricsConfig:
 
 
 class EnvironConfigFactory:
-    def __init__(self, environ: Optional[dict[str, str]] = None) -> None:
+    def __init__(self, environ: dict[str, str] | None = None) -> None:
         self._environ = environ or os.environ
 
     def create(self) -> Config:
@@ -129,7 +127,7 @@ class EnvironConfigFactory:
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
 
-    def _get_url(self, name: str) -> Optional[URL]:
+    def _get_url(self, name: str) -> URL | None:
         value = self._environ[name]
         return None if value == "-" else URL(value)
 
@@ -190,15 +188,14 @@ class EnvironConfigFactory:
             s3=self.create_s3(),
         )
 
-    def create_kube(self) -> Union[KubeConfig, None]:
+    def create_kube(self) -> KubeConfig | None:
         endpoint_url = self._environ.get("NP_STORAGE_API_K8S_API_URL")
         if not endpoint_url:
             logger.info("kube client won't be initialized due to a missing url")
             return None
         auth_type = KubeClientAuthType(
             self._environ.get(
-                "NP_STORAGE_API_K8S_AUTH_TYPE",
-                KubeConfig.auth_type.value
+                "NP_STORAGE_API_K8S_AUTH_TYPE", KubeConfig.auth_type.value
             )
         )
         ca_path = self._environ.get("NP_STORAGE_API_K8S_CA_PATH")
@@ -212,7 +209,8 @@ class EnvironConfigFactory:
             auth_type=auth_type,
             auth_cert_path=self._environ.get("NP_STORAGE_API_K8S_AUTH_CERT_PATH"),
             auth_cert_key_path=self._environ.get(
-                "NP_STORAGE_API_K8S_AUTH_CERT_KEY_PATH"),
+                "NP_STORAGE_API_K8S_AUTH_CERT_KEY_PATH"
+            ),
             token=None,
             token_path=token_path,
             namespace=self._environ.get("NP_STORAGE_API_K8S_NS", KubeConfig.namespace),
@@ -235,8 +233,9 @@ class EnvironConfigFactory:
         )
 
     def create_admission_controller(self) -> AdmissionControllerConfig:
-        cert_secret_name = \
-            self._environ["NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME"]
+        cert_secret_name = self._environ[
+            "NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME"
+        ]
         return AdmissionControllerConfig(
             cert_secret_name=cert_secret_name,
         )

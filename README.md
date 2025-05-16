@@ -38,7 +38,7 @@ export CLOUD_IMAGE_REPO=%link-to-docker-repo%
 The `%link-to-docker-repo%` links to repo with other services docker images.
 It depends on current setup. Please refer to onboarding guide to get it.
 
-Then you can run tests with next command:
+Then you can run tests with the next command:
 
 ```
 make test_integration
@@ -53,4 +53,4 @@ make format
 
 Push new tag of form `vXX.XX.XX` where `XX.XX.XX` is semver version
 (please just use the date, like 20.12.31 for 31 December 2020).
-You can do this by using github "Create release" UI.
+You can do this by using GitHub "Create release" UI.

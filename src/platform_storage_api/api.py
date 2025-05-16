@@ -6,16 +6,15 @@ import struct
 import time
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable
 from contextlib import AsyncExitStack
-from enum import Enum
+from enum import Enum, StrEnum
 from errno import errorcode
 from functools import partial
-from importlib.metadata import version
 from pathlib import PurePath
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import aiohttp.web
-import cbor
+import cbor2
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
@@ -24,6 +23,8 @@ from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import init_logging, setup_sentry
+
+from platform_storage_api import __version__
 
 from .cache import PermissionsCache
 from .config import Config
@@ -44,10 +45,6 @@ from .storage import (
     Storage,
     create_path_resolver,
 )
-
-
-uvloop.install()
-
 
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
 
@@ -70,7 +67,7 @@ class ApiHandler:
         return web.Response()
 
 
-class StorageOperation(str, Enum):
+class StorageOperation(StrEnum):
     """Represent all available operations on storage that are exposed via API.
 
     The CREATE operation handles opening files for writing.
@@ -335,7 +332,7 @@ class StorageHandler:
 
         raise web.HTTPOk
 
-    def _parse_operation(self, request: web.Request) -> Optional[StorageOperation]:
+    def _parse_operation(self, request: web.Request) -> StorageOperation | None:
         ops = []
 
         if "op" in request.query:
@@ -403,7 +400,7 @@ class StorageHandler:
                     break
                 try:
                     (hsize,) = struct.unpack("!I", msg.data[:4])
-                    payload = cbor.loads(msg.data[4:hsize])
+                    payload = cbor2.loads(msg.data[4:hsize])
                     op = payload["op"]
                     reqid = payload["id"]
                 except Exception as e:
@@ -442,7 +439,7 @@ class StorageHandler:
         write: bool,  # noqa: FBT001
         op: str,
         reqid: int,
-        path: str,
+        path: PurePath | str,
         payload: dict[str, Any],
         data: bytes,
     ) -> None:
@@ -499,7 +496,7 @@ class StorageHandler:
         data: bytes = b"",
     ) -> None:
         payload = {"op": op.value, **payload}
-        header = cbor.dumps(payload)
+        header = cbor2.dumps(payload)
         await ws.send_bytes(struct.pack("!I", len(header) + 4) + header + data)
 
     async def _ws_send_ack(
@@ -508,7 +505,7 @@ class StorageHandler:
         op: str,
         reqid: int,
         *,
-        result: Optional[dict[str, Any]] = None,
+        result: dict[str, Any] | None = None,
         data: bytes = b"",
     ) -> None:
         result = result or {}
@@ -521,7 +518,7 @@ class StorageHandler:
         op: str,
         reqid: int,
         errmsg: str,
-        errno: Optional[int] = None,
+        errno: int | None = None,
     ) -> None:
         payload = {
             "rop": op,
@@ -560,7 +557,7 @@ class StorageHandler:
             start = size = 0
         else:
             response.set_status(web.HTTPPartialContent.status_code)
-            response.headers["Content-Range"] = f"bytes {start}-{stop-1}/{fstat.size}"
+            response.headers["Content-Range"] = f"bytes {start}-{stop - 1}/{fstat.size}"
             response.content_length = size
         await response.prepare(request)
         await self._storage.retrieve(response, storage_path, start, size or None)
@@ -707,7 +704,7 @@ class StorageHandler:
         except IsADirectoryError as e:
             await handle_error("Target is a directory", e.errno)
         except OSError as e:
-            await handle_error(e.strerror, e.errno)
+            await handle_error(e.strerror or str(e), e.errno)
         except Exception as e:
             msg_str = _unknown_error_message(e, request)
             logging.exception(msg_str)
@@ -775,7 +772,7 @@ class StorageHandler:
 async def handle_error_if_streamed(
     response: web.StreamResponse,
     str_error: str,
-    errno: Optional[int] = None,
+    errno: int | None = None,
     error_class: type[web.HTTPError] = web.HTTPBadRequest,
 ) -> None:
     if response.prepared:
@@ -793,7 +790,7 @@ async def handle_error_if_streamed(
 def _http_exception(
     error_class: type[web.HTTPError],
     message: str,
-    errno: Optional[int] = None,
+    errno: int | None = None,
     **kwargs: Any,
 ) -> web.HTTPError:
     error_payload: dict[str, Any] = {"error": message, **kwargs}
@@ -849,11 +846,8 @@ def _get_bool_param(request: Request, name: str, default: bool = False) -> bool:
     raise ValueError(msg)
 
 
-package_version = version(__package__)
-
-
 async def add_version_to_header(request: Request, response: web.StreamResponse) -> None:
-    response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
+    response.headers["X-Service-Version"] = f"platform-storage-api/{__version__}"
 
 
 async def create_app(config: Config) -> web.Application:
@@ -930,6 +924,5 @@ def main() -> None:
         ignore_errors=[FileNotFoundError, web.HTTPBadRequest, web.HTTPNotFound],
     )
 
-    loop = asyncio.get_event_loop()
-    app = loop.run_until_complete(create_app(config))
+    app = uvloop.run(create_app(config))
     web.run_app(app, host=config.server.host, port=config.server.port)

@@ -4,11 +4,12 @@ import struct
 import uuid
 from collections.abc import Awaitable, Callable
 from time import time as current_time
-from typing import Any, Optional
+from typing import Any
 from unittest import mock
 
 import aiohttp
-import cbor
+import cbor2
+from aiohttp import ClientWSTimeout
 
 from platform_storage_api.api import WSStorageOperation
 from platform_storage_api.fs.local import FileStatusType
@@ -22,18 +23,18 @@ from .conftest_auth import _User, _UserFactory
 
 
 def ws_request(
-    op: WSStorageOperation, id_: int, path: Optional[str] = None, **kwargs: Any
+    op: WSStorageOperation, id_: int, path: str | None = None, **kwargs: Any
 ) -> bytes:
     payload = {"op": op, "id": id_, **kwargs}
     if path is not None:
         payload["path"] = path
-    header = cbor.dumps(payload)
+    header = cbor2.dumps(payload)
     return struct.pack("!I", len(header) + 4) + header
 
 
 def parse_ws_response(resp: bytes) -> dict[str, Any]:
     (hsize,) = struct.unpack("!I", resp[:4])
-    return cbor.loads(resp[4:hsize])
+    return cbor2.loads(resp[4:hsize])
 
 
 def get_ws_response_data(resp: bytes) -> bytes:
@@ -83,8 +84,9 @@ class TestStorageWebSocket:
         base_path = f"/{user.name}/root-{uuid.uuid4()}"
         rel_path = f"path/to/file-{uuid.uuid4()}"
 
+        ws_timeout = ClientWSTimeout(ws_receive=None, ws_close=10.0)
         async with client.ws_connect(
-            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers, timeout=10
+            f"{server_url}{base_path}?op=WEBSOCKET", headers=headers, timeout=ws_timeout
         ) as ws:
             await ws.send_bytes(ws_request(WSStorageOperation.STAT, 1, rel_path))
             resp = await ws.receive_bytes()
@@ -239,7 +241,6 @@ class TestStorageWebSocket:
         client: aiohttp.ClientSession,
         regular_user_factory: _UserFactory,
     ) -> None:
-
         user = await regular_user_factory()
         headers = {"Authorization": "Bearer " + user.token}
         base_path = f"/{user.name}/root-{uuid.uuid4()}"

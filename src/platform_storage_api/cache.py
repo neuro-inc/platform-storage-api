@@ -4,14 +4,12 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import PurePath
-from typing import Optional
 
 from aiohttp import web
 from aiohttp_security.api import IDENTITY_KEY
 from neuro_auth_client.client import ClientAccessSubTreeView
 
 from .security import AbstractPermissionChecker
-
 
 TimeFactory = Callable[[], float]
 PermissionsCacheKey = tuple[str, str]  # identity, path
@@ -65,7 +63,7 @@ class PermissionsCache(AbstractPermissionChecker):
 
     async def _get_user_permissions_tree_cached(  # noqa: C901
         self, request: web.Request, target_path: PurePath
-    ) -> Optional[ClientAccessSubTreeView]:
+    ) -> ClientAccessSubTreeView | None:
         self._cleanup_cache()
         stack = []
         identity = await self._get_identity(request)
@@ -114,7 +112,7 @@ class PermissionsCache(AbstractPermissionChecker):
             tree = sub_tree
         return tree
 
-    async def _get_identity(self, request: web.Request) -> Optional[str]:
+    async def _get_identity(self, request: web.Request) -> str | None:
         identity_policy = request.config_dict[IDENTITY_KEY]
         return await identity_policy.identify(request)
 

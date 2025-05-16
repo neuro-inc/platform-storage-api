@@ -12,9 +12,6 @@ from neuro_logging import init_logging, setup_sentry
 from platform_storage_api.admission_controller.app import create_app
 from platform_storage_api.config import Config
 
-
-uvloop.install()
-
 logger = logging.getLogger(__name__)
 
 
@@ -29,11 +26,9 @@ async def run() -> None:
     )
 
     # get the necessary certificates from the secrets
-    async with kube_client_from_config(config=config.kube) as kube:
+    async with kube_client_from_config(config=config.kube) as kube:  # type: ignore[arg-type]
         cert_secret_name = config.admission_controller_config.cert_secret_name
-        response = await kube.get(
-            f"{kube.namespace_url}/secrets/{cert_secret_name}"
-        )
+        response = await kube.get(f"{kube.namespace_url}/secrets/{cert_secret_name}")
         secrets = response["data"]
         tls_key = secrets["tls.key"]
         tls_cert = secrets["tls.crt"]
@@ -74,7 +69,7 @@ async def run() -> None:
 
 def main() -> None:
     try:
-        asyncio.run(run())
+        uvloop.run(run())
     except KeyboardInterrupt:
         pass
 

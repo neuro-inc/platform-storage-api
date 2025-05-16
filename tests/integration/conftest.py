@@ -32,7 +32,6 @@ from platform_storage_api.s3_storage import StorageMetricsAsyncS3Storage
 from platform_storage_api.storage import SingleStoragePathResolver
 from platform_storage_api.storage_usage import StorageUsageService
 
-
 pytest_plugins = [
     "tests.integration.conftest_docker",
     "tests.integration.conftest_auth",

@@ -10,7 +10,6 @@ from platform_storage_api.config import (
     StorageServerConfig,
 )
 
-
 CA_DATA_PEM = "this-is-certificate-authority-public-key"
 TOKEN = "this-is-token"
 
@@ -80,9 +79,7 @@ class TestConfig:
         assert config.s3.bucket_name == "test-bucket"
 
     def test_from_environ_custom(
-        self,
-        cert_authority_path: str,
-        token_path: str
+        self, cert_authority_path: str, token_path: str
     ) -> None:
         environ = {
             "NP_STORAGE_MODE": "multiple",
