@@ -9,7 +9,6 @@ from typing import Any
 from aiohttp import web
 from pydantic import BaseModel, TypeAdapter, field_validator
 
-
 SCHEMA_STORAGE = "storage://"
 
 

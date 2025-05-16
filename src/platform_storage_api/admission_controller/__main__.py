@@ -12,7 +12,6 @@ from neuro_logging import init_logging, setup_sentry
 from platform_storage_api.admission_controller.app import create_app
 from platform_storage_api.config import Config
 
-
 uvloop.install()
 
 logger = logging.getLogger(__name__)

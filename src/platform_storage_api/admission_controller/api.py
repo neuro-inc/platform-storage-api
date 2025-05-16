@@ -20,7 +20,6 @@ from platform_storage_api.admission_controller.volume_resolver import (
 )
 from platform_storage_api.storage import Storage
 
-
 logger = logging.getLogger(__name__)
 
 ANNOTATION_APOLO_INJECT_STORAGE = "platform.apolo.us/inject-storage"

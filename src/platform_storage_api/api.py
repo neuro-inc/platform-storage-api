@@ -9,7 +9,6 @@ from contextlib import AsyncExitStack
 from enum import Enum, StrEnum
 from errno import errorcode
 from functools import partial
-from importlib.metadata import version
 from pathlib import PurePath
 from typing import Any
 
@@ -24,6 +23,8 @@ from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import init_logging, setup_sentry
+
+from platform_storage_api import __version__
 
 from .cache import PermissionsCache
 from .config import Config
@@ -44,7 +45,6 @@ from .storage import (
     Storage,
     create_path_resolver,
 )
-
 
 uvloop.install()
 
@@ -849,11 +849,8 @@ def _get_bool_param(request: Request, name: str, default: bool = False) -> bool:
     raise ValueError(msg)
 
 
-package_version = version(__package__)
-
-
 async def add_version_to_header(request: Request, response: web.StreamResponse) -> None:
-    response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
+    response.headers["X-Service-Version"] = f"platform-storage-api/{__version__}"
 
 
 async def create_app(config: Config) -> web.Application:

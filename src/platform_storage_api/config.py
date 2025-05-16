@@ -7,7 +7,6 @@ from pathlib import Path, PurePath
 from apolo_kube_client.client import KubeClientAuthType, KubeConfig
 from yarl import URL
 
-
 logger = logging.getLogger(__name__)
 
 

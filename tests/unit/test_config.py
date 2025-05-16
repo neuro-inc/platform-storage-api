@@ -10,7 +10,6 @@ from platform_storage_api.config import (
     StorageServerConfig,
 )
 
-
 CA_DATA_PEM = "this-is-certificate-authority-public-key"
 TOKEN = "this-is-token"
 

@@ -15,7 +15,6 @@ from platform_storage_api.admission_controller.api import (
     LABEL_APOLO_PROJECT_NAME,
 )
 
-
 # values are also defined at `tests/k8s/admission-controller-deployment.yaml`
 ACTUAL_HOST_PATH = "/tmp/mnt"
 ACTUAL_VOLUME_MOUNT_PATH = "/var/storage"

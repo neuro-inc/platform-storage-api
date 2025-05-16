@@ -20,7 +20,6 @@ from .s3_storage import StorageMetricsAsyncS3Storage
 from .storage import create_path_resolver
 from .storage_usage import StorageUsageService
 
-
 LOGGER = logging.getLogger(__name__)
 
 

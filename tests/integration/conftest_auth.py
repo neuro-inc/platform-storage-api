@@ -15,7 +15,6 @@ from neuro_auth_client import AuthClient, User
 from pytest_docker.plugin import Services
 from yarl import URL
 
-
 logger = logging.getLogger(__name__)
 
 

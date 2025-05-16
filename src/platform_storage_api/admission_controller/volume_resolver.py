@@ -12,7 +12,6 @@ from apolo_kube_client.client import KubeClient
 from platform_storage_api.config import AdmissionControllerConfig
 from platform_storage_api.storage import StoragePathResolver
 
-
 logger = logging.getLogger(__name__)
 
 
