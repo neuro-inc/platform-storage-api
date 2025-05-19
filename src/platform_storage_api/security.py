@@ -11,7 +11,6 @@ from yarl import URL
 
 from .config import Config
 
-
 logger = logging.getLogger(__name__)
 
 AUTH_CLIENT_KEY = web.AppKey("auth_client", AuthClient)

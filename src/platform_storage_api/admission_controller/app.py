@@ -19,7 +19,6 @@ from platform_storage_api.config import Config, KubeConfig
 from platform_storage_api.fs.local import LocalFileSystem
 from platform_storage_api.storage import Storage, create_path_resolver
 
-
 logger = logging.getLogger(__name__)
 
 

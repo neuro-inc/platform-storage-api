@@ -9,13 +9,12 @@ from contextlib import AsyncExitStack
 from enum import Enum, StrEnum
 from errno import errorcode
 from functools import partial
-from importlib.metadata import version
 from pathlib import PurePath
 from typing import Any
 
 import aiohttp
 import aiohttp.web
-import cbor
+import cbor2
 import uvloop
 from aiohttp import web
 from aiohttp.web_request import Request
@@ -24,6 +23,8 @@ from neuro_auth_client import AuthClient
 from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import init_logging, setup_sentry
+
+from platform_storage_api import __version__
 
 from .cache import PermissionsCache
 from .config import Config
@@ -44,10 +45,6 @@ from .storage import (
     Storage,
     create_path_resolver,
 )
-
-
-uvloop.install()
-
 
 # TODO (A Danshyn 04/23/18): investigate chunked encoding
 
@@ -403,7 +400,7 @@ class StorageHandler:
                     break
                 try:
                     (hsize,) = struct.unpack("!I", msg.data[:4])
-                    payload = cbor.loads(msg.data[4:hsize])
+                    payload = cbor2.loads(msg.data[4:hsize])
                     op = payload["op"]
                     reqid = payload["id"]
                 except Exception as e:
@@ -499,7 +496,7 @@ class StorageHandler:
         data: bytes = b"",
     ) -> None:
         payload = {"op": op.value, **payload}
-        header = cbor.dumps(payload)
+        header = cbor2.dumps(payload)
         await ws.send_bytes(struct.pack("!I", len(header) + 4) + header + data)
 
     async def _ws_send_ack(
@@ -849,11 +846,8 @@ def _get_bool_param(request: Request, name: str, default: bool = False) -> bool:
     raise ValueError(msg)
 
 
-package_version = version(__package__)
-
-
 async def add_version_to_header(request: Request, response: web.StreamResponse) -> None:
-    response.headers["X-Service-Version"] = f"platform-storage-api/{package_version}"
+    response.headers["X-Service-Version"] = f"platform-storage-api/{__version__}"
 
 
 async def create_app(config: Config) -> web.Application:
@@ -930,6 +924,5 @@ def main() -> None:
         ignore_errors=[FileNotFoundError, web.HTTPBadRequest, web.HTTPNotFound],
     )
 
-    loop = asyncio.get_event_loop()
-    app = loop.run_until_complete(create_app(config))
+    app = uvloop.run(create_app(config))
     web.run_app(app, host=config.server.host, port=config.server.port)

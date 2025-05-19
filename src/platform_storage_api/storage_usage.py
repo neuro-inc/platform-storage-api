@@ -16,7 +16,6 @@ from .config import Config, S3Config
 from .fs.local import FileStatusType, FileSystem
 from .storage import StoragePathResolver
 
-
 UTC = UTC
 
 if TYPE_CHECKING:

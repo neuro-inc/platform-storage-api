@@ -20,7 +20,6 @@ from platform_storage_api.admission_controller.volume_resolver import (
 )
 from platform_storage_api.storage import Storage
 
-
 logger = logging.getLogger(__name__)
 
 ANNOTATION_APOLO_INJECT_STORAGE = "platform.apolo.us/inject-storage"
@@ -161,6 +160,16 @@ class AdmissionControllerApi:
         if not containers:
             logger.info("POD won't be mutated because doesnt define containers")
             return False
+
+        # check if this is not a reinvocation.
+        # if any volume was auto-injected earlier - we shouldn't proceed with this again
+        for container in containers:
+            if "volumeMounts" not in container:
+                continue
+
+            for volume_mount in container["volumeMounts"]:
+                if volume_mount.get("name", "").startswith(INJECTED_VOLUME_NAME_PREFIX):
+                    return False
 
         return True
 
