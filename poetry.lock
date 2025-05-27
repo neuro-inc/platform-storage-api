@@ -278,14 +278,14 @@ trio = ["trio (>=0.26.1)"]
 
 [[package]]
 name = "apolo-kube-client"
-version = "25.3.3"
+version = "25.5.0"
 description = "Apolo internal client for kubernetes API"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "apolo_kube_client-25.3.3-py3-none-any.whl", hash = "sha256:cb1c0083e600647afdb54016955c38362912229d31ef3792dbd03ff3f592e6f2"},
-    {file = "apolo_kube_client-25.3.3.tar.gz", hash = "sha256:50ec3f17f975e369c98e4ebcc84c99a78a9cdaef8613e558026509bd04ace434"},
+    {file = "apolo_kube_client-25.5.0-py3-none-any.whl", hash = "sha256:f347b528a0091db1e0daca409905116fc22486435681668a8584f02af44f0070"},
+    {file = "apolo_kube_client-25.5.0.tar.gz", hash = "sha256:5eeb5946e2602e5d149ae8c4c597104e288d471859cd8e1d6e848b4e4dc6c66c"},
 ]
 
 [package.dependencies]
@@ -2533,4 +2533,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "40698bd0c58017740ed586a2f8bb3fc736668d57971cb95f7c2ebcea9d40c46d"
+content-hash = "bdf77530a46d35842fa686504e42bf0e928e75b106a6e8ce1b239428ada870fd"
