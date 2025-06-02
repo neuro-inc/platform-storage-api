@@ -33,7 +33,7 @@ neuro-auth-client = "25.5.1"
 neuro-logging = "25.1.0"
 prometheus-client = "0.22.0"
 pydantic = "2.11.5"
-uvicorn = "0.34.2"
+uvicorn = "0.34.3"
 uvloop = "0.21.0"
 
 [tool.poetry.scripts]
