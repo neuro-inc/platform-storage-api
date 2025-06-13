@@ -907,6 +907,11 @@ async def create_app(config: Config) -> web.Application:
     api_v1_app.add_subapp("/storage", storage_app)
     app.add_subapp("/api/v1", api_v1_app)
 
+    async def handle_ping(request: web.Request) -> web.Response:
+        return aiohttp.web.Response(text="Pong")
+
+    app.router.add_get("/ping", handle_ping)
+
     app.on_response_prepare.append(add_version_to_header)
 
     logger.info("Storage API has been initialized, ready to serve.")
