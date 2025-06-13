@@ -34,14 +34,14 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         livenessProbe:
           httpGet:
-            path: /api/v1/ping
+            path: /ping
             port: http
           initialDelaySeconds: 10
           timeoutSeconds: 60
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /api/v1/ping
+            path: /ping
             port: http
           initialDelaySeconds: 10
           periodSeconds: 10
