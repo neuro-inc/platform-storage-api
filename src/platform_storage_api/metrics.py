@@ -7,6 +7,7 @@ import botocore.client
 import botocore.config
 import botocore.session
 from fastapi import FastAPI
+from fastapi.responses import Response
 from neuro_logging import init_logging
 from prometheus_client import CollectorRegistry, make_asgi_app
 
@@ -40,6 +41,10 @@ def create_app(config: MetricsConfig) -> Iterator[FastAPI]:
         app = FastAPI(debug=False)
 
         app.mount("/metrics", metrics_app)
+
+        @app.get("/ping")
+        async def ping() -> Response:
+            return Response("Pong")
 
         yield app
 

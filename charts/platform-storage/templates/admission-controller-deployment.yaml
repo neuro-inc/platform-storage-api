@@ -25,6 +25,21 @@ spec:
       - name: admission-controller
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: http
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          timeoutSeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: http
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 10
         command:
           - platform-storage-admission-controller
         ports:
