@@ -4,7 +4,7 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path, PurePath
-from typing import Any, Union
+from typing import Any, cast
 
 from neuro_logging import trace, trace_cm
 
@@ -62,7 +62,7 @@ class Storage:
         self._fs = fs
         self._path_resolver = path_resolver
 
-    def sanitize_path(self, path: Union[str, "os.PathLike[str]"]) -> PurePath:
+    def sanitize_path(self, path: str | os.PathLike[str]) -> PurePath:
         """
         Sanitize path - it shall in the end depend on the implementation of the
         underlying storage subsystem, while now put it here.
@@ -132,7 +132,7 @@ class Storage:
         await self._fs.mkdir(real_path.parent)
         async with self._fs.open(real_path, "rb") as f:
             await f.seek(offset)
-            return await f.read(size)
+            return cast(bytes, await f.read(size))
 
     @asynccontextmanager
     async def iterstatus(

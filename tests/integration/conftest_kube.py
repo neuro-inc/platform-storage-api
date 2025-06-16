@@ -2,7 +2,7 @@ import json
 import subprocess
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from apolo_kube_client.client import KubeClient
@@ -15,7 +15,7 @@ def kube_config_payload() -> dict[str, Any]:
         ["kubectl", "config", "view", "-o", "json"], stdout=subprocess.PIPE
     )
     payload_str = result.stdout.decode().rstrip()
-    return json.loads(payload_str)
+    return cast(dict[str, Any], json.loads(payload_str))
 
 
 @pytest.fixture(scope="session")

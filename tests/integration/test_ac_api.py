@@ -3,7 +3,7 @@ import json
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from itertools import count
-from typing import Any
+from typing import Any, cast
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -925,4 +925,4 @@ class TestMutateApi:
         patch_data = data["response"].get("patch")
         if patch_data:
             data["response"]["patch"] = json.loads(base64.b64decode(patch_data))
-        return data["response"]
+        return cast(dict[str, Any], data["response"])

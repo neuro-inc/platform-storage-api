@@ -5,6 +5,7 @@ from typing import cast
 
 from aiohttp import web
 from apolo_kube_client.client import kube_client_from_config
+from apolo_kube_client.config import KubeConfig
 
 from platform_storage_api.admission_controller.api import AdmissionControllerApi
 from platform_storage_api.admission_controller.app_keys import (
@@ -15,7 +16,7 @@ from platform_storage_api.admission_controller.volume_resolver import (
     KubeApi,
     KubeVolumeResolver,
 )
-from platform_storage_api.config import Config, KubeConfig
+from platform_storage_api.config import Config
 from platform_storage_api.fs.local import LocalFileSystem
 from platform_storage_api.storage import Storage, create_path_resolver
 

@@ -4,7 +4,7 @@ import struct
 import uuid
 from collections.abc import Awaitable, Callable
 from time import time as current_time
-from typing import Any
+from typing import Any, cast
 from unittest import mock
 
 import aiohttp
@@ -34,7 +34,7 @@ def ws_request(
 
 def parse_ws_response(resp: bytes) -> dict[str, Any]:
     (hsize,) = struct.unpack("!I", resp[:4])
-    return cbor2.loads(resp[4:hsize])
+    return cast(dict[str, Any], cbor2.loads(resp[4:hsize]))
 
 
 def get_ws_response_data(resp: bytes) -> bytes:
