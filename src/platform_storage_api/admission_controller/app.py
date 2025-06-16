@@ -62,4 +62,9 @@ async def create_app(config: Config) -> web.Application:
 
     app.add_subapp("/admission-controller", admission_controller_app)
 
+    async def handle_ping(req: web.Request) -> web.Response:
+        return web.Response(text="Pong")
+
+    app.router.add_get("/ping", handle_ping)
+
     return app
