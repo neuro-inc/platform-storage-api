@@ -5,13 +5,14 @@ from collections.abc import AsyncIterable, AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import aiobotocore.client
 import aiohttp
 import pytest
 import pytest_asyncio
 import uvicorn
+from apolo_kube_client.config import KubeConfig
 from neuro_admin_client import AdminClient
 from yarl import URL
 
@@ -19,7 +20,6 @@ from platform_storage_api.api import create_app
 from platform_storage_api.config import (
     AdmissionControllerConfig,
     Config,
-    KubeConfig,
     MetricsConfig,
     PlatformConfig,
     S3Config,
@@ -167,11 +167,11 @@ async def status_iter_response_to_list(
 
 
 def get_liststatus_dict(response_json: dict[str, Any]) -> list[Any]:
-    return response_json["FileStatuses"]["FileStatus"]
+    return cast(list[Any], response_json["FileStatuses"]["FileStatus"])
 
 
 def get_filestatus_dict(response_json: dict[str, Any]) -> dict[str, Any]:
-    return response_json["FileStatus"]
+    return cast(dict[str, Any], response_json["FileStatus"])
 
 
 @pytest.fixture

@@ -166,7 +166,7 @@ class StorageHandler:
     def _create_response(self, fstat: FileStatus) -> web.StreamResponse:
         response = web.StreamResponse()
         response.content_length = fstat.size
-        response.last_modified = fstat.modification_time  # type: ignore
+        response.last_modified = fstat.modification_time
         response.headers["X-File-Type"] = str(fstat.type)
         response.headers["X-File-Permission"] = fstat.permission.value
         if fstat.type == FileStatusType.FILE:

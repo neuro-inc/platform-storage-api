@@ -6,7 +6,7 @@ import os
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 import pytest
@@ -38,7 +38,7 @@ _TokenFactory = Callable[[str], str]
 def token_factory() -> _TokenFactory:
     def _factory(name: str) -> str:
         payload = {"identity": name}
-        return jwt.encode(payload, "secret", algorithm="HS256")
+        return cast(str, jwt.encode(payload, "secret", algorithm="HS256"))
 
     return _factory
 
@@ -56,7 +56,7 @@ def cluster_token(token_factory: Callable[[str], str]) -> str:
 @pytest.fixture
 def no_claim_token(auth_jwt_secret: str) -> str:
     payload: dict[str, Any] = {}
-    return jwt.encode(payload, auth_jwt_secret, algorithm="HS256")
+    return cast(str, jwt.encode(payload, auth_jwt_secret, algorithm="HS256"))
 
 
 @pytest.fixture

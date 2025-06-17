@@ -11,10 +11,10 @@ from neuro_auth_client.client import ClientAccessSubTreeView
 from neuro_auth_client.security import IdentityPolicy
 
 from platform_storage_api.cache import (
-    AbstractPermissionChecker,
     PermissionsCache,
     TimeFactory,
 )
+from platform_storage_api.security import AbstractPermissionChecker
 
 P = PurePath
 

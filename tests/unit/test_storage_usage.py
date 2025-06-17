@@ -5,13 +5,13 @@ from unittest import mock
 
 import pytest
 from aioresponses import aioresponses
+from apolo_kube_client.config import KubeConfig
 from neuro_admin_client import AdminClient
 from yarl import URL
 
 from platform_storage_api.config import (
     AdmissionControllerConfig,
     Config,
-    KubeConfig,
     PlatformConfig,
     S3Config,
     StorageConfig,
