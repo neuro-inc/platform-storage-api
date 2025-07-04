@@ -98,7 +98,12 @@ metrics:
 admissionController:
   serviceName: "storage-admission-controller"
   webhookPath: "/admission-controller/mutate"
-  namespaceSelector: {}
+  namespaceSelector:
+    matchExpressions:
+      - key: platform.apolo.us/org
+        operator: Exists
+      - key: platform.apolo.us/project
+        operator: Exists
   objectSelector:
     matchLabels:
       platform.apolo.us/inject-storage: "true"
