@@ -18,7 +18,7 @@ packages = [{ include = "platform_storage_api", from = "src" }]
 include = ["src/platform_storage_api/__init__.py"]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4.0"
+python = ">=3.13,<4.0"
 urllib3 = ">=1.26.11,<1.27"
 aiobotocore = "2.23.0"
 aiodns = "3.5.0"
@@ -27,7 +27,7 @@ aiohttp = ">=3.11.18,<3.13"
 apolo-kube-client = "25.6.0"
 cbor2 = "5.6.5"
 charset-normalizer = "3.4.2"
-fastapi = "0.115.14"
+fastapi = "0.116.0"
 neuro-admin-client = "25.5.0"
 neuro-auth-client = "25.5.1"
 neuro-logging = "25.6.0"
