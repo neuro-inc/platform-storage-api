@@ -16,7 +16,7 @@ from enum import StrEnum
 from itertools import islice
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import Any, TypeVar
+from typing import Any
 
 import aiofiles
 
@@ -693,28 +693,25 @@ async def copy_streams(
             await instream.write(chunk)
 
 
-_T = TypeVar("_T")
-
-
-async def sync_iterator_to_async(
+async def sync_iterator_to_async[T](
     loop: asyncio.AbstractEventLoop,
     executor: ThreadPoolExecutor | None,
-    iter_: Iterable[_T],
+    iter_: Iterable[T],
     queue_size: int = 5000,
-) -> AsyncIterator[_T]:
+) -> AsyncIterator[T]:
     class EndMark:
         pass
 
     chunk_size = max(queue_size / 20, 50)
 
-    queue: asyncio.Queue[_T | EndMark | Exception] = asyncio.Queue(queue_size)
+    queue: asyncio.Queue[T | EndMark | Exception] = asyncio.Queue(queue_size)
 
-    async def put_to_queue(chunk: list[_T | EndMark | Exception]) -> None:
+    async def put_to_queue(chunk: list[T | EndMark | Exception]) -> None:
         for item in chunk:
             await queue.put(item)
 
     def sync_runner() -> None:
-        chunk: list[_T | EndMark | Exception] = []
+        chunk: list[T | EndMark | Exception] = []
         try:
             try:
                 for item in iter_:
