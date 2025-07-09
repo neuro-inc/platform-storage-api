@@ -19,7 +19,7 @@ include = ["src/platform_storage_api/__init__.py"]
 
 [tool.poetry.dependencies]
 python = ">=3.13,<4.0"
-urllib3 = ">=1.26.11,<1.27"
+urllib3 = ">=1.26.11,<2.6"
 aiobotocore = "2.23.0"
 aiodns = "3.5.0"
 aiofiles = "24.1.0"
