@@ -892,10 +892,12 @@ async def create_app(config: Config) -> web.Application:
             # TODO here we shall test whether secured-ping works as well
             # TODO in a spin loop we shall do that
 
+            logger.info("Initializing ProjectDeleter")
             deleter = await exit_stack.enter_async_context(
                 ProjectDeleter(storage, config.events)
             )
 
+            logger.info("All initialization is done")
             yield
 
             logger.info("Finish app")
