@@ -247,5 +247,5 @@ class EnvironConfigFactory:
         if "NP_STORAGE_EVENTS_URL" in self._environ:
             url = URL(self._environ["NP_STORAGE_EVENTS_URL"])
             token = self._environ["NP_STORAGE_EVENTS_TOKEN"]
-            return EventsClientConfig(url=url, token=token)
+            return EventsClientConfig(url=url, token=token, name="platform-storage")
         return None
