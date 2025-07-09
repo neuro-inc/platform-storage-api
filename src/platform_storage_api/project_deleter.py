@@ -34,3 +34,5 @@ class ProjectDeleter:
         if ev.event_type == self.PROJECT_REMOVE:
             path = "{ev.org}/{ev.project}"
             await self._storage.remove(path, recursive=True)
+
+            await self._client.ack({self.ADMIN_STREAM: [ev.tag]})
