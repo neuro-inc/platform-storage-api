@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import logging
 from collections.abc import AsyncIterator
 
 import aiohttp
@@ -13,6 +14,8 @@ from apolo_events_client import (
 )
 from pytest_aiohttp import AiohttpServer
 from yarl import URL
+
+log = logging.getLogger()
 
 
 @dataclasses.dataclass
@@ -52,7 +55,8 @@ async def events_server(
     app.router.add_get("/apis/events/v1/stream", stream)
 
     srv = await aiohttp_server(app)
-    return srv.make_url("/apis/events")
+    yield srv.make_url("/apis/events")
+    log.info("FINALIZE")
 
 
 @pytest.fixture
