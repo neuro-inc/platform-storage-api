@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+from collections.abc import AsyncIterator
 
 import aiohttp
 import pytest
@@ -26,7 +27,9 @@ def queues() -> Queues:
 
 
 @pytest.fixture
-async def events_server(queues: Queues, aiohttp_server: AiohttpServer) -> URL:
+async def events_server(
+    queues: Queues, aiohttp_server: AiohttpServer
+) -> AsyncIterator[URL]:
     async def sender(ws: web.WebSocketResponse) -> None:
         while True:
             msg = await queues.outcome.get()
