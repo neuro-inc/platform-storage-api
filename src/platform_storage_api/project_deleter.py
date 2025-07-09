@@ -28,6 +28,9 @@ class ProjectDeleter:
         return self
 
     async def __aexit__(self, exc_typ: object, exc_val: object, exc_tb: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
         await self._client.aclose()
 
     async def _on_admin_event(self, ev: RecvEvent) -> None:
