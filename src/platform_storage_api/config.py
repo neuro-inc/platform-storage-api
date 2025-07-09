@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 
+from apolo_events_client import EventsClientConfig
 from apolo_kube_client.config import KubeClientAuthType, KubeConfig
 from yarl import URL
 
@@ -82,6 +83,7 @@ class Config:
     platform: PlatformConfig
     s3: S3Config
     admission_controller_config: AdmissionControllerConfig
+    events: EventsClientConfig | None = None
     kube: KubeConfig | None = None
     permission_expiration_interval_s: float = 0
     permission_forgetting_interval_s: float = 0
@@ -123,6 +125,7 @@ class EnvironConfigFactory:
             s3=self.create_s3(),
             admission_controller_config=self.create_admission_controller(),
             kube=self.create_kube(),
+            events=self.create_events(),
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
@@ -239,3 +242,10 @@ class EnvironConfigFactory:
         return AdmissionControllerConfig(
             cert_secret_name=cert_secret_name,
         )
+
+    def create_events(self) -> EventsClientConfig | None:
+        if "NP_STORAGE_EVENTS_URL" in self._environ:
+            url = URL(self._environ["NP_STORAGE_EVENTS_URL"])
+            token = self._environ["NP_STORAGE_EVENTS_TOKEN"]
+            return EventsClientConfig(url=url, token=token)
+        return None

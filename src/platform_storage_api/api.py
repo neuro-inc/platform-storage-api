@@ -35,6 +35,7 @@ from .fs.local import (
     FileStatusType,
     LocalFileSystem,
 )
+from .project_deleter import ProjectDeleter
 from .security import (
     AUTH_CLIENT_KEY,
     AbstractPermissionChecker,
@@ -890,6 +891,8 @@ async def create_app(config: Config) -> web.Application:
             # initialized - perform ping
             # TODO here we shall test whether secured-ping works as well
             # TODO in a spin loop we shall do that
+
+            await exit_stack.enter_async_context(ProjectDeleter(storage, config.events))
 
             yield
 
