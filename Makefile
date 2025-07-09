@@ -32,11 +32,11 @@ endif
 
 .PHONY: test_unit
 test_unit:
-	poetry run pytest -vv tests/unit
+	poetry run pytest -vvvs tests/unit
 
 .PHONY: test_integration
 test_integration:
-	poetry run pytest -vv tests/integration
+	poetry run pytest -vvvs tests/integration
 
 .PHONY: clean-dist
 clean-dist:
