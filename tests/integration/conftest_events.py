@@ -11,6 +11,9 @@ from apolo_events_client import (
     ClientMsgTypes,
     EventsClientConfig,
     ServerMsgTypes,
+    Subscribe,
+    Subscribed,
+    SubscribeGroup,
 )
 from pytest_aiohttp import AiohttpServer
 from yarl import URL
@@ -48,7 +51,17 @@ async def events_server(
                 assert ws_msg.type == aiohttp.WSMsgType.TEXT
                 msg = ClientMessage.model_validate_json(ws_msg.data)
                 event = msg.root
-                await queues.income.put(event)
+                match event:
+                    case Subscribe():
+                        await ws.send_str(
+                            Subscribed(subscr_id=event.id).model_dump_json()
+                        )
+                    case SubscribeGroup():
+                        await ws.send_str(
+                            Subscribed(subscr_id=event.id).model_dump_json()
+                        )
+                    case _:
+                        await queues.income.put(event)
         return ws
 
     app = aiohttp.web.Application()
