@@ -55,8 +55,10 @@ async def events_server(
     app.router.add_get("/apis/events/v1/stream", stream)
 
     srv = await aiohttp_server(app)
+    log.info("Started events test server at %r", srv.make_url("/apis/events"))
     yield srv.make_url("/apis/events")
-    log.info("FINALIZE")
+
+    log.info("Exit events test server")
 
 
 @pytest.fixture
