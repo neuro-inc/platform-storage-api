@@ -23,8 +23,9 @@ class ProjectDeleter:
         self._client = from_config(config)
 
     async def __aenter__(self) -> Self:
-        await self._client.__aenter__()
+        logger.info("Subscribe for %r", self.ADMIN_STREAM)
         await self._client.subscribe_group(self.ADMIN_STREAM, self._on_admin_event)
+        logger.info("Subscribed")
         return self
 
     async def __aexit__(self, exc_typ: object, exc_val: object, exc_tb: object) -> None:
