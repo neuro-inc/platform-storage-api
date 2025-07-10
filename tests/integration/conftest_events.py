@@ -87,6 +87,7 @@ async def events_server(
             try:
                 async with session.get(srv.make_url("/ping")) as resp:
                     assert resp.status == 200
+                    break
             except ConnectionError:
                 log.info("Wait for server starting")
 
