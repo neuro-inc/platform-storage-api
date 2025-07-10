@@ -36,7 +36,7 @@ test_unit:
 
 .PHONY: test_integration
 test_integration:
-	poetry run pytest -vv tests/integration
+	poetry run pytest -vvvs --log-level DEBUG --log-cli-level DEBUG tests/integration
 
 .PHONY: clean-dist
 clean-dist:

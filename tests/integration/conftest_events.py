@@ -2,6 +2,7 @@ import asyncio
 import dataclasses
 import logging
 from collections.abc import AsyncIterator
+from weakref import WeakSet
 
 import aiohttp
 import pytest
@@ -36,6 +37,8 @@ def queues() -> Queues:
 async def events_server(
     queues: Queues, aiohttp_server: AiohttpServer
 ) -> AsyncIterator[URL]:
+    websockets: WeakSet[web.WebSocketResponse] = WeakSet()
+
     async def sender(ws: web.WebSocketResponse) -> None:
         while True:
             msg = await queues.outcome.get()
@@ -64,14 +67,20 @@ async def events_server(
                         await queues.income.put(event)
         return ws
 
+    async def on_shutdown(app: web.Application) -> None:
+        for ws in list(websockets):
+            await ws.close()
+
     app = aiohttp.web.Application()
     app.router.add_get("/apis/events/v1/stream", stream)
+    app.on_shutdown.append(on_shutdown)
 
     srv = await aiohttp_server(app)
     log.info("Started events test server at %r", srv.make_url("/apis/events"))
     yield srv.make_url("/apis/events")
 
     log.info("Exit events test server")
+    await on_shutdown(app)
 
 
 @pytest.fixture
