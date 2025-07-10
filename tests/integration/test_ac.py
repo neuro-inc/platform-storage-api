@@ -201,14 +201,14 @@ async def test_inject_single_storage(kube_client: KubeClient) -> None:
         # ensures it has a proper name and a proper mount path
         assert volume_name.startswith(INJECTED_VOLUME_NAME_PREFIX)
         actual_host_path = actual_host_path_volume["hostPath"]["path"]
-        expected_host_path = f"{ACTUAL_HOST_PATH}/{org}/{project}"
-        assert actual_host_path == expected_host_path
+        assert actual_host_path == ACTUAL_HOST_PATH
 
         actual_host_path_volume_mount = next(
             iter(v for v in container["volumeMounts"] if v["name"] == volume_name)
         )
         assert actual_host_path_volume_mount["name"] == volume_name
         assert actual_host_path_volume_mount["mountPath"] == "/var/pod_mount"
+        assert actual_host_path_volume_mount["subPath"] == f"{org}/{project}"
 
 
 async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
@@ -239,22 +239,23 @@ async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
         },
     ) as response:
         spec = response["spec"]
-        volumes = spec["volumes"]
         container = spec["containers"][0]
 
-        volume_by_name = {v["name"]: v for v in volumes if "hostPath" in v}
-        volume_mount_by_name = {
-            v["name"]: v
-            for v in container["volumeMounts"]
-            if v["name"] in volume_by_name
-        }
+        volumes = [v for v in spec["volumes"] if "hostPath" in v]
 
-        assert len(volume_by_name) == 2
-        assert len(volume_mount_by_name) == 2
+        assert len(volumes) == 1
 
-        for volume_name, volume in volume_by_name.items():
-            volume_mount = volume_mount_by_name[volume_name]
-            assert volume_name.startswith(INJECTED_VOLUME_NAME_PREFIX)
-            assert volume_name == volume_mount["name"]
-            assert volume["hostPath"]["path"].startswith(ACTUAL_HOST_PATH)
+        for volume in volumes:
+            assert volume["name"].startswith(INJECTED_VOLUME_NAME_PREFIX)
+            assert volume["hostPath"]["path"] == ACTUAL_HOST_PATH
+
+        volume_names = {v["name"] for v in volumes}
+        volume_mounts = [
+            v for v in container["volumeMounts"] if v["name"] in volume_names
+        ]
+
+        assert len(volume_mounts) == 2
+
+        for volume_mount in volume_mounts:
             assert volume_mount["mountPath"].startswith("/var/pod_mount")
+            assert volume_mount["subPath"].startswith(f"{org}/{project}")
