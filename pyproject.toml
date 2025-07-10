@@ -72,7 +72,8 @@ ignore = [
     "PTH104", # `os.rename()` should be replaced by `Path.rename()`
     "PTH106", # `os.rmdir()` should be replaced by `Path.rmdir()`
     "PTH108", # `os.unlink()` should be replaced by `Path.unlink()`
-    "PTH115" # `os.readlink()` should be replaced by `Path.readlink()`
+    "PTH115", # `os.readlink()` should be replaced by `Path.readlink()`
+    "C901" # xxx is too complex
 ]
 
 [tool.isort]
