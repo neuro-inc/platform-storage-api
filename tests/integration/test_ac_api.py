@@ -388,9 +388,7 @@ class TestMutateApi:
         return await self._test__ensure_volumes_will_be_added(
             nfs_api,
             uuid_mock,
-            volume_expected={
-                "nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}
-            },
+            volume_expected={"nfs": {"path": "/var/exports", "server": "0.0.0.0"}},
         )
 
     async def test__host_path__ensure_volumes_will_be_added(
@@ -401,7 +399,7 @@ class TestMutateApi:
         return await self._test__ensure_volumes_will_be_added(
             host_path_api,
             uuid_mock,
-            volume_expected={"hostPath": {"path": "/var/exports/org/proj", "type": ""}},
+            volume_expected={"hostPath": {"path": "/var/exports", "type": ""}},
         )
 
     async def _test__ensure_volumes_will_be_added(
@@ -463,6 +461,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
+                    "subPath": "org/proj",
                 },
             },
         ]
@@ -477,9 +476,7 @@ class TestMutateApi:
         return await self._test__resolve_single_volume(
             nfs_api,
             uuid_mock,
-            volume_expected={
-                "nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}
-            },
+            volume_expected={"nfs": {"path": "/var/exports", "server": "0.0.0.0"}},
         )
 
     async def test__host_path__resolve_single_volume(
@@ -490,7 +487,7 @@ class TestMutateApi:
         return await self._test__resolve_single_volume(
             host_path_api,
             uuid_mock,
-            volume_expected={"hostPath": {"path": "/var/exports/org/proj", "type": ""}},
+            volume_expected={"hostPath": {"path": "/var/exports", "type": ""}},
         )
 
     async def _test__resolve_single_volume(
@@ -554,6 +551,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
+                    "subPath": "org/proj",
                 },
             },
         ]
@@ -626,168 +624,33 @@ class TestMutateApi:
         data = await self._ensure_allowed(response)
         assert "patch" not in data
 
-    async def test__nfs__resolve_multiple_volumes(
+    async def test__nfs__resolve_single_volume_to_multiple_containers(
         self,
         nfs_api: ApiConfig,
         uuid_mock: Mock,
     ) -> None:
-        return await self._test__resolve_multiple_volumes(
+        return await self._test__resolve_single_volume_to_multiple_containers(
             nfs_api,
             uuid_mock,
-            first_volume_expected={
-                "nfs": {"path": "/var/exports/org/proj/data1", "server": "0.0.0.0"}
-            },
-            second_volume_expected={
-                "nfs": {"path": "/var/exports/org/proj/data2", "server": "0.0.0.0"}
-            },
+            volume_expected={"nfs": {"path": "/var/exports", "server": "0.0.0.0"}},
         )
 
-    async def test__host_path__resolve_multiple_volumes(
+    async def test__host_path__resolve_single_volume_to_multiple_containers(
         self,
         host_path_api: ApiConfig,
         uuid_mock: Mock,
     ) -> None:
-        return await self._test__resolve_multiple_volumes(
+        return await self._test__resolve_single_volume_to_multiple_containers(
             host_path_api,
             uuid_mock,
-            first_volume_expected={
-                "hostPath": {"path": "/var/exports/org/proj/data1", "type": ""}
-            },
-            second_volume_expected={
-                "hostPath": {"path": "/var/exports/org/proj/data2", "type": ""}
-            },
+            volume_expected={"hostPath": {"path": "/var/exports", "type": ""}},
         )
 
-    async def _test__resolve_multiple_volumes(
+    async def _test__resolve_single_volume_to_multiple_containers(
         self,
         api: ApiConfig,
         uuid_mock: Mock,
-        first_volume_expected: dict[str, Any],
-        second_volume_expected: dict[str, Any],
-    ) -> None:
-        """
-        Adding two volumes to the pod.
-        One if a read-write, while another one is a read-only
-        """
-        url = f"http://{api.host}:{api.port}/admission-controller/mutate"
-        response = await self.http.post(
-            url,
-            json={
-                "request": {
-                    "uid": str(uuid4()),
-                    "object": {
-                        "kind": "Pod",
-                        "metadata": {
-                            "labels": {
-                                LABEL_APOLO_ORG_NAME: "org",
-                                LABEL_APOLO_PROJECT_NAME: "proj",
-                            },
-                            "annotations": {
-                                ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
-                                    [
-                                        {
-                                            "mount_path": "/var/mount-volume",
-                                            "storage_uri": "storage://default/org/proj/data1",
-                                            "mount_mode": "rw",
-                                        },
-                                        {
-                                            "mount_path": "/var/mount-volume-2",
-                                            "storage_uri": "storage://default/org/proj/data2",
-                                            "mount_mode": "r",
-                                        },
-                                    ]
-                                )
-                            },
-                        },
-                        "spec": {
-                            "containers": [{"name": "container"}],
-                        },
-                    },
-                }
-            },
-        )
-
-        data = await self._ensure_allowed(response)
-        expected_ops = [
-            # since pod doesn't define volumes and mounts,
-            # we expect to see those ops here
-            {"op": "add", "path": "/spec/volumes", "value": []},
-            {"op": "add", "path": "/spec/containers/0/volumeMounts", "value": []},
-            {
-                "op": "add",
-                "path": "/spec/volumes/-",
-                "value": {
-                    "name": "storage-auto-injected-volume-1",
-                    **first_volume_expected,
-                },
-            },
-            {
-                "op": "add",
-                "path": "/spec/containers/0/volumeMounts/-",
-                "value": {
-                    "mountPath": "/var/mount-volume",
-                    "name": "storage-auto-injected-volume-1",
-                },
-            },
-            {
-                "op": "add",
-                "path": "/spec/volumes/-",
-                "value": {
-                    "name": "storage-auto-injected-volume-2",
-                    **second_volume_expected,
-                },
-            },
-            {
-                "op": "add",
-                "path": "/spec/containers/0/volumeMounts/-",
-                "value": {
-                    "mountPath": "/var/mount-volume-2",
-                    "name": "storage-auto-injected-volume-2",
-                    "readOnly": True,
-                },
-            },
-        ]
-
-        assert data["patch"] == expected_ops
-
-    async def test__nfs__resolve_multiple_volumes_to_multiple_containers(
-        self,
-        nfs_api: ApiConfig,
-        uuid_mock: Mock,
-    ) -> None:
-        return await self._test__resolve_multiple_volumes_to_multiple_containers(
-            nfs_api,
-            uuid_mock,
-            first_volume_expected={
-                "nfs": {"path": "/var/exports/org/proj/data1", "server": "0.0.0.0"}
-            },
-            second_volume_expected={
-                "nfs": {"path": "/var/exports/org/proj/data2", "server": "0.0.0.0"}
-            },
-        )
-
-    async def test__host_path__resolve_multiple_volumes_to_multiple_containers(
-        self,
-        host_path_api: ApiConfig,
-        uuid_mock: Mock,
-    ) -> None:
-        return await self._test__resolve_multiple_volumes_to_multiple_containers(
-            host_path_api,
-            uuid_mock,
-            first_volume_expected={
-                "hostPath": {"path": "/var/exports/org/proj/data1", "type": ""}
-            },
-            second_volume_expected={
-                "hostPath": {"path": "/var/exports/org/proj/data2", "type": ""}
-            },
-        )
-
-    async def _test__resolve_multiple_volumes_to_multiple_containers(
-        self,
-        api: ApiConfig,
-        uuid_mock: Mock,
-        first_volume_expected: dict[str, Any],
-        second_volume_expected: dict[str, Any],
+        volume_expected: dict[str, Any],
     ) -> None:
         """
         Adding two volumes to the pod, which defines two containers.
@@ -845,7 +708,7 @@ class TestMutateApi:
                 "path": "/spec/volumes/-",
                 "value": {
                     "name": "storage-auto-injected-volume-1",
-                    **first_volume_expected,
+                    **volume_expected,
                 },
             },
             {
@@ -854,6 +717,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
+                    "subPath": "org/proj/data1",
                 },
             },
             {
@@ -862,14 +726,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
-                },
-            },
-            {
-                "op": "add",
-                "path": "/spec/volumes/-",
-                "value": {
-                    "name": "storage-auto-injected-volume-2",
-                    **second_volume_expected,
+                    "subPath": "org/proj/data1",
                 },
             },
             {
@@ -877,8 +734,9 @@ class TestMutateApi:
                 "path": "/spec/containers/0/volumeMounts/-",
                 "value": {
                     "mountPath": "/var/mount-volume-2",
-                    "name": "storage-auto-injected-volume-2",
+                    "name": "storage-auto-injected-volume-1",
                     "readOnly": True,
+                    "subPath": "org/proj/data2",
                 },
             },
             {
@@ -886,8 +744,9 @@ class TestMutateApi:
                 "path": "/spec/containers/1/volumeMounts/-",
                 "value": {
                     "mountPath": "/var/mount-volume-2",
-                    "name": "storage-auto-injected-volume-2",
+                    "name": "storage-auto-injected-volume-1",
                     "readOnly": True,
+                    "subPath": "org/proj/data2",
                 },
             },
         ]

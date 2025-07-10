@@ -14,7 +14,7 @@ RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-storage-ap
     && rm -rf /tmp/dist
 
 FROM python:${PY_VERSION}-slim-bookworm AS runtime
-LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-storage-api"
+LABEL org.opencontainers.image.source="https://github.com/neuro-inc/platform-storage-api"
 
 # Name of your service (folder under /home)
 ARG SERVICE_NAME="platform-storage-api"

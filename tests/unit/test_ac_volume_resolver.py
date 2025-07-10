@@ -101,9 +101,10 @@ async def test__resolve_successfully(
     storage_path = "/default/org/project"
 
     async with volume_resolver_with_nfs as vr:
-        volume = await vr.resolve_to_mount_volume(storage_path)
+        volume_mount = await vr.resolve_volume_mount(storage_path)
 
-        assert volume.backend == VolumeBackend.NFS
-        spec = cast(NfsVolumeSpec, volume.spec)
+        assert volume_mount.sub_path == "default/org/project"
+        assert volume_mount.volume.backend == VolumeBackend.NFS
+        spec = cast(NfsVolumeSpec, volume_mount.volume.spec)
         assert spec.server == "0.0.0.0"
-        assert spec.path == f"{volume_path}{storage_path}"
+        assert spec.path == volume_path
