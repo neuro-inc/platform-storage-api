@@ -58,6 +58,7 @@ async def events_server(
                 assert ws_msg.type == aiohttp.WSMsgType.TEXT
                 msg = ClientMessage.model_validate_json(ws_msg.data)
                 event = msg.root
+                log.debug("Event %r", event)
                 match event:
                     case Subscribe():
                         await ws.send_str(
