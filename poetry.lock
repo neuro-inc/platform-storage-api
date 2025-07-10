@@ -276,19 +276,25 @@ trio = ["trio (>=0.26.1)"]
 
 [[package]]
 name = "apolo-events-client"
-version = "25.7.6"
+version = "25.7.7"
 description = "Apolo client for platform-events"
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "apolo_events_client-25.7.6-py3-none-any.whl", hash = "sha256:adfe5c3b6120c6315e13776c8f27830a9a7aedece3705325c2a766e105d5ba3b"},
-    {file = "apolo_events_client-25.7.6.tar.gz", hash = "sha256:17f0af87b8cd913566e1d849b21018f071f43f45c904acfdbca3df250066c749"},
+    {file = "apolo_events_client-25.7.7-py3-none-any.whl", hash = "sha256:14b91e499da162303ef14e644787dc5b2cf9dd15fdef5fc706512f4cfc4d7b30"},
+    {file = "apolo_events_client-25.7.7.tar.gz", hash = "sha256:1353fa9210291ec17a6b56821b00c2d6f888e20924197c40adde3f425cc3af9a"},
 ]
 
 [package.dependencies]
 aiohttp = {version = ">=3.12.7", extras = ["speedups"]}
 pydantic = ">=2.11.5"
+pytest = {version = ">=8.4.1", optional = true, markers = "extra == \"pytest\""}
+pytest-aiohttp = {version = ">=1.1.0", optional = true, markers = "extra == \"pytest\""}
+pytest-asyncio = {version = ">=1.0.0", optional = true, markers = "extra == \"pytest\""}
+
+[package.extras]
+pytest = ["pytest (>=8.4.1)", "pytest-aiohttp (>=1.1.0)", "pytest-asyncio (>=1.0.0)"]
 
 [[package]]
 name = "apolo-kube-client"
@@ -2641,4 +2647,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "0343cdd9b2f728e046106725abb8d312595f425633165c35a68e5eb7313d4657"
+content-hash = "0d58175d9c11d7a65eeb8a4eed2032445b5683c4f3126ae15e9d861687b08a4e"
