@@ -12,7 +12,7 @@ async def test_deleter(
     client: aiohttp.ClientSession,
     regular_user_factory: _UserFactory,
     server_url: str,
-    queues: Queues,
+    events_queues: Queues,
 ) -> None:
     user = await regular_user_factory()
     headers = {"Authorization": "Bearer " + user.token}
@@ -22,7 +22,7 @@ async def test_deleter(
     async with client.put(url, headers=headers, data=payload) as response:
         assert response.status == 201
 
-    await queues.outcome.put(
+    await events_queues.outcome.put(
         RecvEvents(
             subscr_id=uuid4(),
             events=[
@@ -41,7 +41,7 @@ async def test_deleter(
         )
     )
 
-    ev = await queues.income.get()
+    ev = await events_queues.income.get()
 
     assert isinstance(ev, Ack)
     assert ev.events[StreamType("platform-admin")] == ["123"]

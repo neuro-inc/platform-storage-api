@@ -36,11 +36,15 @@ from platform_storage_api.storage_usage import StorageUsageService
 pytest_plugins = [
     "tests.integration.conftest_docker",
     "tests.integration.conftest_auth",
-    "tests.integration.conftest_events",
     "tests.integration.conftest_moto",
     "tests.integration.conftest_kube",
     "tests.conftest_ac",
 ]
+
+
+@pytest.fixture
+def events_client_name() -> str:
+    return "platform-storage"
 
 
 @asynccontextmanager
