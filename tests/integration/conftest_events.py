@@ -45,6 +45,7 @@ async def events_server(
             await ws.send_str(msg.model_dump_json())
 
     async def ping(req: web.Request) -> web.Response:
+        log.info("PING")
         return web.Response(text="pong")
 
     async def stream(req: web.Request) -> web.WebSocketResponse:
