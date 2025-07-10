@@ -44,10 +44,6 @@ async def events_server(
             msg = await queues.outcome.get()
             await ws.send_str(msg.model_dump_json())
 
-    async def ping(req: web.Request) -> web.Response:
-        log.info("PING")
-        return web.Response(text="pong")
-
     async def stream(req: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse()
         await ws.prepare(req)
@@ -78,19 +74,10 @@ async def events_server(
 
     app = aiohttp.web.Application()
     app.router.add_get("/apis/events/v1/stream", stream)
-    app.router.add_get("/ping", ping)
     app.on_shutdown.append(on_shutdown)
 
     srv = await aiohttp_server(app)
     log.info("Started events test server at %r", srv.make_url("/apis/events"))
-    async with aiohttp.ClientSession() as session:
-        while True:
-            try:
-                async with session.get(srv.make_url("/ping")) as resp:
-                    assert resp.status == 200
-                    break
-            except ConnectionError:
-                log.info("Wait for server starting")
 
     yield srv.make_url("/apis/events")
 
