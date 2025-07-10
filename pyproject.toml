@@ -35,7 +35,7 @@ prometheus-client = "0.22.1"
 pydantic = "2.11.7"
 uvicorn = "0.35.0"
 uvloop = "0.21.0"
-apolo-events-client = "^25.7.5"
+apolo-events-client = "^25.7.6"
 
 [tool.poetry.scripts]
 platform-storage-api = "platform_storage_api.api:main"
