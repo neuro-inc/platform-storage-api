@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 from uuid import uuid4
@@ -117,6 +118,7 @@ class AdmissionControllerApi:
                 message=e.message,
             )
         except Exception:
+            logger.exception("unhandled exception")
             return admission_review.decline(
                 status_code=400,
                 message="storage injector unhandled error",
@@ -211,7 +213,10 @@ class AdmissionControllerApi:
         # here we are already confident that paths are valid,
         # so in addition, we try to create them
         for injection_schema in injection_spec:
-            await self._storage.mkdir(injection_schema.storage_path)
+            try:
+                await self._storage.mkdir(injection_schema.storage_path)
+            except FileExistsError:
+                pass
 
         return injection_spec
 
@@ -244,6 +249,8 @@ class AdmissionControllerApi:
                     value=[],
                 )
 
+        mounted_volumes: dict[str, str] = {}
+
         for injection_schema in injection_spec:
             mount_path = injection_schema.mount_path
             storage_path = injection_schema.storage_path
@@ -251,7 +258,7 @@ class AdmissionControllerApi:
 
             # now let's try to resolve a path which POD wants to mount
             try:
-                volume_spec = await self._volume_resolver.resolve_to_mount_volume(
+                volume_mount = await self._volume_resolver.resolve_volume_mount(
                     path=storage_path
                 )
             except VolumeResolverError as e:
@@ -260,21 +267,22 @@ class AdmissionControllerApi:
                 logger.exception(error_message)
                 raise MutationError(error_message) from e
 
-            future_volume_name = create_injection_volume_name()
+            volume_spec = volume_mount.volume.to_kube()
+            volume_spec_key = json.dumps(volume_spec)
 
-            # add a volume host path
-            admission_review.add_patch(
-                path="/spec/volumes/-",
-                value={
-                    "name": future_volume_name,
-                    **volume_spec.to_kube(),
-                },
-            )
+            if not (future_volume_name := mounted_volumes.get(volume_spec_key)):
+                future_volume_name = create_injection_volume_name()
+                mounted_volumes[volume_spec_key] = future_volume_name
+                admission_review.add_patch(
+                    path="/spec/volumes/-",
+                    value={"name": future_volume_name, **volume_spec},
+                )
 
             # add a volumeMount with mount path for all the POD containers
             for container_idx in range(len(containers)):
                 patch_value: dict[str, str | bool] = {
                     "name": future_volume_name,
+                    "subPath": volume_mount.sub_path,
                     "mountPath": mount_path,
                 }
                 if mount_mode is MountMode.READ_ONLY:

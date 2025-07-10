@@ -1,7 +1,6 @@
 import dataclasses
 import logging
 import socket
-from copy import deepcopy
 from enum import Enum
 from pathlib import Path, PurePath
 from types import TracebackType
@@ -90,6 +89,12 @@ class KubeVolume:
 
     def to_kube(self) -> dict[str, Any]:
         return {self.backend.value: self.spec.to_kube()}
+
+
+@dataclasses.dataclass
+class KubeVolumeMount:
+    volume: KubeVolume
+    sub_path: str
 
 
 class KubeApi:
@@ -212,28 +217,24 @@ class KubeVolumeResolver:
         """
         return Path(await self._path_resolver.resolve_path(PurePath(storage_path)))
 
-    async def resolve_to_mount_volume(self, path: str) -> KubeVolume:
+    async def resolve_volume_mount(self, path: str) -> KubeVolumeMount:
         """
         resolves a path to a proper mount volume, so later it can be used
         in a kube spec of a POD.
         :param path: an absolute path to a file
         """
-        local_path = str(await self.to_local_path(storage_path=path))
+        local_path = await self.to_local_path(storage_path=path)
 
         for fs_path_prefix, kube_volume in self._local_fs_prefix_to_kube_volume.items():
-            if not local_path.startswith(fs_path_prefix):
+            try:
+                sub_path = local_path.relative_to(fs_path_prefix)
+            except ValueError:
                 continue
 
-            # path match, so we create a new volume with the adjusted path
-            new_mount_path = local_path.replace(
-                fs_path_prefix,
-                kube_volume.spec.path,
-                1,  # replace it only once at the beginning of the string
+            return KubeVolumeMount(
+                volume=kube_volume,
+                sub_path=str(sub_path),
             )
-
-            new_volume = deepcopy(kube_volume)
-            new_volume.spec = dataclasses.replace(new_volume.spec, path=new_mount_path)
-            return new_volume
 
         raise VolumeResolverError()
 
