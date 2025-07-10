@@ -12,6 +12,7 @@ import aiohttp
 import pytest
 import pytest_asyncio
 import uvicorn
+from apolo_events_client import EventsClientConfig
 from apolo_kube_client.config import KubeConfig
 from neuro_admin_client import AdminClient
 from yarl import URL
@@ -39,6 +40,11 @@ pytest_plugins = [
     "tests.integration.conftest_kube",
     "tests.conftest_ac",
 ]
+
+
+@pytest.fixture
+def events_client_name() -> str:
+    return "platform-storage"
 
 
 @asynccontextmanager
@@ -95,7 +101,10 @@ def platform_config(
 
 @pytest.fixture
 def config(
-    platform_config: PlatformConfig, s3_config: S3Config, local_tmp_dir_path: Path
+    platform_config: PlatformConfig,
+    s3_config: S3Config,
+    local_tmp_dir_path: Path,
+    events_config: EventsClientConfig,
 ) -> Config:
     server_config = StorageServerConfig()
     storage_config = StorageConfig(fs_local_base_path=local_tmp_dir_path)
@@ -108,6 +117,7 @@ def config(
             cert_secret_name="secret",
         ),
         kube=KubeConfig(endpoint_url="https://localhost:8443"),
+        events=events_config,
     )
 
 
