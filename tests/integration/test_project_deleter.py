@@ -4,22 +4,19 @@ from uuid import uuid4
 import aiohttp
 from apolo_events_client import Ack, EventType, RecvEvent, RecvEvents, StreamType, Tag
 
-from .conftest import ApiConfig
 from .conftest_auth import _UserFactory
 from .conftest_events import Queues
 
 
 async def test_deleter(
-    api: ApiConfig,
     client: aiohttp.ClientSession,
     regular_user_factory: _UserFactory,
     server_url: str,
     queues: Queues,
 ) -> None:
-    # (local_tmp_dir_path/"org"/"proj").mkdir(parents=True)
     user = await regular_user_factory()
     headers = {"Authorization": "Bearer " + user.token}
-    url = f"{server_url}/org/proj/path/to/file"
+    url = f"{server_url}/org/project/path/to/file"
     payload = b"test content"
 
     async with client.put(url, headers=headers, data=payload) as response:

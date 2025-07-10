@@ -165,6 +165,11 @@ class Storage:
 
     @trace
     async def remove(self, path: PurePath | str, *, recursive: bool = False) -> None:
+        await self.remove_notrace(path, recursive=recursive)
+
+    async def remove_notrace(
+        self, path: PurePath | str, *, recursive: bool = False
+    ) -> None:
         real_path = await self._path_resolver.resolve_path(PurePath(path))
         await self._fs.remove(real_path, recursive=recursive)
 

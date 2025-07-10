@@ -36,7 +36,6 @@ class ProjectDeleter:
 
     async def _on_admin_event(self, ev: RecvEvent) -> None:
         if ev.event_type == self.PROJECT_REMOVE:
-            path = "{ev.org}/{ev.project}"
-            await self._storage.remove(path, recursive=True)
-
+            path = f"/{ev.org}/{ev.project}"
+            await self._storage.remove_notrace(path, recursive=True)
             await self._client.ack({self.ADMIN_STREAM: [ev.tag]})
