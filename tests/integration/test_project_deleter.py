@@ -3,16 +3,16 @@ from uuid import uuid4
 
 import aiohttp
 from apolo_events_client import Ack, EventType, RecvEvent, RecvEvents, StreamType, Tag
+from apolo_events_client.pytest import EventsQueues
 
 from .conftest_auth import _UserFactory
-from .conftest_events import Queues
 
 
 async def test_deleter(
     client: aiohttp.ClientSession,
     regular_user_factory: _UserFactory,
     server_url: str,
-    events_queues: Queues,
+    events_queues: EventsQueues,
 ) -> None:
     user = await regular_user_factory()
     headers = {"Authorization": "Bearer " + user.token}
