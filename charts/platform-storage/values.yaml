@@ -15,6 +15,7 @@ platform:
   clusterName:
   authUrl:
   adminUrl:
+  eventsUrl: http://platform-events:8080/apis/events
   token: {}
 
 resources:
