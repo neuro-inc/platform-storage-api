@@ -24,7 +24,9 @@ class ProjectDeleter:
 
     async def __aenter__(self) -> Self:
         logger.info("Subscribe for %r", self.ADMIN_STREAM)
-        await self._client.subscribe_group(self.ADMIN_STREAM, self._on_admin_event)
+        await self._client.subscribe_group(
+            self.ADMIN_STREAM, self._on_admin_event, auto_ack=True
+        )
         logger.info("Subscribed")
         return self
 
@@ -38,4 +40,3 @@ class ProjectDeleter:
         if ev.event_type == self.PROJECT_REMOVE:
             path = f"/{ev.org}/{ev.project}"
             await self._storage.remove_notrace(path, recursive=True)
-            await self._client.ack({self.ADMIN_STREAM: [ev.tag]})
