@@ -31,7 +31,6 @@ spec:
               volumeMounts:
                 {{- include "platformStorage.volumeMounts" . | nindent 16 }}
               {{- end }}
-          {{- with .Values.imagePullSecrets }}
           {{- if .Values.securityContext.enabled }}
           securityContext:
             runAsUser: {{ .Values.securityContext.runAsUser }}
@@ -41,6 +40,7 @@ spec:
             allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
             fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy}}
           {{- end }}
+          {{- with .Values.imagePullSecrets }}
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
           {{- end }}
