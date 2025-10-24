@@ -345,20 +345,22 @@ pytest = ["pytest (>=8.4.1)", "pytest-aiohttp (>=1.1.0)", "pytest-asyncio (>=1.0
 
 [[package]]
 name = "apolo-kube-client"
-version = "25.7.4"
+version = "25.10.9"
 description = "Apolo internal client for kubernetes API"
 optional = false
-python-versions = "<4.0,>=3.9"
+python-versions = "<4.0,>=3.13"
 groups = ["main"]
 files = [
-    {file = "apolo_kube_client-25.7.4-py3-none-any.whl", hash = "sha256:13bc6d20d59f8b5b46a161a30ab18c8357269db753b7091e86a198e08f3d2c0e"},
-    {file = "apolo_kube_client-25.7.4.tar.gz", hash = "sha256:4903ec7d137ed34ac3326f91508e98a48d8c3049439f66640094e6c766956ec0"},
+    {file = "apolo_kube_client-25.10.9-py3-none-any.whl", hash = "sha256:e870054eef044cdb1d23a1bff2efb0ae028257a7b2adbd056ea705ceded2ea66"},
+    {file = "apolo_kube_client-25.10.9.tar.gz", hash = "sha256:79261d305337c91b183df8d7c2ace0b3b6b14d63d53c75fd715a28f03cbc3567"},
 ]
 
 [package.dependencies]
-aiohttp = ">=3.8.1"
+aiohttp = ">=3.12.9"
+cachetools = ">=5.3.3"
 multidict = ">=6"
-yarl = ">=1.10"
+pydantic = ">=2.12.3,<3.0.0"
+yarl = ">=1.20"
 
 [[package]]
 name = "attrs"
@@ -690,6 +692,18 @@ files = [
 
 [package.dependencies]
 cffi = ">=1.0.0"
+
+[[package]]
+name = "cachetools"
+version = "6.2.1"
+description = "Extensible memoizing collections and decorators"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "cachetools-6.2.1-py3-none-any.whl", hash = "sha256:09868944b6dde876dfd44e1d47e18484541eaf12f26f29b7af91b26cc892d701"},
+    {file = "cachetools-6.2.1.tar.gz", hash = "sha256:3f391e4bd8f8bf0931169baf7456cc822705f4e2a31f840d218f445b9a854201"},
+]
 
 [[package]]
 name = "cbor2"
@@ -2861,4 +2875,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "5fc2d7a656f43f79515bf783d45e185e8040c5d3a4b930317fb4225e6a319fcb"
+content-hash = "3459bbdead8d29e1e507b36bb2a05327e5044f136cac93299507e9425c8ffe63"
