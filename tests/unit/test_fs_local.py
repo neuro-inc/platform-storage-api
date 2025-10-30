@@ -86,14 +86,14 @@ class TestLocalFileSystem:
     def path_with_symlink(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "dir").mkdir()
         (tmp_dir_path / "dir/subdir").mkdir()
-        os.symlink("dir", tmp_dir_path / "link")
+        (tmp_dir_path / "link").symlink_to("dir")
         return tmp_dir_path / "link/subdir"
 
     @pytest.fixture
     def symlink_to_dir(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "dir").mkdir()
         path = tmp_dir_path / "dirlink"
-        os.symlink("dir", path, target_is_directory=True)
+        path.symlink_to("dir", target_is_directory=True)
         assert path.is_dir()
         return path
 
@@ -101,14 +101,14 @@ class TestLocalFileSystem:
     def symlink_to_file(self, tmp_dir_path: Path) -> Path:
         (tmp_dir_path / "file").write_bytes(b"test")
         path = tmp_dir_path / "filelink"
-        os.symlink("file", path)
+        path.symlink_to("file")
         assert path.is_file()
         return path
 
     @pytest.fixture
     def free_symlink(self, tmp_dir_path: Path) -> Path:
         path = tmp_dir_path / "nonexistentlink"
-        os.symlink("nonexistent", path)
+        path.symlink_to("nonexistent")
         return path
 
     @pytest_asyncio.fixture
@@ -385,7 +385,7 @@ class TestLocalFileSystem:
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
         path = tmp_dir_path / "nested"
-        os.symlink("nonexisting", path, target_is_directory=True)
+        path.symlink_to("nonexisting", target_is_directory=True)
 
         async with fs.iterstatus(path) as it:
             with pytest.raises(FileNotFoundError):
@@ -395,7 +395,7 @@ class TestLocalFileSystem:
         self, fs: FileSystem, tmp_dir_path: Path
     ) -> None:
         path = tmp_dir_path / "nested"
-        os.symlink("nonexisting", path)
+        path.symlink_to("nonexisting")
 
         async with fs.iterstatus(tmp_dir_path) as it:
             statuses = [status async for status in it]
