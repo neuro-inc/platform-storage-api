@@ -78,7 +78,9 @@ class HostPathVolumeSpec(BaseVolumeSpec):
         """
         return cls(
             path=spec.path,
-            type=HostPathType(spec.type) or HostPathType.EMPTY,
+            type=HostPathType(spec.type)
+            if spec.type is not None
+            else HostPathType.EMPTY,
         )
 
 
