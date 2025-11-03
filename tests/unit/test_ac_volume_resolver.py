@@ -1,9 +1,19 @@
 from collections.abc import Iterator
-from typing import Any, cast
+from typing import cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from apolo_kube_client import ResourceNotFound
+from apolo_kube_client import (
+    ResourceNotFound,
+    V1AWSElasticBlockStoreVolumeSource,
+    V1Container,
+    V1PersistentVolume,
+    V1PersistentVolumeClaim,
+    V1PersistentVolumeClaimSpec,
+    V1PersistentVolumeSpec,
+    V1Pod,
+    V1PodSpec,
+)
 
 from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,
@@ -41,9 +51,11 @@ async def test__pod_without_volumes_will_raise_an_error(
     """
     No volumes mounted to a pod
     """
-    pod_spec: dict[str, Any] = {
-        "spec": {"containers": [{"volumeMounts": []}], "volumes": []}
-    }
+    pod_spec = V1Pod(
+        spec=V1PodSpec(
+            containers=[V1Container(name="test", volume_mounts=[])], volumes=[]
+        )
+    )
     kube_api_with_nfs.get_pod = AsyncMock(return_value=pod_spec)
     with pytest.raises(VolumeResolverError) as e:
         async with volume_resolver_with_nfs:
@@ -62,17 +74,21 @@ async def test__unsupported_volume_type_will_raise_an_error(
     """
     Mounted volume has an unsupported backend (e.g., currently, not an NFS)
     """
-    non_supported_backend = "non-supported-backend"
-
     kube_api_with_nfs.get_pvc = AsyncMock(
-        return_value={
-            "spec": {
-                "volumeName": volume_name,
-            }
-        }
+        return_value=V1PersistentVolumeClaim(
+            spec=V1PersistentVolumeClaimSpec(
+                volume_name=volume_name,
+            )
+        )
     )
     kube_api_with_nfs.get_pv = AsyncMock(
-        return_value={"spec": {non_supported_backend: {}}}
+        return_value=V1PersistentVolume(
+            spec=V1PersistentVolumeSpec(
+                aws_elastic_block_store=V1AWSElasticBlockStoreVolumeSource(
+                    volume_id="volume-id"
+                )
+            )
+        )
     )
 
     with pytest.raises(VolumeResolverError) as e:
@@ -86,7 +102,7 @@ async def test__unsupported_volume_type_will_raise_an_error(
         logger_mock.info.call_args[0][0]
         == "volume did not produce any valid mapping: %s"
     )
-    assert logger_mock.info.call_args[0][1]["name"] == volume_name
+    assert logger_mock.info.call_args[0][1].name == volume_name
 
 
 async def test__resolve_successfully(
