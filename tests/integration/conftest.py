@@ -13,7 +13,7 @@ import pytest
 import pytest_asyncio
 import uvicorn
 from apolo_events_client import EventsClientConfig
-from apolo_kube_client.config import KubeConfig
+from apolo_kube_client import KubeConfig
 from neuro_admin_client import AdminClient
 from yarl import URL
 
