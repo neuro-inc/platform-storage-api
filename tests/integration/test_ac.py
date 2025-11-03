@@ -6,8 +6,17 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from apolo_kube_client.client import KubeClient
-from apolo_kube_client.errors import ResourceInvalid
+from apolo_kube_client import (
+    KubeClient,
+    ResourceInvalid,
+    V1Container,
+    V1Job,
+    V1JobSpec,
+    V1ObjectMeta,
+    V1Pod,
+    V1PodSpec,
+    V1PodTemplateSpec,
+)
 
 from platform_storage_api.admission_controller.api import (
     INJECTED_VOLUME_NAME_PREFIX,
@@ -25,50 +34,46 @@ async def pod_cm(
     kube_client: KubeClient,
     annotations: dict[str, Any] | None = None,
     labels: dict[str, Any] | None = None,
-) -> AsyncIterator[dict[str, Any]]:
+) -> AsyncIterator[V1Pod]:
     """
     A context manager for creating the pod, returning the response,
     and deleting the POD at the end
     """
     pod_name = str(uuid4())
-    payload = {
-        "kind": "Pod",
-        "apiVersion": "v1",
-        "metadata": {
-            "name": pod_name,
-        },
-        "spec": {
-            "containers": [
-                {
-                    "name": "hello",
-                    "image": "busybox",
-                    "command": ["sh", "-c", "sleep 5"],
-                }
+    payload = V1Pod(
+        metadata=V1ObjectMeta(
+            name=pod_name,
+        ),
+        spec=V1PodSpec(
+            containers=[
+                V1Container(
+                    name="hello",
+                    image="busybox",
+                    command=["sh", "-c", "sleep 5"],
+                )
             ]
-        },
-    }
+        ),
+    )
     if annotations is not None:
-        payload["metadata"]["annotations"] = annotations  # type: ignore[index]
+        payload.metadata.annotations = annotations
 
     if labels is not None:
-        payload["metadata"]["labels"] = labels  # type: ignore[index]
+        payload.metadata.labels = labels
 
-    url = f"{kube_client.namespace_url}/pods"
-    response = await kube_client.post(
-        url=url,
-        json=payload,
-    )
+    response = await kube_client.core_v1.pod.create(payload)
 
     # wait until a POD is running
     async with asyncio.timeout(60):
-        while (await kube_client.get(f"{url}/{pod_name}"))["status"][  # noqa ASYNC110
-            "phase"
-        ] != "Running":
-            await asyncio.sleep(0.1)
+        while True:
+            pod = await kube_client.core_v1.pod.get(pod_name)
+            if pod.status.phase != "Running":
+                await asyncio.sleep(0.1)
+            else:
+                break
 
     yield response
 
-    await kube_client.delete(f"{url}/{pod_name}")
+    await kube_client.core_v1.pod.delete(pod_name)
 
 
 async def test__not_a_pod_will_be_ignored(
@@ -79,41 +84,33 @@ async def test__not_a_pod_will_be_ignored(
     """
     job_name = str(uuid4())
 
-    payload = {
-        "apiVersion": "batch/v1",
-        "kind": "Job",
-        "metadata": {
-            "name": job_name,
-            "annotations": {
+    payload = V1Job(
+        metadata=V1ObjectMeta(
+            name=job_name,
+            annotations={
                 "platform.apolo.us/inject-storage": "INVALID",
             },
-        },
-        "spec": {
-            "template": {
-                "spec": {
-                    "restartPolicy": "Never",
-                    "containers": [
-                        {
-                            "name": "hello",
-                            "image": "busybox",
-                            "command": ["sh", "-c", "sleep 1"],
-                        }
+        ),
+        spec=V1JobSpec(
+            template=V1PodTemplateSpec(
+                spec=V1PodSpec(
+                    restart_policy="Never",
+                    containers=[
+                        V1Container(
+                            name="hello",
+                            image="busybox",
+                            command=["sh", "-c", "sleep 1"],
+                        )
                     ],
-                }
-            }
-        },
-    }
-
-    url = (
-        f"{kube_client._base_url}/apis/batch/v1/namespaces/{kube_client.namespace}/jobs"
+                )
+            )
+        ),
     )
-    response = await kube_client.post(
-        url,
-        json=payload,
-    )
-    assert response["kind"] == "Job"
 
-    await kube_client.delete(f"{url}/{job_name}")
+    response = await kube_client.batch_v1.job.create(payload)
+    assert response.kind == "Job"
+
+    await kube_client.batch_v1.job.delete(job_name)
 
 
 async def test__pod_without_labels_will_be_ignored(
@@ -123,7 +120,7 @@ async def test__pod_without_labels_will_be_ignored(
     Ensures that POD will be created if it doesn't define a necessary labels.
     """
     async with pod_cm(kube_client) as response:
-        assert response["kind"] == "Pod"
+        assert response.kind == "Pod"
 
 
 async def test__pod_without_annotation_will_be_ignored(
@@ -139,7 +136,7 @@ async def test__pod_without_annotation_will_be_ignored(
             LABEL_APOLO_PROJECT_NAME: "project",
         },
     ) as response:
-        assert response["kind"] == "Pod"
+        assert response.kind == "Pod"
 
 
 async def test__pod_invalid_annotation_will_prohibit_pod_creation(
@@ -190,25 +187,29 @@ async def test_inject_single_storage(kube_client: KubeClient) -> None:
             LABEL_APOLO_PROJECT_NAME: project,
         },
     ) as response:
-        spec = response["spec"]
-        volumes = spec["volumes"]
-        container = spec["containers"][0]
+        spec = response.spec
+        assert spec is not None
+        volumes = spec.volumes
+        container = spec.containers[0]
 
         # finds a hostPath volume
-        actual_host_path_volume = next(iter(v for v in volumes if "hostPath" in v))
-        volume_name = actual_host_path_volume["name"]
+        actual_host_path_volume = next(
+            iter(v for v in volumes if v.host_path is not None)
+        )
+        volume_name = actual_host_path_volume.name
+        assert actual_host_path_volume.host_path is not None
 
         # ensures it has a proper name and a proper mount path
         assert volume_name.startswith(INJECTED_VOLUME_NAME_PREFIX)
-        actual_host_path = actual_host_path_volume["hostPath"]["path"]
+        actual_host_path = actual_host_path_volume.host_path.path
         assert actual_host_path == ACTUAL_HOST_PATH
 
         actual_host_path_volume_mount = next(
-            iter(v for v in container["volumeMounts"] if v["name"] == volume_name)
+            iter(v for v in container.volume_mounts if v.name == volume_name)
         )
-        assert actual_host_path_volume_mount["name"] == volume_name
-        assert actual_host_path_volume_mount["mountPath"] == "/var/pod_mount"
-        assert actual_host_path_volume_mount["subPath"] == f"{org}/{project}"
+        assert actual_host_path_volume_mount.name == volume_name
+        assert actual_host_path_volume_mount.mount_path == "/var/pod_mount"
+        assert actual_host_path_volume_mount.sub_path == f"{org}/{project}"
 
 
 async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
@@ -238,24 +239,25 @@ async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
             LABEL_APOLO_PROJECT_NAME: project,
         },
     ) as response:
-        spec = response["spec"]
-        container = spec["containers"][0]
+        spec = response.spec
+        assert spec is not None
+        container = spec.containers[0]
 
-        volumes = [v for v in spec["volumes"] if "hostPath" in v]
+        volumes = [v for v in spec.volumes if v.host_path is not None]
 
         assert len(volumes) == 1
 
         for volume in volumes:
-            assert volume["name"].startswith(INJECTED_VOLUME_NAME_PREFIX)
-            assert volume["hostPath"]["path"] == ACTUAL_HOST_PATH
+            assert volume.host_path is not None
+            assert volume.name.startswith(INJECTED_VOLUME_NAME_PREFIX)
+            assert volume.host_path.path == ACTUAL_HOST_PATH
 
-        volume_names = {v["name"] for v in volumes}
-        volume_mounts = [
-            v for v in container["volumeMounts"] if v["name"] in volume_names
-        ]
+        volume_names = {v.name for v in volumes}
+        volume_mounts = [v for v in container.volume_mounts if v.name in volume_names]
 
         assert len(volume_mounts) == 2
 
         for volume_mount in volume_mounts:
-            assert volume_mount["mountPath"].startswith("/var/pod_mount")
-            assert volume_mount["subPath"].startswith(f"{org}/{project}")
+            assert volume_mount.mount_path.startswith("/var/pod_mount")
+            assert volume_mount.sub_path is not None
+            assert volume_mount.sub_path.startswith(f"{org}/{project}")
