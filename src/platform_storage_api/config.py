@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 
 from apolo_events_client import EventsClientConfig
-from apolo_kube_client.config import KubeClientAuthType, KubeConfig
+from apolo_kube_client import KubeClientAuthType, KubeConfig
 from yarl import URL
 
 logger = logging.getLogger(__name__)
@@ -196,9 +196,11 @@ class EnvironConfigFactory:
         if not endpoint_url:
             logger.info("kube client won't be initialized due to a missing url")
             return None
+
+        fields = KubeConfig.__pydantic_fields__
         auth_type = KubeClientAuthType(
             self._environ.get(
-                "NP_STORAGE_API_K8S_AUTH_TYPE", KubeConfig.auth_type.value
+                "NP_STORAGE_API_K8S_AUTH_TYPE", fields["auth_type"].default
             )
         )
         ca_path = self._environ.get("NP_STORAGE_API_K8S_CA_PATH")
@@ -216,22 +218,24 @@ class EnvironConfigFactory:
             ),
             token=None,
             token_path=token_path,
-            namespace=self._environ.get("NP_STORAGE_API_K8S_NS", KubeConfig.namespace),
+            namespace=self._environ.get(
+                "NP_STORAGE_API_K8S_NS", fields["namespace"].default
+            ),
             client_conn_timeout_s=int(
                 self._environ.get("NP_STORAGE_API_K8S_CLIENT_CONN_TIMEOUT")
-                or KubeConfig.client_conn_timeout_s
+                or fields["client_conn_timeout_s"].default
             ),
             client_read_timeout_s=int(
                 self._environ.get("NP_STORAGE_API_K8S_CLIENT_READ_TIMEOUT")
-                or KubeConfig.client_read_timeout_s
+                or fields["client_read_timeout_s"].default
             ),
             client_watch_timeout_s=int(
                 self._environ.get("NP_STORAGE_API_K8S_CLIENT_WATCH_TIMEOUT")
-                or KubeConfig.client_watch_timeout_s
+                or fields["client_watch_timeout_s"].default
             ),
             client_conn_pool_size=int(
                 self._environ.get("NP_STORAGE_API_K8S_CLIENT_CONN_POOL_SIZE")
-                or KubeConfig.client_conn_pool_size
+                or fields["client_conn_pool_size"].default
             ),
         )
 

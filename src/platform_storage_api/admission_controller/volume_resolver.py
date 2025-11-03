@@ -4,9 +4,18 @@ import socket
 from enum import Enum
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import Any, Union
+from typing import Any, Self, Union
 
-from apolo_kube_client.client import KubeClient
+from apolo_kube_client import (
+    KubeClient,
+    V1Container,
+    V1HostPathVolumeSource,
+    V1NFSVolumeSource,
+    V1PersistentVolume,
+    V1PersistentVolumeClaim,
+    V1PersistentVolumeClaimVolumeSource,
+    V1Pod,
+)
 
 from platform_storage_api.config import AdmissionControllerConfig
 from platform_storage_api.storage import StoragePathResolver
@@ -36,13 +45,13 @@ class NfsVolumeSpec(BaseVolumeSpec):
     path: str
 
     @classmethod
-    def from_pv(cls, pv: dict[str, Any]) -> "NfsVolumeSpec":
+    def from_pv(cls, pv: V1NFSVolumeSource) -> Self:
         """
         Constructs an NFS volume spec from a PV object
         """
         return cls(
-            server=pv["spec"][VolumeBackend.NFS]["server"],
-            path=pv["spec"][VolumeBackend.NFS]["path"],
+            server=pv.server,
+            path=pv.path,
         )
 
 
@@ -63,13 +72,13 @@ class HostPathVolumeSpec(BaseVolumeSpec):
     type: HostPathType
 
     @classmethod
-    def from_spec(cls, spec: dict[str, Any]) -> "HostPathVolumeSpec":
+    def from_spec(cls, spec: V1HostPathVolumeSource) -> Self:
         """
         Constructs a host-path volume spec from a PV object
         """
         return cls(
-            path=spec[VolumeBackend.HOST_PATH]["path"],
-            type=spec[VolumeBackend.HOST_PATH].get("type") or HostPathType.EMPTY,
+            path=spec.path,
+            type=HostPathType(spec.type) or HostPathType.EMPTY,
         )
 
 
@@ -105,26 +114,14 @@ class KubeApi:
     def __init__(self, kube_client: KubeClient):
         self._kube = kube_client
 
-    def generate_namespace_url(self) -> str:
-        return self._kube.generate_namespace_url()
+    async def get_pod(self, pod_name: str) -> V1Pod:
+        return await self._kube.core_v1.pod.get(pod_name)
 
-    async def get_pod(
-        self, pod_name: str, namespace_url: str | None = None
-    ) -> dict[str, Any]:
-        namespace_url = namespace_url or self.generate_namespace_url()
-        url = f"{namespace_url}/pods/{pod_name}"
-        return await self._kube.get(url)
+    async def get_pvc(self, pvc_name: str) -> V1PersistentVolumeClaim:
+        return await self._kube.core_v1.persistent_volume_claim.get(pvc_name)
 
-    async def get_pvc(
-        self, pvc_name: str, namespace_url: str | None = None
-    ) -> dict[str, Any]:
-        namespace_url = namespace_url or self.generate_namespace_url()
-        url = f"{namespace_url}/persistentvolumeclaims/{pvc_name}"
-        return await self._kube.get(url)
-
-    async def get_pv(self, pv_name: str) -> dict[str, Any]:
-        url = f"{self._kube.api_v1_url}/persistentvolumes/{pv_name}"
-        return await self._kube.get(url)
+    async def get_pv(self, pv_name: str) -> V1PersistentVolume:
+        return await self._kube.core_v1.persistent_volume.get(pv_name)
 
 
 class KubeVolumeResolver:
@@ -143,7 +140,7 @@ class KubeVolumeResolver:
         and a value is a kube volume definition.
         """
 
-    async def __aenter__(self) -> "KubeVolumeResolver":
+    async def __aenter__(self) -> Self:
         """
         Initialize the kube volume resolver.
         Gets the most fresh platform-storage POD and passes it to an
@@ -175,7 +172,7 @@ class KubeVolumeResolver:
 
     async def _refresh_internal_state(
         self,
-        pod: dict[str, Any],
+        pod: V1Pod,
     ) -> None:
         """
         Refreshes an internal mapping of volumes based on a provided POD.
@@ -183,21 +180,22 @@ class KubeVolumeResolver:
         of volumes
         """
         logger.info("refreshing internal state")
+        assert pod.spec is not None
 
-        containers = pod["spec"]["containers"]
+        containers = pod.spec.containers
 
         # go over volumes to identify linked PVCs
-        for volume in pod["spec"]["volumes"]:
+        for volume in pod.spec.volumes:
             # host-path-based volume
-            if VolumeBackend.HOST_PATH in volume:
+            if volume.host_path is not None:
                 kube_volume_mapping = self._kube_volume_from_host_path(
-                    volume, containers
+                    volume.name, volume.host_path, containers
                 )
 
             # potentially might be an NFS volume
-            elif "persistentVolumeClaim" in volume:
+            elif volume.persistent_volume_claim is not None:
                 kube_volume_mapping = await self._kube_volume_from_pvc(
-                    volume, containers
+                    volume.name, volume.persistent_volume_claim, containers
                 )
 
             else:
@@ -240,30 +238,31 @@ class KubeVolumeResolver:
 
     @staticmethod
     def _kube_volume_from_host_path(
-        volume: dict[str, Any],
-        containers: list[dict[str, Any]],
+        volume_name: str,
+        host_path_source: V1HostPathVolumeSource,
+        containers: list[V1Container],
     ) -> dict[str, KubeVolume]:
-        volume_name = volume["name"]
         kube_volume_mapping = {}
 
         # now let's go over containers and figure out mount paths for volumes
         for container in containers:
-            for volume_mount in container["volumeMounts"]:
-                if volume_mount["name"] != volume_name:
+            for volume_mount in container.volume_mounts:
+                if volume_mount.name != volume_name:
                     continue
 
-                local_path = volume_mount["mountPath"]
+                local_path = volume_mount.mount_path
                 kube_volume = KubeVolume(
                     backend=VolumeBackend.HOST_PATH,
-                    spec=HostPathVolumeSpec.from_spec(spec=volume),
+                    spec=HostPathVolumeSpec.from_spec(host_path_source),
                 )
                 kube_volume_mapping[local_path] = kube_volume
         return kube_volume_mapping
 
     async def _kube_volume_from_pvc(
         self,
-        volume: dict[str, Any],
-        containers: list[dict[str, Any]],
+        storage_name: str,
+        pvc: V1PersistentVolumeClaimVolumeSource,
+        containers: list[V1Container],
     ) -> dict[str, KubeVolume]:
         kube_volume_mapping = {}
 
@@ -274,29 +273,28 @@ class KubeVolumeResolver:
         # storage name to a local mounted path
         storage_name_to_local_path: dict[str, str] = {}
 
-        pvc = volume["persistentVolumeClaim"]
-        storage_name, pvc_name = volume["name"], pvc["claimName"]
-        storage_name_to_pvc[storage_name] = pvc_name
+        storage_name_to_pvc[storage_name] = pvc.claim_name
 
         # now let's go over containers and figure out mount paths for volumes
         for container in containers:
-            for volume_mount in container["volumeMounts"]:
-                volume_name = volume_mount["name"]
+            for volume_mount in container.volume_mounts:
+                volume_name = volume_mount.name
                 if volume_name not in storage_name_to_pvc:
                     continue
-                mount_path = volume_mount["mountPath"]
+                mount_path = volume_mount.mount_path
                 storage_name_to_local_path[volume_name] = mount_path
 
         # get PVs by claim names
         for storage_name, claim_name in storage_name_to_pvc.items():
             claim = await self._kube.get_pvc(pvc_name=claim_name)
-            storage_name_to_pv[storage_name] = claim["spec"]["volumeName"]
+            assert claim.spec.volume_name is not None
+            storage_name_to_pv[storage_name] = claim.spec.volume_name
 
         # finally, get real underlying storage paths
         for storage_name, pv_name in storage_name_to_pv.items():
             pv = await self._kube.get_pv(pv_name)
 
-            if VolumeBackend.NFS not in pv["spec"]:
+            if pv.spec.nfs is None:
                 logger.info(
                     "storage `%s` doesn't define supported volume backends",
                     storage_name,
@@ -306,7 +304,7 @@ class KubeVolumeResolver:
             local_path = storage_name_to_local_path[storage_name]
             kube_volume = KubeVolume(
                 backend=VolumeBackend.NFS,
-                spec=NfsVolumeSpec.from_pv(pv=pv),
+                spec=NfsVolumeSpec.from_pv(pv=pv.spec.nfs),
             )
             kube_volume_mapping[local_path] = kube_volume
 

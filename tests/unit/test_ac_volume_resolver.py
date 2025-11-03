@@ -3,7 +3,7 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from apolo_kube_client.errors import ResourceNotFound
+from apolo_kube_client import ResourceNotFound
 
 from platform_storage_api.admission_controller.volume_resolver import (
     KubeVolumeResolver,

@@ -5,7 +5,7 @@ from unittest import mock
 
 import pytest
 from aioresponses import aioresponses
-from apolo_kube_client.config import KubeConfig
+from apolo_kube_client import KubeConfig
 from neuro_admin_client import AdminClient
 from yarl import URL
 
