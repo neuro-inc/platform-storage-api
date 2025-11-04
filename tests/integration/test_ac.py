@@ -157,7 +157,7 @@ async def test__pod_invalid_annotation_will_prohibit_pod_creation(
         ):
             pass
 
-    assert str(e.value) == (
+    assert e.value["message"] == (
         'admission webhook "admission-controller.apolo.us" denied the request: '
         "injection spec is invalid"
     )
