@@ -157,10 +157,11 @@ async def test__pod_invalid_annotation_will_prohibit_pod_creation(
         ):
             pass
 
-    assert e.value.args[0]["message"] == (
+    # the exception value is str(json) that was returned from k8s, apply substr search
+    assert (
         'admission webhook "admission-controller.apolo.us" denied the request: '
         "injection spec is invalid"
-    )
+    ) in e.value
 
 
 async def test_inject_single_storage(kube_client: KubeClient) -> None:
