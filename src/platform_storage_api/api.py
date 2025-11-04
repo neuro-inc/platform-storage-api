@@ -927,12 +927,12 @@ async def create_app(config: Config) -> web.Application:
 
 
 def main() -> None:
-    init_logging()
+    init_logging(health_check_url_path="/ping")
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
 
     setup_sentry(
-        health_check_url_path="/api/v1/ping",
+        health_check_url_path="/ping",
         ignore_errors=[FileNotFoundError, web.HTTPBadRequest, web.HTTPNotFound],
     )
 
