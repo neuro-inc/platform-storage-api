@@ -161,7 +161,7 @@ async def test__pod_invalid_annotation_will_prohibit_pod_creation(
     assert (
         'admission webhook "admission-controller.apolo.us" denied the request: '
         "injection spec is invalid"
-    ) in e.value
+    ) in str(e.value)
 
 
 async def test_inject_single_storage(kube_client: KubeClient) -> None:
