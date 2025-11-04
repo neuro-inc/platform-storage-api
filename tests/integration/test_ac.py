@@ -159,7 +159,7 @@ async def test__pod_invalid_annotation_will_prohibit_pod_creation(
 
     # the exception value is str(json) that was returned from k8s, apply substr search
     assert (
-        'admission webhook "admission-controller.apolo.us" denied the request: '
+        'admission webhook \\"admission-controller.apolo.us\\" denied the request: '
         "injection spec is invalid"
     ) in str(e.value)
 
