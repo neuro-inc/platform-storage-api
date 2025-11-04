@@ -65,16 +65,20 @@ class ApiConfig(NamedTuple):
     port: int
 
     @property
+    def base_url(self) -> str:
+        return f"http://{self.host}:{self.port}"
+
+    @property
     def endpoint(self) -> str:
-        return f"http://{self.host}:{self.port}/api/v1"
+        return f"{self.base_url}/api/v1"
 
     @property
     def storage_base_url(self) -> str:
-        return self.endpoint + "/storage"
+        return f"{self.endpoint}/storage"
 
     @property
     def ping_url(self) -> str:
-        return self.endpoint + "/ping"
+        return f"{self.base_url}/ping"
 
 
 @pytest.fixture

@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 async def run() -> None:
-    init_logging()
+    init_logging(health_check_url_path="/ping")
     config = Config.from_environ()
     logging.info("Loaded config: %r", config)
 
     setup_sentry(
-        health_check_url_path="/api/v1/ping",
+        health_check_url_path="/ping",
         ignore_errors=[web.HTTPNotFound],
     )
 
