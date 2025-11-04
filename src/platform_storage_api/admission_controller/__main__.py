@@ -6,7 +6,7 @@ from base64 import b64decode
 
 import uvloop
 from aiohttp import web
-from apolo_kube_client.client import kube_client_from_config
+from apolo_kube_client import KubeClient
 from neuro_logging import init_logging, setup_sentry
 
 from platform_storage_api.admission_controller.app import create_app
@@ -25,11 +25,12 @@ async def run() -> None:
         ignore_errors=[web.HTTPNotFound],
     )
 
+    assert config.kube is not None
     # get the necessary certificates from the secrets
-    async with kube_client_from_config(config=config.kube) as kube:  # type: ignore[arg-type]
+    async with KubeClient(config=config.kube) as kube:
         cert_secret_name = config.admission_controller_config.cert_secret_name
-        response = await kube.get(f"{kube.namespace_url}/secrets/{cert_secret_name}")
-        secrets = response["data"]
+        response = await kube.core_v1.secret.get(cert_secret_name)
+        secrets = response.data
         tls_key = secrets["tls.key"]
         tls_cert = secrets["tls.crt"]
 

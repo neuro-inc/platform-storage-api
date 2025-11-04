@@ -5,11 +5,24 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from apolo_kube_client import (
+    V1Container,
+    V1HostPathVolumeSource,
+    V1NFSVolumeSource,
+    V1PersistentVolume,
+    V1PersistentVolumeClaim,
+    V1PersistentVolumeClaimSpec,
+    V1PersistentVolumeClaimVolumeSource,
+    V1PersistentVolumeSpec,
+    V1Pod,
+    V1PodSpec,
+    V1Volume,
+    V1VolumeMount,
+)
 
 from platform_storage_api.admission_controller.volume_resolver import (
     KubeApi,
     KubeVolumeResolver,
-    VolumeBackend,
 )
 from platform_storage_api.config import AdmissionControllerConfig
 from platform_storage_api.fs.local import FileSystem
@@ -40,33 +53,34 @@ def volume_name() -> str:
 def pod_spec_with_nfs(
     local_mount_path: str,
     volume_name: str,
-) -> dict[str, Any]:
+) -> V1Pod:
     """
     A pod with mounted NFS volume.
     Simulates a POD spec of the webhook service itself.
     """
-    return {
-        "spec": {
-            "containers": [
-                {
-                    "volumeMounts": [
-                        {
-                            "name": volume_name,
-                            "mountPath": local_mount_path,
-                        },
-                    ]
-                }
+    return V1Pod(
+        spec=V1PodSpec(
+            containers=[
+                V1Container(
+                    name="test",
+                    volume_mounts=[
+                        V1VolumeMount(
+                            name=volume_name,
+                            mount_path=local_mount_path,
+                        ),
+                    ],
+                )
             ],
-            "volumes": [
-                {
-                    "name": volume_name,
-                    "persistentVolumeClaim": {
-                        "claimName": "pvc-claim-name",
-                    },
-                },
+            volumes=[
+                V1Volume(
+                    name=volume_name,
+                    persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(
+                        claim_name="pvc-claim-name",
+                    ),
+                ),
             ],
-        }
-    }
+        )
+    )
 
 
 @pytest.fixture
@@ -74,49 +88,54 @@ def pod_spec_with_host_path(
     local_mount_path: str,
     volume_name: str,
     volume_path: str,
-) -> dict[str, Any]:
+) -> V1Pod:
     """
     A pod with mounted hostPath volume.
     Simulates a POD spec of the webhook service itself.
     """
-    return {
-        "spec": {
-            "containers": [
-                {
-                    "volumeMounts": [
-                        {
-                            "name": volume_name,
-                            "mountPath": local_mount_path,
-                        },
-                    ]
-                }
+    return V1Pod(
+        spec=V1PodSpec(
+            containers=[
+                V1Container(
+                    name="test",
+                    volume_mounts=[
+                        V1VolumeMount(
+                            name=volume_name,
+                            mount_path=local_mount_path,
+                        ),
+                    ],
+                )
             ],
-            "volumes": [{"name": volume_name, "hostPath": {"path": volume_path}}],
-        }
-    }
+            volumes=[
+                V1Volume(
+                    name=volume_name, host_path=V1HostPathVolumeSource(path=volume_path)
+                )
+            ],
+        )
+    )
 
 
 @pytest.fixture
-def valid_pvc_spec(volume_name: str) -> dict[str, Any]:
-    return {
-        "spec": {
-            "volumeName": volume_name,
-        }
-    }
+def valid_pvc_spec(volume_name: str) -> V1PersistentVolumeClaim:
+    return V1PersistentVolumeClaim(
+        spec=V1PersistentVolumeClaimSpec(
+            volume_name=volume_name,
+        )
+    )
 
 
 @pytest.fixture
 def valid_pv_spec(
     volume_path: str,
-) -> dict[str, Any]:
-    return {
-        "spec": {
-            VolumeBackend.NFS.value: {
-                "server": "0.0.0.0",
-                "path": volume_path,
-            }
-        }
-    }
+) -> V1PersistentVolume:
+    return V1PersistentVolume(
+        spec=V1PersistentVolumeSpec(
+            nfs=V1NFSVolumeSource(
+                server="0.0.0.0",
+                path=volume_path,
+            )
+        )
+    )
 
 
 @pytest.fixture

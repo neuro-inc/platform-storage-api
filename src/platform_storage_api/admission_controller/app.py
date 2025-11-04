@@ -1,11 +1,9 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
-from typing import cast
 
 from aiohttp import web
-from apolo_kube_client.client import kube_client_from_config
-from apolo_kube_client.config import KubeConfig
+from apolo_kube_client import KubeClient
 
 from platform_storage_api.admission_controller.api import AdmissionControllerApi
 from platform_storage_api.admission_controller.app_keys import (
@@ -38,9 +36,9 @@ async def create_app(config: Config) -> web.Application:
             path_resolver = create_path_resolver(config, fs)
             storage = Storage(path_resolver, fs)
 
-            kube_config = cast(KubeConfig, config.kube)
+            assert config.kube is not None
             kube_client = await exit_stack.enter_async_context(
-                kube_client_from_config(kube_config)
+                KubeClient(config=config.kube)
             )
             kube_api = KubeApi(kube_client)
             volume_resolver = await exit_stack.enter_async_context(
