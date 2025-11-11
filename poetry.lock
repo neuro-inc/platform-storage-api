@@ -524,6 +524,7 @@ description = "Python bindings for the Brotli compression library"
 optional = false
 python-versions = "*"
 groups = ["main", "dev"]
+markers = "platform_python_implementation == \"CPython\""
 files = [
     {file = "brotli-1.2.0-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:99cfa69813d79492f0e5d52a20fd18395bc82e671d5d40bd5a91d13e75e468e8"},
     {file = "brotli-1.2.0-cp27-cp27m-manylinux1_i686.whl", hash = "sha256:3ebe801e0f4e56d17cd386ca6600573e3706ce1845376307f5d2cbd32149b69a"},
@@ -2193,19 +2194,19 @@ testing = ["coverage (>=6.2)", "hypothesis (>=5.7.1)"]
 
 [[package]]
 name = "pytest-docker"
-version = "3.2.3"
+version = "3.2.4"
 description = "Simple pytest fixtures for Docker and Docker Compose based tests"
 optional = false
 python-versions = ">=3.8"
 groups = ["dev"]
 files = [
-    {file = "pytest_docker-3.2.3-py3-none-any.whl", hash = "sha256:f973c35e6f2b674c8fc87e8b3354b02c15866a21994c0841a338c240a05de1eb"},
-    {file = "pytest_docker-3.2.3.tar.gz", hash = "sha256:26a1c711d99ef01e86e7c9c007f69641552c1554df4fccb065b35581cca24206"},
+    {file = "pytest_docker-3.2.4-py3-none-any.whl", hash = "sha256:909094dc2e9764406f30764f89553f08a1c3ab4d00ff6116cc58f6adfa839360"},
+    {file = "pytest_docker-3.2.4.tar.gz", hash = "sha256:e82bc76df7c0108f9e98e2102b3345391de70397ec1dca8ac5124e8ff5d929bd"},
 ]
 
 [package.dependencies]
 attrs = ">=19.2.0"
-pytest = ">=4.0,<9.0"
+pytest = ">=4.0,<10.0"
 
 [package.extras]
 docker-compose-v1 = ["docker-compose (>=1.27.3,<2.0)"]
@@ -2874,4 +2875,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "b856a370390e4318dc0013667722bda8d0d635393e5ee9b07ceb9e956aeef3bf"
+content-hash = "25f77030d978ebcf63ee430589e9d453bedeb5e9c32f52d9ff6c470961bdc5c7"
