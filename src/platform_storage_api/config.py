@@ -218,9 +218,6 @@ class EnvironConfigFactory:
             ),
             token=None,
             token_path=token_path,
-            namespace=self._environ.get(
-                "NP_STORAGE_API_K8S_NS", fields["namespace"].default
-            ),
             client_conn_timeout_s=int(
                 self._environ.get("NP_STORAGE_API_K8S_CLIENT_CONN_TIMEOUT")
                 or fields["client_conn_timeout_s"].default
