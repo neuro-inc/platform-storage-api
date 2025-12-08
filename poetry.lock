@@ -28,14 +28,14 @@ httpx = ["httpx (>=0.25.1,<0.29)"]
 
 [[package]]
 name = "aiodns"
-version = "3.5.0"
+version = "3.6.0"
 description = "Simple DNS resolver for asyncio"
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "aiodns-3.5.0-py3-none-any.whl", hash = "sha256:6d0404f7d5215849233f6ee44854f2bb2481adf71b336b2279016ea5990ca5c5"},
-    {file = "aiodns-3.5.0.tar.gz", hash = "sha256:11264edbab51896ecf546c18eb0dd56dff0428c6aa6d2cd87e643e07300eb310"},
+    {file = "aiodns-3.6.0-py3-none-any.whl", hash = "sha256:9fa49f812648374d046436a3b96491afb141320cd0b501df83880f034d0b5b85"},
+    {file = "aiodns-3.6.0.tar.gz", hash = "sha256:9b0ef54339e6687cdbd39a7d73d7de2467cb5c115281da28f2598f058633dac8"},
 ]
 
 [package.dependencies]
@@ -2989,4 +2989,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "f02279f44e3b91f167b94104b29494fd6b88579eb69378455c4b062824d075ea"
+content-hash = "355475041b6a747590c845ec2a0d6ab297082102521cb5d1a44ffe002000d4a3"
