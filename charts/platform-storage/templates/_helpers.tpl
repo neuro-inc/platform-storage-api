@@ -112,7 +112,7 @@ release: {{ .Release.Name | quote }}
   {{- else if eq $storage.type "nfs" }}
   nfs:
     server: {{ $storage.server }}
-    path: {{ .Values.exportPath }}
+    path: {{ $storage.path }}
   {{- end }}
 {{- end -}}
 {{- end -}}
