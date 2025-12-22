@@ -81,10 +81,10 @@ function k8s::apply_all_configurations {
     minikube image load storage-ac.tar
     kubectl apply -f tests/k8s/rbac.yaml
     kubectl apply -f tests/k8s/preinstall-job.yaml
-    wait_job admission-controller-lib-preinstall
+    wait_job storage-admission-controller-lib-preinstall
     kubectl apply -f tests/k8s/admission-controller-deployment.yaml
     kubectl apply -f tests/k8s/postinstall-job.yaml
-    wait_job admission-controller-lib-postinstall
+    wait_job storage-admission-controller-lib-postinstall
 }
 
 
