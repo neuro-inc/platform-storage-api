@@ -8,6 +8,8 @@ from uuid import uuid4
 import pytest
 from apolo_kube_client import (
     KubeClient,
+    KubeClientProxy,
+    KubeClientSelector,
     ResourceInvalid,
     V1Container,
     V1Job,
@@ -31,7 +33,7 @@ ACTUAL_VOLUME_MOUNT_PATH = "/var/storage"
 
 @asynccontextmanager
 async def pod_cm(
-    kube_client: KubeClient,
+    kube_client: KubeClient | KubeClientProxy,
     annotations: dict[str, Any] | None = None,
     labels: dict[str, Any] | None = None,
 ) -> AsyncIterator[V1Pod]:
@@ -160,106 +162,122 @@ async def test__pod_invalid_annotation_will_prohibit_pod_creation(
     # the exception value is str(json) that was returned from k8s, apply substr search
     assert (
         e.value.args[0].message
-        == 'admission webhook "admission-controller.apolo.us" denied the request: '
-        "injection spec is invalid"
+        == 'admission webhook "storage-admission-controller.apolo.us" '
+        "denied the request: injection spec is invalid"
     )
 
 
-async def test_inject_single_storage(kube_client: KubeClient) -> None:
+async def test_inject_single_storage(
+    kube_selector: KubeClientSelector,
+    org_project: tuple[str, str],
+) -> None:
     """
     Creates a POD with the proper annotations,
     and expect that a storage will be mounted
     """
-    org, project = "org", "proj"
+    org, project = org_project
 
-    async with pod_cm(
-        kube_client,
-        annotations={
-            "platform.apolo.us/inject-storage": json.dumps(
-                [
-                    {
-                        "mount_path": "/var/pod_mount",
-                        "storage_uri": f"storage://default/{org}/{project}",
-                    }
-                ]
+    async with kube_selector.get_client(
+        org_name=org,
+        project_name=project,
+    ) as kube:
+        async with pod_cm(
+            kube,
+            annotations={
+                "platform.apolo.us/inject-storage": json.dumps(
+                    [
+                        {
+                            "mount_path": "/var/pod_mount",
+                            "storage_uri": f"storage://default/{org}/{project}",
+                        }
+                    ]
+                )
+            },
+            labels={
+                LABEL_APOLO_ORG_NAME: org,
+                LABEL_APOLO_PROJECT_NAME: project,
+            },
+        ) as response:
+            spec = response.spec
+            assert spec is not None
+            volumes = spec.volumes
+            container = spec.containers[0]
+
+            # finds a hostPath volume
+            actual_host_path_volume = next(
+                iter(v for v in volumes if v.host_path is not None)
             )
-        },
-        labels={
-            LABEL_APOLO_ORG_NAME: org,
-            LABEL_APOLO_PROJECT_NAME: project,
-        },
-    ) as response:
-        spec = response.spec
-        assert spec is not None
-        volumes = spec.volumes
-        container = spec.containers[0]
+            volume_name = actual_host_path_volume.name
+            assert actual_host_path_volume.host_path is not None
 
-        # finds a hostPath volume
-        actual_host_path_volume = next(
-            iter(v for v in volumes if v.host_path is not None)
-        )
-        volume_name = actual_host_path_volume.name
-        assert actual_host_path_volume.host_path is not None
+            # ensures it has a proper name and a proper mount path
+            assert volume_name.startswith(INJECTED_VOLUME_NAME_PREFIX)
+            actual_host_path = actual_host_path_volume.host_path.path
+            assert actual_host_path == ACTUAL_HOST_PATH
 
-        # ensures it has a proper name and a proper mount path
-        assert volume_name.startswith(INJECTED_VOLUME_NAME_PREFIX)
-        actual_host_path = actual_host_path_volume.host_path.path
-        assert actual_host_path == ACTUAL_HOST_PATH
-
-        actual_host_path_volume_mount = next(
-            iter(v for v in container.volume_mounts if v.name == volume_name)
-        )
-        assert actual_host_path_volume_mount.name == volume_name
-        assert actual_host_path_volume_mount.mount_path == "/var/pod_mount"
-        assert actual_host_path_volume_mount.sub_path == f"{org}/{project}"
+            actual_host_path_volume_mount = next(
+                iter(v for v in container.volume_mounts if v.name == volume_name)
+            )
+            assert actual_host_path_volume_mount.name == volume_name
+            assert actual_host_path_volume_mount.mount_path == "/var/pod_mount"
+            assert actual_host_path_volume_mount.sub_path == f"{org}/{project}"
 
 
-async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
+async def test_inject_multiple_storages(
+    kube_selector: KubeClientSelector,
+    org_project: tuple[str, str],
+) -> None:
     """
     Creates a POD with the proper annotation, which includes two volume mounts
     """
-    org, project = "org", "proj"
+    org, project = org_project
 
-    async with pod_cm(
-        kube_client,
-        annotations={
-            "platform.apolo.us/inject-storage": json.dumps(
-                [
-                    {
-                        "mount_path": "/var/pod_mount",
-                        "storage_uri": f"storage://default/{org}/{project}/1",
-                    },
-                    {
-                        "mount_path": "/var/pod_mount_2",
-                        "storage_uri": f"storage://default/{org}/{project}/2",
-                    },
-                ]
-            ),
-        },
-        labels={
-            LABEL_APOLO_ORG_NAME: org,
-            LABEL_APOLO_PROJECT_NAME: project,
-        },
-    ) as response:
-        spec = response.spec
-        assert spec is not None
-        container = spec.containers[0]
+    async with kube_selector.get_client(
+        org_name=org,
+        project_name=project,
+    ) as kube:
+        async with pod_cm(
+            kube,
+            annotations={
+                "platform.apolo.us/inject-storage": json.dumps(
+                    [
+                        {
+                            "mount_path": "/var/pod_mount",
+                            "storage_uri": f"storage://default/{org}/{project}/1",
+                        },
+                        {
+                            "mount_path": "/var/pod_mount_2",
+                            "storage_uri": f"storage://default/{org}/{project}/2",
+                        },
+                    ]
+                ),
+            },
+            labels={
+                LABEL_APOLO_ORG_NAME: org,
+                LABEL_APOLO_PROJECT_NAME: project,
+            },
+        ) as response:
+            spec = response.spec
+            assert spec is not None
+            container = spec.containers[0]
 
-        volumes = [v for v in spec.volumes if v.host_path is not None]
+            volumes = [v for v in spec.volumes if v.host_path is not None]
 
-        assert len(volumes) == 1
+            assert len(volumes) == 1
 
-        for volume in volumes:
-            assert volume.host_path is not None
-            assert volume.name.startswith(INJECTED_VOLUME_NAME_PREFIX)
-            assert volume.host_path.path == ACTUAL_HOST_PATH
+            for volume in volumes:
+                assert volume.host_path is not None
+                assert volume.name.startswith(INJECTED_VOLUME_NAME_PREFIX)
+                assert volume.host_path.path == ACTUAL_HOST_PATH
 
-        volume_names = {v.name for v in volumes}
-        volume_mounts = [v for v in container.volume_mounts if v.name in volume_names]
+            volume_names = {v.name for v in volumes}
+            volume_mounts = [
+                v for v in container.volume_mounts if v.name in volume_names
+            ]
 
-        assert len(volume_mounts) == 2
+            assert len(volume_mounts) == 2
 
-        for volume_mount in volume_mounts:
-            assert volume_mount.mount_path.startswith("/var/pod_mount")
-            assert volume_mount.sub_path is not None
-            assert volume_mount.sub_path.startswith(f"{org}/{project}")
+            for volume_mount in volume_mounts:
+                assert volume_mount.mount_path.startswith("/var/pod_mount")
+                assert volume_mount.sub_path is not None
+                assert volume_mount.sub_path.startswith(f"{org}/{project}")
