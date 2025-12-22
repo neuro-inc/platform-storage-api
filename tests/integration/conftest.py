@@ -39,6 +39,7 @@ pytest_plugins = [
     "tests.integration.conftest_moto",
     "tests.integration.conftest_kube",
     "tests.conftest_ac",
+    "tests.integration.conftest_clusters",
 ]
 
 

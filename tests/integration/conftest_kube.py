@@ -5,7 +5,12 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from apolo_kube_client import KubeClient, KubeClientAuthType, KubeConfig
+from apolo_kube_client import (
+    KubeClient,
+    KubeClientAuthType,
+    KubeClientSelector,
+    KubeConfig,
+)
 
 
 @pytest.fixture(scope="session")
@@ -44,7 +49,7 @@ def cert_authority_data_pem(
     return None
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 async def kube_config(
     kube_config_cluster_payload: dict[str, Any],
     kube_config_user_payload: dict[str, Any],
@@ -62,7 +67,11 @@ async def kube_config(
 
 
 @pytest.fixture
-async def kube_client(kube_config: KubeConfig) -> AsyncIterator[KubeClient]:
-    client = KubeClient(config=kube_config)
-    async with client:
-        yield client
+async def kube_selector(kube_config: KubeConfig) -> AsyncIterator[KubeClientSelector]:
+    async with KubeClientSelector(config=kube_config) as kube_client_selector:
+        yield kube_client_selector
+
+
+@pytest.fixture
+async def kube_client(kube_selector: KubeClientSelector) -> KubeClient:
+    return kube_selector.host_client

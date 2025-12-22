@@ -63,7 +63,7 @@ dist: build
 build/test-image: dist
 	docker build \
 		--build-arg PY_VERSION=$$(cat .python-version) \
-		-t admission-controller-tests:latest .
+		-t storage-admission-controller-tests:latest .
 
 .PHONY: docker_pull_test_images
 docker_pull_test_images:

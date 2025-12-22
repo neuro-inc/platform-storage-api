@@ -6,16 +6,16 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: admission-controller
+      app: storage-admission-controller
   template:
     metadata:
       labels:
-        app: admission-controller
+        app: storage-admission-controller
     spec:
-      serviceAccountName: admission-controller
+      serviceAccountName: storage-admission-controller
       containers:
-      - name: admission-controller
-        image: docker.io/library/admission-controller-tests:latest
+      - name: storage-admission-controller
+        image: docker.io/library/storage-admission-controller-tests:latest
         imagePullPolicy: "IfNotPresent"
         command:
           - platform-storage-admission-controller
@@ -51,7 +51,7 @@ spec:
           - name: NP_STORAGE_API_K8S_NS
             value: "default"
           - name: NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME
-            value: "admission-controller-cert"
+            value: "storage-admission-controller-cert"
         volumeMounts:
           - mountPath: /var/storage
             name: volume
@@ -65,10 +65,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: admission-controller
+  name: storage-admission-controller
 spec:
   selector:
-    app: admission-controller
+    app: storage-admission-controller
   ports:
     - name: https
       port: 443
