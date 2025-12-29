@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import ssl
 import tempfile
 from base64 import b64decode
@@ -25,11 +26,13 @@ async def run() -> None:
         ignore_errors=[web.HTTPNotFound],
     )
 
+    namespace = os.environ["NP_STORAGE_API_K8S_NS"]
+
     assert config.kube is not None
     # get the necessary certificates from the secrets
     async with KubeClient(config=config.kube) as kube:
         cert_secret_name = config.admission_controller_config.cert_secret_name
-        response = await kube.core_v1.secret.get(cert_secret_name)
+        response = await kube.core_v1.secret.get(cert_secret_name, namespace=namespace)
         secrets = response.data
         tls_key = secrets["tls.key"]
         tls_cert = secrets["tls.crt"]
