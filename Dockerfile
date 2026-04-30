@@ -1,4 +1,4 @@
-ARG PY_VERSION=3.13.3
+ARG PY_VERSION=3.13
 
 FROM python:${PY_VERSION}-slim-bookworm AS builder
 
@@ -10,8 +10,7 @@ COPY requirements.txt /tmp/
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 COPY dist /tmp/dist/
-RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-storage-api \
-    && rm -rf /tmp/dist
+RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-storage-api
 
 FROM python:${PY_VERSION}-slim-bookworm AS runtime
 LABEL org.opencontainers.image.source="https://github.com/neuro-inc/platform-storage-api"
