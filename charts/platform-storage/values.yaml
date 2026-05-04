@@ -65,29 +65,13 @@ sentry:
 
 priorityClassName: ""
 
-s3:
+s3: {}
   # region:
   # accessKeyId: {}
   # secretAccessKey: {}
   # endpoint:
   # bucket:
   # keyPrefix:
-
-# --- SeaweedFS config (active):
-  region: "us-east-1"
-  endpoint: "http://seaweedfs-s3:9000"
-  bucket: "platform-storage-metrics"
-  accessKeyId:
-    valueFrom:
-      secretKeyRef:
-        name: seaweedfs-s3-secret
-        key: admin_access_key_id
-  secretAccessKey:
-    valueFrom:
-      secretKeyRef:
-        name: seaweedfs-s3-secret
-        key: admin_secret_access_key
-  # For readonly - use read_access_key_id from secret.
 
 storageUsageCollector:
   schedule: "0 * * * *" # every hour

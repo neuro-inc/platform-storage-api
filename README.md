@@ -1,81 +1,56 @@
 # Platform Storage API
 
-## S3/SeaweedFS/MinIO Configuration
+This component is responsible for data ingestion, browsing, manipulation and
+retrieval of files in the underlying backend FS.
 
-This service supports the following S3-compatible storage backends:
-- **MinIO** (for local development, testing)
-- **SeaweedFS** (recommended for all production work)
+## Local Development
 
-### Selecting backend
-Use the `s3` section in your `values.yaml` or set environment variables directly (see deployment helm templates for ENV mappings).
-
-### Example values.yaml configuration
-```yaml
-# MinIO config example (commented, inactive):
-# s3:
-#   region: "us-east-1"
-#   endpoint: "http://minio.platform:9000"
-#   bucket: "platform-storage-metrics"
-#   accessKeyId:
-#     valueFrom:
-#       secretKeyRef:
-#         name: minio-secret
-#         key: access_key_id
-#   secretAccessKey:
-#     valueFrom:
-#       secretKeyRef:
-#         name: minio-secret
-#         key: secret_access_key
-
-# SeaweedFS config (active):
-s3:
-  region: "us-east-1"
-  endpoint: "http://seaweedfs-s3:9000"
-  bucket: "platform-storage-metrics"
-  accessKeyId:
-    valueFrom:
-      secretKeyRef:
-        name: seaweedfs-s3-secret
-        key: admin_access_key_id
-  secretAccessKey:
-    valueFrom:
-      secretKeyRef:
-        name: seaweedfs-s3-secret
-        key: admin_secret_access_key
-  # For readonly access: use keys read_access_key_id/read_secret_access_key.
+### Preparing environment
+```
+python -m venv venv
+source venv/bin/activate
+pip install -e .
 ```
 
-### Required Kubernetes Secret for SeaweedFS
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: seaweedfs-s3-secret
-  namespace: <your-namespace>
-type: Opaque
-data:
-  admin_access_key_id: <base64-encoded>
-  admin_secret_access_key: <base64-encoded>
-  read_access_key_id: <base64-encoded>
-  read_secret_access_key: <base64-encoded>
+### Running unit tests locally
+```
+pip install -r requirements-test.txt
+pytest -vv tests
 ```
 
-### Local Testing via aws-cli/minio/mc
-1. Port-forward to the cluster S3 endpoint:
-   ```shell
-   kubectl port-forward svc/seaweedfs-s3 9000:9000 -n <namespace>
-   ```
-2. Test with AWS CLI:
-   ```shell
-   AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... aws --endpoint-url http://localhost:9000 s3 ls
-   ```
-3. Or with minio-client (mc):
-   ```shell
-   mc alias set seaweed http://localhost:9000 <admin_access_key_id> <admin_secret_access_key>
-   mc ls seaweed
-   ```
+NOTE:
+if you are running tests on a macOS,
+you should install the coreutils, so tests which are using the `du` cmd will work properly:
 
-### Notes
-- Switch backend by editing the values.yaml (`type:` or top-level `s3:` fields)
-- Readonly deployments should use `read_access_key_id` from the secret.
-- See deployment Helm templates for exact ENV mapping and details.
+```shell
+brew install coreutils
+```
+
+### Running integration tests locally
+Make sure you have docker installed.
+To build docker image where test run, you should set the following ENV variables:
+
+```
+export TAG=latest
+export CLOUD_IMAGE_REPO=%link-to-docker-repo%
+```
+
+The `%link-to-docker-repo%` links to repo with other services docker images.
+It depends on current setup. Please refer to onboarding guide to get it.
+
+Then you can run tests with the next command:
+
+```
+make test_integration
+```
+
+### Reformatting code
+```
+make format
+```
+
+## How to release
+
+Push new tag of form `vXX.XX.XX` where `XX.XX.XX` is semver version
+(please just use the date, like 20.12.31 for 31 December 2020).
+You can do this by using GitHub "Create release" UI.

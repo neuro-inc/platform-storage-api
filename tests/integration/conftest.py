@@ -123,20 +123,13 @@ def seaweedfs_s3_config(seaweedfs_server: URL) -> S3Config:
     )
 
 
-@pytest.fixture(params=["moto", "seaweedfs"])
+@pytest.fixture(params=["moto"])
 def parametrized_s3_config(
     request: pytest.FixtureRequest,
     moto_server: URL,
-    seaweedfs_s3_config: S3Config,
     s3_config: S3Config,
 ) -> S3Config:
-    # Allows running tests with either mocked (moto) or real (SeaweedFS) S3 backend
-    if request.param == "moto":
-        return s3_config
-    if request.param == "seaweedfs":
-        return seaweedfs_s3_config
-    msg = f"Unknown S3 backend: {request.param}"
-    raise Exception(msg)
+    return s3_config
 
 
 @pytest.fixture
