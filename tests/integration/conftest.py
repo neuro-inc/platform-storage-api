@@ -15,6 +15,7 @@ import uvicorn
 from apolo_events_client import EventsClientConfig
 from apolo_kube_client import KubeConfig
 from neuro_admin_client import AdminClient
+from pytest_docker.plugin import Services
 from yarl import URL
 
 from platform_storage_api.api import create_app
@@ -103,10 +104,38 @@ def platform_config(
     )
 
 
+@pytest.fixture(scope="session")
+def seaweedfs_server(docker_ip: str, docker_services: Services) -> URL:
+    # SeaweedFS S3 endpoint from docker-compose (matches MinIO test pattern)
+    port = docker_services.port_for("seaweedfs-s3", 9000)
+    return URL(f"http://{docker_ip}:{port}")
+
+
+@pytest.fixture
+def seaweedfs_s3_config(seaweedfs_server: URL) -> S3Config:
+    # Credentials and bucket name match test docker-compose setup
+    return S3Config(
+        region="us-east-1",
+        access_key_id="admin",
+        secret_access_key="devsecret",
+        endpoint_url=str(seaweedfs_server),
+        bucket_name="storage-metrics",
+    )
+
+
+@pytest.fixture(params=["moto"])
+def parametrized_s3_config(
+    request: pytest.FixtureRequest,
+    moto_server: URL,
+    s3_config: S3Config,
+) -> S3Config:
+    return s3_config
+
+
 @pytest.fixture
 def config(
     platform_config: PlatformConfig,
-    s3_config: S3Config,
+    parametrized_s3_config: S3Config,
     local_tmp_dir_path: Path,
     events_config: EventsClientConfig,
 ) -> Config:
@@ -116,7 +145,7 @@ def config(
         server=server_config,
         storage=storage_config,
         platform=platform_config,
-        s3=s3_config,
+        s3=parametrized_s3_config,
         admission_controller_config=AdmissionControllerConfig(
             cert_secret_name="secret",
         ),
