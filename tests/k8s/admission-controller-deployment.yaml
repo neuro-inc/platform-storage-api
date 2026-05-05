@@ -35,7 +35,9 @@ spec:
           - name: NP_PLATFORM_CLUSTER_NAME
             value: "minikube"
           - name: S3_REGION
-            value: "none"
+            value: "us-east-1"
+          - name: S3_ENDPOINT_URL
+            value: "http://seaweedfs-s3.platform.svc.cluster.local:9000"
           - name: S3_BUCKET_NAME
             value: ""
           - name: SERVER_PORT
