@@ -67,6 +67,7 @@ class S3Config:
 @dataclass(frozen=True)
 class AdmissionControllerConfig:
     cert_secret_name: str
+    namespace: str
 
     @classmethod
     def from_environ(
@@ -242,6 +243,7 @@ class EnvironConfigFactory:
         ]
         return AdmissionControllerConfig(
             cert_secret_name=cert_secret_name,
+            namespace=self._environ.get("NP_STORAGE_API_K8S_NS", "default"),
         )
 
     def create_events(self) -> EventsClientConfig | None:

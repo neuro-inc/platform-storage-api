@@ -185,9 +185,10 @@ def path_resolver(local_mount_path: str) -> StoragePathResolver:
 
 
 @pytest.fixture
-def config() -> AdmissionControllerConfig:
+def admission_controller_config() -> AdmissionControllerConfig:
     return AdmissionControllerConfig(
         cert_secret_name="secret",
+        namespace="default",
     )
 
 
@@ -200,12 +201,12 @@ def storage(path_resolver: StoragePathResolver, local_fs: FileSystem) -> Storage
 def volume_resolver_with_nfs(
     kube_api_with_nfs: Mock,
     path_resolver: StoragePathResolver,
-    config: AdmissionControllerConfig,
+    admission_controller_config: AdmissionControllerConfig,
 ) -> KubeVolumeResolver:
     return KubeVolumeResolver(
         kube_api=kube_api_with_nfs,
         path_resolver=path_resolver,
-        admission_controller_config=config,
+        admission_controller_config=admission_controller_config,
     )
 
 
@@ -213,10 +214,10 @@ def volume_resolver_with_nfs(
 def volume_resolver_with_host_path(
     kube_api_with_host_path: Mock,
     path_resolver: StoragePathResolver,
-    config: AdmissionControllerConfig,
+    admission_controller_config: AdmissionControllerConfig,
 ) -> KubeVolumeResolver:
     return KubeVolumeResolver(
         kube_api=kube_api_with_host_path,
         path_resolver=path_resolver,
-        admission_controller_config=config,
+        admission_controller_config=admission_controller_config,
     )
