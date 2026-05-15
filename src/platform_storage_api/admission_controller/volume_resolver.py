@@ -1,7 +1,7 @@
 import dataclasses
 import logging
 import socket
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path, PurePath
 from types import TracebackType
 from typing import Any, Self, Union
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class VolumeResolverError(Exception): ...
 
 
-class VolumeBackend(str, Enum):
+class VolumeBackend(StrEnum):
     """Supported volume backends"""
 
     NFS = "nfs"
@@ -55,7 +55,7 @@ class NfsVolumeSpec(BaseVolumeSpec):
         )
 
 
-class HostPathType(str, Enum):
+class HostPathType(StrEnum):
     EMPTY = ""
     DIRECTORY_OR_CREATE = "DirectoryOrCreate"
     DIRECTORY = "Directory"

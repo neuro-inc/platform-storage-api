@@ -1,6 +1,6 @@
 import abc
 import logging
-from enum import Enum
+from enum import StrEnum
 from pathlib import PurePath
 
 from aiohttp import web
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 AUTH_CLIENT_KEY = web.AppKey("auth_client", AuthClient)
 
 
-class AuthAction(str, Enum):
+class AuthAction(StrEnum):
     DENY = "deny"
     LIST = "list"
     READ = "read"

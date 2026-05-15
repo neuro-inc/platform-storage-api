@@ -6,7 +6,7 @@ import struct
 import time
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable
 from contextlib import AsyncExitStack
-from enum import Enum, StrEnum
+from enum import StrEnum
 from errno import errorcode
 from functools import partial
 from pathlib import PurePath
@@ -103,7 +103,7 @@ class StorageOperation(StrEnum):
         return [item.value for item in cls]
 
 
-class WSStorageOperation(str, Enum):
+class WSStorageOperation(StrEnum):
     ACK = "ACK"
     ERROR = "ERROR"
     READ = "READ"

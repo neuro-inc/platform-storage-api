@@ -1,7 +1,6 @@
 import abc
 import asyncio
 import contextlib
-import enum
 import errno
 import logging
 import os
@@ -16,7 +15,7 @@ from enum import StrEnum
 from itertools import islice
 from pathlib import Path, PurePath
 from types import TracebackType
-from typing import Any
+from typing import Any, Self
 
 import aiofiles
 
@@ -35,7 +34,7 @@ class StorageType(StrEnum):
     S3 = "s3"
 
 
-class FileStatusType(str, enum.Enum):
+class FileStatusType(StrEnum):
     DIRECTORY = "DIRECTORY"
     FILE = "FILE"
     SYMLINK = "SYMLINK"
@@ -44,7 +43,7 @@ class FileStatusType(str, enum.Enum):
         return self.value
 
 
-class FileStatusPermission(str, enum.Enum):
+class FileStatusPermission(StrEnum):
     READ = "read"
     WRITE = "write"
     MANAGE = "manage"
@@ -127,7 +126,7 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         msg = f"Unsupported storage type: {type_}"
         raise ValueError(msg)
 
-    async def __aenter__(self) -> "FileSystem":
+    async def __aenter__(self) -> Self:
         await self.init()
         return self
 

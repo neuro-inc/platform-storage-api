@@ -74,7 +74,8 @@ ignore = [
     "PTH106", # `os.rmdir()` should be replaced by `Path.rmdir()`
     "PTH108", # `os.unlink()` should be replaced by `Path.unlink()`
     "PTH115", # `os.readlink()` should be replaced by `Path.readlink()`
-    "C901" # xxx is too complex
+    "C901", # xxx is too complex
+    "ASYNC240" # too complex for now: Async functions should not use pathlib.Path methods, use trio.Path or anyio.path
 ]
 
 [tool.isort]
