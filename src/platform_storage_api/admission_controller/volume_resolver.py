@@ -116,8 +116,8 @@ class KubeApi:
     def __init__(self, kube_client: KubeClient):
         self._kube = kube_client
 
-    async def get_pod(self, pod_name: str) -> V1Pod:
-        return await self._kube.core_v1.pod.get(pod_name)
+    async def get_pod(self, pod_name: str, namespace: str | None = None) -> V1Pod:
+        return await self._kube.core_v1.pod.get(pod_name, namespace=namespace)
 
     async def get_pvc(self, pvc_name: str) -> V1PersistentVolumeClaim:
         return await self._kube.core_v1.persistent_volume_claim.get(pvc_name)
@@ -152,7 +152,7 @@ class KubeVolumeResolver:
         pod_name = socket.gethostname()
 
         try:
-            pod = await self._kube.get_pod(pod_name)
+            pod = await self._kube.get_pod(pod_name, namespace=self._config.namespace)
         except Exception as e:
             raise VolumeResolverError() from e
 

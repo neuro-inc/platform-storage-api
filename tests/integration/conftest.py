@@ -119,6 +119,7 @@ def config(
         s3=s3_config,
         admission_controller_config=AdmissionControllerConfig(
             cert_secret_name="secret",
+            namespace="default",
         ),
         kube=KubeConfig(endpoint_url="https://localhost:8443"),
         events=events_config,

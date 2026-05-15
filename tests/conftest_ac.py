@@ -188,6 +188,7 @@ def path_resolver(local_mount_path: str) -> StoragePathResolver:
 def config() -> AdmissionControllerConfig:
     return AdmissionControllerConfig(
         cert_secret_name="secret",
+        namespace="default",
     )
 
 
