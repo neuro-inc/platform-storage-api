@@ -37,7 +37,7 @@ class PlatformConfig:
     cluster_name: str
 
 
-class StorageMode(str, enum.Enum):
+class StorageMode(enum.StrEnum):
     SINGLE = "single"
     MULTIPLE = "multiple"
 

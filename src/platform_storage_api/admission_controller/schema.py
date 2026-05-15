@@ -1,7 +1,7 @@
 import base64
 import dataclasses
 import json
-from enum import Enum
+from enum import StrEnum
 from functools import cached_property
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -12,7 +12,7 @@ from pydantic import BaseModel, TypeAdapter, field_validator
 SCHEMA_STORAGE = "storage://"
 
 
-class MountMode(str, Enum):
+class MountMode(StrEnum):
     READ_ONLY = "r"
     READ_WRITE = "rw"
 
@@ -72,7 +72,7 @@ class MountSchema(BaseModel):
 InjectionSchema = TypeAdapter(list[MountSchema])
 
 
-class AdmissionReviewPatchType(str, Enum):
+class AdmissionReviewPatchType(StrEnum):
     JSON = "JSONPatch"
 
 
