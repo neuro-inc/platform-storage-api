@@ -119,8 +119,12 @@ class KubeApi:
     async def get_pod(self, pod_name: str, namespace: str | None = None) -> V1Pod:
         return await self._kube.core_v1.pod.get(pod_name, namespace=namespace)
 
-    async def get_pvc(self, pvc_name: str) -> V1PersistentVolumeClaim:
-        return await self._kube.core_v1.persistent_volume_claim.get(pvc_name)
+    async def get_pvc(
+        self, pvc_name: str, namespace: str | None = None
+    ) -> V1PersistentVolumeClaim:
+        return await self._kube.core_v1.persistent_volume_claim.get(
+            pvc_name, namespace=namespace
+        )
 
     async def get_pv(self, pv_name: str) -> V1PersistentVolume:
         return await self._kube.core_v1.persistent_volume.get(pv_name)
@@ -288,7 +292,9 @@ class KubeVolumeResolver:
 
         # get PVs by claim names
         for storage_name, claim_name in storage_name_to_pvc.items():
-            claim = await self._kube.get_pvc(pvc_name=claim_name)
+            claim = await self._kube.get_pvc(
+                pvc_name=claim_name, namespace=self._config.namespace
+            )
             assert claim.spec.volume_name is not None
             storage_name_to_pv[storage_name] = claim.spec.volume_name
 
