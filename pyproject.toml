@@ -35,7 +35,7 @@ prometheus-client = "0.25.0"
 pydantic = "2.13.4"
 uvicorn = "0.40.0"
 uvloop = "0.22.1"
-apolo-events-client = "^25.10.0"
+apolo-events-client = ">=25.10,<27.0"
 
 [tool.poetry.scripts]
 platform-storage-api = "platform_storage_api.api:main"
@@ -53,7 +53,7 @@ pytest = "9.1.1"
 pytest-aiohttp = "1.1.1"
 pytest-asyncio = "1.4.0"
 pytest-docker = "3.2.5"
-apolo-events-client = {extras = ["pytest"], version = "^25.10.0"}
+apolo-events-client = {extras = ["pytest"], version = ">=25.10,<27.0"}
 
 [tool.poetry-dynamic-versioning]
 enable = true
