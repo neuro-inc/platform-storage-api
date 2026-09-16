@@ -129,3 +129,22 @@ class TestConfig:
         )
         assert config.s3.bucket_name == "test-bucket"
         assert config.s3.key_prefix == "test-key-prefix"
+
+    def test_events_group_is_cluster_scoped(self) -> None:
+        environ = {
+            "NP_STORAGE_LOCAL_BASE_PATH": "/path/to/dir",
+            "NP_PLATFORM_AUTH_URL": "-",
+            "NP_PLATFORM_ADMIN_URL": "-",
+            "NP_PLATFORM_TOKEN": "test-token",
+            "NP_PLATFORM_CLUSTER_NAME": "apolo-main",
+            "S3_REGION": "us-east-1",
+            "S3_ENDPOINT_URL": "http://seaweedfs-s3.platform.svc.cluster.local:9000",
+            "S3_BUCKET_NAME": "test-bucket",
+            "NP_STORAGE_API_K8S_API_URL": "https://localhost:8443",
+            "NP_STORAGE_ADMISSION_CONTROLLER_CERT_SECRET_NAME": "secret",
+            "NP_STORAGE_EVENTS_URL": "http://platform-events:8080/apis/events",
+            "NP_STORAGE_EVENTS_TOKEN": "events-token",
+        }
+        config = Config.from_environ(environ)
+        assert config.events is not None
+        assert config.events.name == "platform-storage-apolo-main"

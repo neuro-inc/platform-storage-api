@@ -13,6 +13,7 @@ async def test_deleter(
     regular_user_factory: _UserFactory,
     server_url: str,
     events_queues: EventsQueues,
+    cluster_name: str,
 ) -> None:
     user = await regular_user_factory()
     headers = {"Authorization": "Bearer " + user.token}
@@ -33,7 +34,7 @@ async def test_deleter(
                     stream=StreamType("platform-admin"),
                     event_type=EventType("project-remove"),
                     org="org",
-                    cluster="cluster",
+                    cluster=cluster_name,
                     project="project",
                     user="user",
                 ),
@@ -51,3 +52,45 @@ async def test_deleter(
 
     async with client.head(f"{server_url}/org/proj", headers=headers) as response:
         assert response.status == 404
+
+
+async def test_deleter_ignores_other_cluster(
+    client: aiohttp.ClientSession,
+    regular_user_factory: _UserFactory,
+    server_url: str,
+    events_queues: EventsQueues,
+) -> None:
+    user = await regular_user_factory()
+    headers = {"Authorization": "Bearer " + user.token}
+    url = f"{server_url}/org/project/path/to/file"
+    payload = b"test content"
+
+    async with client.put(url, headers=headers, data=payload) as response:
+        assert response.status == 201
+
+    await events_queues.outcome.put(
+        RecvEvents(
+            subscr_id=uuid4(),
+            events=[
+                RecvEvent(
+                    tag=Tag("124"),
+                    timestamp=datetime.now(tz=UTC),
+                    sender="platform-admin",
+                    stream=StreamType("platform-admin"),
+                    event_type=EventType("project-remove"),
+                    org="org",
+                    cluster="other-cluster",
+                    project="project",
+                    user="user",
+                ),
+            ],
+        )
+    )
+
+    ev = await events_queues.income.get()
+
+    assert isinstance(ev, Ack)
+    assert ev.events[StreamType("platform-admin")] == ["124"]
+
+    async with client.head(url, headers=headers) as response:
+        assert response.status == 200

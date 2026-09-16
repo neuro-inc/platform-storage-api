@@ -893,7 +893,9 @@ async def create_app(config: Config) -> web.Application:
             # TODO in a spin loop we shall do that
 
             logger.info("Initializing ProjectDeleter %r", config.events)
-            await exit_stack.enter_async_context(ProjectDeleter(storage, config.events))
+            await exit_stack.enter_async_context(
+                ProjectDeleter(storage, config.events, config.platform.cluster_name)
+            )
 
             logger.info("All initialization is done")
             yield

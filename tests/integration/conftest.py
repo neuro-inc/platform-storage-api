@@ -43,8 +43,8 @@ pytest_plugins = [
 
 
 @pytest.fixture
-def events_client_name() -> str:
-    return "platform-storage"
+def events_client_name(cluster_name: str) -> str:
+    return f"platform-storage-{cluster_name}"
 
 
 @asynccontextmanager

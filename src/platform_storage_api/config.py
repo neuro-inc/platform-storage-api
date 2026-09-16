@@ -119,14 +119,15 @@ class EnvironConfigFactory:
                 Config.permission_forgetting_interval_s,
             )
         )
+        platform = self.create_platform()
         return Config(
             server=server_config,
             storage=storage_config,
-            platform=self.create_platform(),
+            platform=platform,
             s3=self.create_s3(),
             admission_controller_config=self.create_admission_controller(),
             kube=self.create_kube(),
-            events=self.create_events(),
+            events=self.create_events(platform.cluster_name),
             permission_expiration_interval_s=permission_expiration_interval_s,
             permission_forgetting_interval_s=permission_forgetting_interval_s,
         )
@@ -246,9 +247,11 @@ class EnvironConfigFactory:
             namespace=self._environ.get("NP_STORAGE_API_K8S_NS", "default"),
         )
 
-    def create_events(self) -> EventsClientConfig | None:
+    def create_events(self, cluster_name: str) -> EventsClientConfig | None:
         if "NP_STORAGE_EVENTS_URL" in self._environ:
             url = URL(self._environ["NP_STORAGE_EVENTS_URL"])
             token = self._environ["NP_STORAGE_EVENTS_TOKEN"]
-            return EventsClientConfig(url=url, token=token, name="platform-storage")
+            return EventsClientConfig(
+                url=url, token=token, name=f"platform-storage-{cluster_name}"
+            )
         return None

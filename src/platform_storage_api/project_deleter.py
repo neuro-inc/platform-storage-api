@@ -18,9 +18,15 @@ class ProjectDeleter:
     ADMIN_STREAM = StreamType("platform-admin")
     PROJECT_REMOVE = EventType("project-remove")
 
-    def __init__(self, storage: Storage, config: EventsClientConfig | None) -> None:
+    def __init__(
+        self,
+        storage: Storage,
+        config: EventsClientConfig | None,
+        cluster_name: str,
+    ) -> None:
         self._storage = storage
         self._client = from_config(config)
+        self._cluster_name = cluster_name
 
     async def __aenter__(self) -> Self:
         logger.info("Subscribe for %r", self.ADMIN_STREAM)
@@ -38,5 +44,13 @@ class ProjectDeleter:
 
     async def _on_admin_event(self, ev: RecvEvent) -> None:
         if ev.event_type == self.PROJECT_REMOVE:
+            if ev.cluster != self._cluster_name:
+                logger.warning(
+                    "Skip %s for cluster %r, this is %r",
+                    ev.event_type,
+                    ev.cluster,
+                    self._cluster_name,
+                )
+                return
             path = f"/{ev.org}/{ev.project}"
             await self._storage.remove_notrace(path, recursive=True)
