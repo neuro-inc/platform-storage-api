@@ -14,9 +14,11 @@ from platform_storage_api.fs.local import (
     FileStatus,
     FileStatusType,
     FileSystem,
+    FileSystemException,
     FileUsage,
     LocalFileSystem,
     StorageType,
+    check_du_failure,
     copy_streams,
     parse_du_size_output,
 )
@@ -1420,3 +1422,98 @@ class TestLocalFileSystem:
         ]
         assert result[0].size
         assert result[1].size
+
+    async def test_disk_usage_by_file_keeps_result_when_a_dir_is_unreadable(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        # `du` exits 1 on an unreadable directory but still reports a total for
+        # the path it was given; that result must not be thrown away.
+        if os.geteuid() == 0:
+            pytest.skip("root reads every directory, so du would not fail")
+
+        project = tmp_dir_path / "project"
+        project.mkdir()
+        (project / "readable").write_text("readable")
+        unreadable = project / "unreadable"
+        unreadable.mkdir()
+        (unreadable / "file").write_text("hidden")
+        unreadable.chmod(0o000)
+
+        try:
+            result = await fs.disk_usage_by_file(project)
+        finally:
+            unreadable.chmod(0o700)
+
+        assert [usage.path for usage in result] == [project]
+        assert result[0].size
+
+    async def test_disk_usage_by_file_raises_when_a_path_is_not_reported(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        with pytest.raises(FileSystemException):
+            await fs.disk_usage_by_file(tmp_dir_path / "does-not-exist")
+
+    async def test_disk_usage_by_file_raises_when_a_project_root_is_unreadable(
+        self, fs: FileSystem, tmp_dir_path: Path
+    ) -> None:
+        # du still prints a line for the path, but the size is the empty
+        # directory rather than the data underneath, so it must not be kept.
+        if os.geteuid() == 0:
+            pytest.skip("root reads every directory, so du would not fail")
+
+        project = tmp_dir_path / "project"
+        project.mkdir()
+        (project / "file").write_text("data")
+        project.chmod(0o000)
+
+        try:
+            with pytest.raises(FileSystemException):
+                await fs.disk_usage_by_file(project)
+        finally:
+            project.chmod(0o700)
+
+
+class TestCheckDuFailure:
+    paths = [PurePath("/storage/org/project"), PurePath("/storage/org/other")]
+
+    def test_permission_errors_below_the_requested_paths_are_tolerated(self) -> None:
+        stderr = (
+            "du: cannot read directory '/storage/org/project/a': Permission denied\n"
+            "du: cannot read directory '/storage/org/project/b/c': Permission denied\n"
+        )
+
+        message = check_du_failure(1, stderr, self.paths)
+
+        assert message is not None
+        assert "2 directory(ies)" in message
+        assert "/storage/org/project/a" in message
+
+    def test_unreadable_requested_path_is_not_tolerated(self) -> None:
+        stderr = "du: cannot read directory '/storage/org/project': Permission denied\n"
+
+        assert check_du_failure(1, stderr, self.paths) is None
+
+    def test_termination_by_signal_is_not_tolerated(self) -> None:
+        stderr = (
+            "du: cannot read directory '/storage/org/project/a': Permission denied\n"
+        )
+
+        assert check_du_failure(-9, stderr, self.paths) is None
+
+    def test_other_exit_codes_are_not_tolerated(self) -> None:
+        stderr = (
+            "du: cannot read directory '/storage/org/project/a': Permission denied\n"
+        )
+
+        assert check_du_failure(2, stderr, self.paths) is None
+
+    def test_unrecognised_diagnostic_is_not_tolerated(self) -> None:
+        stderr = (
+            "du: cannot read directory '/storage/org/project/a': Permission denied\n"
+            "du: cannot access '/storage/org/project/b': Input/output error\n"
+        )
+
+        assert check_du_failure(1, stderr, self.paths) is None
+
+    def test_failure_without_diagnostics_is_not_tolerated(self) -> None:
+        assert check_du_failure(1, "", self.paths) is None
