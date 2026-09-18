@@ -4,10 +4,11 @@ import contextlib
 import errno
 import logging
 import os
+import re
 import shutil
 import stat as statmodule
 import sys
-from collections.abc import AsyncIterator, Iterable, Iterator
+from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
@@ -626,10 +627,10 @@ class LocalFileSystem(FileSystem):
                 f"--files0-from={temp_file.name}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                # classification below matches C-locale diagnostics
+                env={**os.environ, "LC_ALL": "C", "LANG": "C"},
             )
             stdout, stderr = await process.communicate()
-        if process.returncode:
-            raise FileSystemException(stderr.decode())
         result = []
         for line in stdout.splitlines():
             line = line.strip()
@@ -642,7 +643,64 @@ class LocalFileSystem(FileSystem):
                     size=parse_du_size_output(size_str.decode()),
                 )
             )
+        if process.returncode:
+            message = check_du_failure(process.returncode, stderr.decode(), paths)
+            if message is None:
+                raise FileSystemException(stderr.decode())
+            missing = [p for p in paths if p not in {u.path for u in result}]
+            if missing:
+                raise FileSystemException(stderr.decode())
+            logger.warning("%s", message)
         return result
+
+
+# du writes one of these to stderr for every directory it is not allowed to
+# read. The subprocess runs under LC_ALL=C so the wording is the one matched here.
+_DU_PERMISSION_ERROR = re.compile(
+    r"^du: cannot (?:read directory|access) '(?P<path>.*)': Permission denied$"
+)
+
+
+def check_du_failure(
+    returncode: int, stderr: str, paths: Sequence[PurePath]
+) -> str | None:
+    """Decide whether a failed `du` run still produced usable totals.
+
+    `du` exits 1 when it cannot read a directory it walks, while still counting
+    everything else and still printing a total for every path it was given.
+    Discarding that leaves no storage usage at all, which is worse than totals
+    that are understated for a few unreadable subtrees.
+
+    Everything else is not usable and the caller must keep the previous
+    snapshot rather than overwrite it: another exit code, termination by a
+    signal, a diagnostic we do not recognise, or a requested project directory
+    that could not be read at all — `du` still prints a line for it, but the
+    number is the empty directory rather than the data underneath.
+
+    Returns a message describing the tolerated failure, or None when the result
+    has to be discarded.
+    """
+    if returncode != 1:
+        return None
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    if not lines:
+        return None
+    unreadable = []
+    for line in lines:
+        match = _DU_PERMISSION_ERROR.match(line)
+        if match is None:
+            return None
+        unreadable.append(PurePath(match.group("path")))
+    requested = set(paths)
+    unreadable_roots = [path for path in unreadable if path in requested]
+    if unreadable_roots:
+        return None
+    sample = ", ".join(str(path) for path in unreadable[:5])
+    return (
+        f"du could not read {len(unreadable)} directory(ies); the totals of the "
+        f"projects containing them are understated, every requested path was "
+        f"still reported. First ones: {sample}"
+    )
 
 
 _SIZE_UNIT_POWERS = {

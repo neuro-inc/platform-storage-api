@@ -78,6 +78,14 @@ storageUsageCollector:
   startingDeadlineSeconds: 300
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
+  # concurrencyPolicy is Forbid, so a job that keeps retrying blocks every later
+  # schedule for as long as it lives: one failing job once held the hourly
+  # schedule for 30 hours. Retrying inside the job is redundant when the next
+  # schedule is itself the retry, and it starts with a full time budget.
+  backoffLimit: 0
+  # A full collection over a large storage takes hours, so the cap is generous,
+  # but it is a cap.
+  activeDeadlineSeconds: 43200 # 12h
 
   resources:
     requests:
