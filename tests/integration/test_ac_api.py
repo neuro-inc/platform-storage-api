@@ -653,8 +653,8 @@ class TestMutateApi:
         volume_expected: dict[str, Any],
     ) -> None:
         """
-        Adding two volumes to the pod, which defines two containers.
-        Volumes should be added to each container.
+        Adding two volumes to the pod, which defines regular and init containers.
+        Volumes should be added to every container.
         """
         url = f"http://{api.host}:{api.port}/admission-controller/mutate"
         response = await self.http.post(
@@ -691,6 +691,7 @@ class TestMutateApi:
                                 {"name": "container-1"},
                                 {"name": "container-2"},
                             ],
+                            "initContainers": [{"name": "init-container"}],
                         },
                     },
                 }
@@ -703,6 +704,11 @@ class TestMutateApi:
             {"op": "add", "path": "/spec/volumes", "value": []},
             {"op": "add", "path": "/spec/containers/0/volumeMounts", "value": []},
             {"op": "add", "path": "/spec/containers/1/volumeMounts", "value": []},
+            {
+                "op": "add",
+                "path": "/spec/initContainers/0/volumeMounts",
+                "value": [],
+            },
             {
                 "op": "add",
                 "path": "/spec/volumes/-",
@@ -731,6 +737,15 @@ class TestMutateApi:
             },
             {
                 "op": "add",
+                "path": "/spec/initContainers/0/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume",
+                    "name": "storage-auto-injected-volume-1",
+                    "subPath": "org/proj/data1",
+                },
+            },
+            {
+                "op": "add",
                 "path": "/spec/containers/0/volumeMounts/-",
                 "value": {
                     "mountPath": "/var/mount-volume-2",
@@ -742,6 +757,16 @@ class TestMutateApi:
             {
                 "op": "add",
                 "path": "/spec/containers/1/volumeMounts/-",
+                "value": {
+                    "mountPath": "/var/mount-volume-2",
+                    "name": "storage-auto-injected-volume-1",
+                    "readOnly": True,
+                    "subPath": "org/proj/data2",
+                },
+            },
+            {
+                "op": "add",
+                "path": "/spec/initContainers/0/volumeMounts/-",
                 "value": {
                     "mountPath": "/var/mount-volume-2",
                     "name": "storage-auto-injected-volume-1",
