@@ -165,13 +165,13 @@ class AdmissionControllerApi:
 
         # check if this is not a reinvocation.
         # if any volume was auto-injected earlier - we shouldn't proceed with this again
-        for container in containers:
-            if "volumeMounts" not in container:
-                continue
-
-            for volume_mount in container["volumeMounts"]:
-                if volume_mount.get("name", "").startswith(INJECTED_VOLUME_NAME_PREFIX):
-                    return False
+        for container_field in ("containers", "initContainers"):
+            for container in pod_spec.get(container_field) or []:
+                for volume_mount in container.get("volumeMounts") or []:
+                    if volume_mount.get("name", "").startswith(
+                        INJECTED_VOLUME_NAME_PREFIX
+                    ):
+                        return False
 
         return True
 
@@ -231,7 +231,10 @@ class AdmissionControllerApi:
         with various patch operations.
         Raises an error if mutation is impossible.
         """
-        containers = pod_spec.get("containers") or []
+        containers_by_field = {
+            field: pod_spec.get(field) or []
+            for field in ("containers", "initContainers")
+        }
         logger.info("Injecting volumes")
 
         # let's ensure POD has volumes
@@ -242,12 +245,13 @@ class AdmissionControllerApi:
             )
 
         # and ensure that each container has a volume mounts
-        for idx, container in enumerate(containers):
-            if "volumeMounts" not in container:
-                admission_review.add_patch(
-                    path=f"/spec/containers/{idx}/volumeMounts",
-                    value=[],
-                )
+        for field, containers in containers_by_field.items():
+            for idx, container in enumerate(containers):
+                if "volumeMounts" not in container:
+                    admission_review.add_patch(
+                        path=f"/spec/{field}/{idx}/volumeMounts",
+                        value=[],
+                    )
 
         mounted_volumes: dict[str, str] = {}
 
@@ -279,18 +283,19 @@ class AdmissionControllerApi:
                 )
 
             # add a volumeMount with mount path for all the POD containers
-            for container_idx in range(len(containers)):
-                patch_value: dict[str, str | bool] = {
-                    "name": future_volume_name,
-                    "subPath": volume_mount.sub_path,
-                    "mountPath": mount_path,
-                }
-                if mount_mode is MountMode.READ_ONLY:
-                    patch_value["readOnly"] = True
+            for field, containers in containers_by_field.items():
+                for container_idx in range(len(containers)):
+                    patch_value: dict[str, str | bool] = {
+                        "name": future_volume_name,
+                        "subPath": volume_mount.sub_path,
+                        "mountPath": mount_path,
+                    }
+                    if mount_mode is MountMode.READ_ONLY:
+                        patch_value["readOnly"] = True
 
-                admission_review.add_patch(
-                    path=f"/spec/containers/{container_idx}/volumeMounts/-",
-                    value=patch_value,
-                )
+                    admission_review.add_patch(
+                        path=f"/spec/{field}/{container_idx}/volumeMounts/-",
+                        value=patch_value,
+                    )
 
         return admission_review.allow()
