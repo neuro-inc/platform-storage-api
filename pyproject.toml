@@ -52,7 +52,7 @@ pre-commit = "4.7.0"
 pytest = "9.1.1"
 pytest-aiohttp = "1.1.1"
 pytest-asyncio = "1.4.0"
-pytest-docker = "3.2.5"
+pytest-docker = "3.2.6"
 apolo-events-client = {extras = ["pytest"], version = ">=26.9,<27.0"}
 
 [tool.poetry-dynamic-versioning]
