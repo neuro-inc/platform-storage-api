@@ -23,9 +23,7 @@ class StorageServerConfig(ServerConfig):
     keep_alive_timeout_s: float = 75
 
     @classmethod
-    def from_environ(
-        cls, environ: dict[str, str] | None = None
-    ) -> "StorageServerConfig":
+    def from_environ(cls, environ: dict[str, str] | None = None) -> StorageServerConfig:
         return EnvironConfigFactory(environ).create_storage_server()
 
 
@@ -50,7 +48,7 @@ class StorageConfig:
     mode: StorageMode = StorageMode.SINGLE
 
     @classmethod
-    def from_environ(cls, environ: dict[str, str] | None = None) -> "StorageConfig":
+    def from_environ(cls, environ: dict[str, str] | None = None) -> StorageConfig:
         return EnvironConfigFactory(environ).create_storage()
 
 
@@ -73,7 +71,7 @@ class AdmissionControllerConfig:
     def from_environ(
         cls,
         environ: dict[str, str] | None = None,
-    ) -> "AdmissionControllerConfig":
+    ) -> AdmissionControllerConfig:
         return EnvironConfigFactory(environ).create_admission_controller()
 
 
@@ -90,7 +88,7 @@ class Config:
     permission_forgetting_interval_s: float = 0
 
     @classmethod
-    def from_environ(cls, environ: dict[str, str] | None = None) -> "Config":
+    def from_environ(cls, environ: dict[str, str] | None = None) -> Config:
         return EnvironConfigFactory(environ).create()
 
 
