@@ -57,17 +57,35 @@ async def run_asgi_app(
     class TestServer(uvicorn.Server):
         async def startup(self, sockets: list[Any] | None = None) -> None:
             await super().startup(sockets=sockets)
-            started.set()
+            if self.started:
+                started.set()
 
     server = TestServer(uvicorn.Config(app=app, host=host, port=port))
     server_task = asyncio.create_task(server.serve())
-    await started.wait()
+    ready_task = asyncio.create_task(started.wait())
     try:
+        done, _ = await asyncio.wait(
+            (ready_task, server_task),
+            timeout=30,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if server_task in done:
+            await server_task
+            message = "Server stopped before startup completed"
+            raise RuntimeError(message)
+        if not done:
+            message = "Server startup timed out"
+            raise TimeoutError(message)
         yield
     finally:
+        ready_task.cancel()
         server.should_exit = True
-        await server_task
-        await server.shutdown()
+        try:
+            async with asyncio.timeout(10):
+                await asyncio.shield(server_task)
+        finally:
+            server_task.cancel()
+            await asyncio.gather(ready_task, server_task, return_exceptions=True)
 
 
 class ApiConfig(NamedTuple):
