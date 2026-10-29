@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterable, AsyncIterator
 from contextlib import asynccontextmanager
@@ -51,12 +52,21 @@ def events_client_name(cluster_name: str) -> str:
 async def run_asgi_app(
     app: Any, *, host: str = "0.0.0.0", port: int = 8080
 ) -> AsyncIterator[None]:
-    server = uvicorn.Server(uvicorn.Config(app=app, host=host, port=port))
-    server.should_exit = True
-    await server.serve()
+    started = asyncio.Event()
+
+    class TestServer(uvicorn.Server):
+        async def startup(self, sockets: list[Any] | None = None) -> None:
+            await super().startup(sockets=sockets)
+            started.set()
+
+    server = TestServer(uvicorn.Config(app=app, host=host, port=port))
+    server_task = asyncio.create_task(server.serve())
+    await started.wait()
     try:
         yield
     finally:
+        server.should_exit = True
+        await server_task
         await server.shutdown()
 
 
