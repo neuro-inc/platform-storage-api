@@ -60,7 +60,7 @@ async def run_asgi_app(
             if self.started:
                 started.set()
 
-    server = TestServer(uvicorn.Config(app=app, host=host, port=port))
+    server = TestServer(uvicorn.Config(app=app, host=host, port=port, lifespan="off"))
     server_task = asyncio.create_task(server.serve())
     ready_task = asyncio.create_task(started.wait())
     try:
