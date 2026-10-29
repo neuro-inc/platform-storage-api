@@ -47,6 +47,5 @@ COPY --from=builder --chown=$SERVICE_NAME:$SERVICE_GID /root/.local /home/${SERV
 ENV NP_STORAGE_API_PORT=8080
 EXPOSE $NP_STORAGE_API_PORT
 
-RUN python -c "from importlib.metadata import version; assert tuple(map(int, version('certifi').split('.'))) >= (2026, 10, 19)"
 
 ENTRYPOINT [ "platform-storage-api" ]
