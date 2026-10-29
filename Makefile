@@ -46,7 +46,7 @@ IMAGE_NAME = platformstorageapi
 
 .PHONY: build/image
 build/image: dist
-	docker build \
+	docker build --pull --no-cache \
 		--build-arg PY_VERSION=$$(cat .python-version) \
 		-t $(IMAGE_NAME):latest .
 
@@ -61,7 +61,7 @@ dist: build
 
 .PHONY: build/test-image
 build/test-image: dist
-	docker build \
+	docker build --pull --no-cache \
 		--build-arg PY_VERSION=$$(cat .python-version) \
 		-t admission-controller-tests:latest .
 

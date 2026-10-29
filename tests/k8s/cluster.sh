@@ -68,7 +68,7 @@ function k8s::apply_all_configurations {
     echo "Applying configurations..."
     kubectl config use-context minikube
     make dist
-    docker build -t admission-controller-tests:latest .
+    docker build --pull --no-cache -t admission-controller-tests:latest .
     docker image save -o ac.tar admission-controller-tests:latest
     minikube image load ac.tar
     kubectl apply -f tests/k8s/rbac.yaml
