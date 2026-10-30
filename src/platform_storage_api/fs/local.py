@@ -62,7 +62,7 @@ class FileStatus:
     @classmethod
     def create_file_status(
         cls, path: PurePath, size: int, modification_time: int | None = None
-    ) -> "FileStatus":
+    ) -> FileStatus:
         return cls(
             path=path,
             type=FileStatusType.FILE,
@@ -73,7 +73,7 @@ class FileStatus:
     @classmethod
     def create_dir_status(
         cls, path: PurePath, modification_time: int | None = None
-    ) -> "FileStatus":
+    ) -> FileStatus:
         return cls(
             path=path,
             type=FileStatusType.DIRECTORY,
@@ -87,7 +87,7 @@ class FileStatus:
         path: PurePath,
         modification_time: int | None = None,
         target: str | None = None,
-    ) -> "FileStatus":
+    ) -> FileStatus:
         return cls(
             path=path,
             type=FileStatusType.SYMLINK,
@@ -96,7 +96,7 @@ class FileStatus:
             target=target,
         )
 
-    def with_permission(self, permission: FileStatusPermission) -> "FileStatus":
+    def with_permission(self, permission: FileStatusPermission) -> FileStatus:
         return replace(self, permission=permission)
 
 
@@ -121,7 +121,7 @@ class FileUsage:
 
 class FileSystem(AbstractAsyncContextManager):  # type: ignore
     @classmethod
-    def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> "FileSystem":
+    def create(cls, type_: StorageType, *args: Any, **kwargs: Any) -> FileSystem:
         if type_ == StorageType.LOCAL:
             return LocalFileSystem(**kwargs)
         msg = f"Unsupported storage type: {type_}"
@@ -354,7 +354,7 @@ class LocalFileSystem(FileSystem):
         path: PurePath,
         stat: os.stat_result,
         is_dir: bool,  # noqa: FBT001
-    ) -> "FileStatus":
+    ) -> FileStatus:
         mod_time = int(stat.st_mtime)  # converting float to int
         if is_dir:
             return FileStatus.create_dir_status(path, modification_time=mod_time)
@@ -367,7 +367,7 @@ class LocalFileSystem(FileSystem):
         path: PurePath,
         stat: os.stat_result,
         target: str | None = None,
-    ) -> "FileStatus":
+    ) -> FileStatus:
         mod_time = int(stat.st_mtime)  # converting float to int
         return FileStatus.create_link_status(
             path, modification_time=mod_time, target=target

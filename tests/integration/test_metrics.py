@@ -31,7 +31,7 @@ async def metrics_server(
     host = "0.0.0.0"
     port = unused_tcp_port_factory()
     async with run_asgi_app(app, host=host, port=port):
-        yield URL(f"http://{host}:{port}")
+        yield URL(f"http://127.0.0.1:{port}")
 
 
 @pytest.fixture

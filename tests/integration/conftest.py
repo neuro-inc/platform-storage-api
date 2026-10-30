@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterable, AsyncIterator
 from contextlib import asynccontextmanager
@@ -51,13 +52,40 @@ def events_client_name(cluster_name: str) -> str:
 async def run_asgi_app(
     app: Any, *, host: str = "0.0.0.0", port: int = 8080
 ) -> AsyncIterator[None]:
-    server = uvicorn.Server(uvicorn.Config(app=app, host=host, port=port))
-    server.should_exit = True
-    await server.serve()
+    started = asyncio.Event()
+
+    class TestServer(uvicorn.Server):
+        async def startup(self, sockets: list[Any] | None = None) -> None:
+            await super().startup(sockets=sockets)
+            if self.started:
+                started.set()
+
+    server = TestServer(uvicorn.Config(app=app, host=host, port=port, lifespan="off"))
+    server_task = asyncio.create_task(server.serve())
+    ready_task = asyncio.create_task(started.wait())
     try:
+        done, _ = await asyncio.wait(
+            (ready_task, server_task),
+            timeout=30,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if server_task in done:
+            await server_task
+            message = "Server stopped before startup completed"
+            raise RuntimeError(message)
+        if not done:
+            message = "Server startup timed out"
+            raise TimeoutError(message)
         yield
     finally:
-        await server.shutdown()
+        ready_task.cancel()
+        server.should_exit = True
+        try:
+            async with asyncio.timeout(10):
+                await asyncio.shield(server_task)
+        finally:
+            server_task.cancel()
+            await asyncio.gather(ready_task, server_task, return_exceptions=True)
 
 
 class ApiConfig(NamedTuple):

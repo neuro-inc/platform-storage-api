@@ -18,7 +18,7 @@ packages = [{ include = "platform_storage_api", from = "src" }]
 include = ["src/platform_storage_api/__init__.py"]
 
 [tool.poetry.dependencies]
-python = ">=3.13,<4.0"
+python = ">=3.14,<3.15"
 urllib3 = ">=1.26.11,<2.9"
 aiobotocore = "3.10.0"
 aiodns = "4.0.4"
@@ -33,7 +33,7 @@ neuro-auth-client = "25.8.2"
 neuro-logging = ">=26.9,<27.0"
 prometheus-client = "0.26.0"
 pydantic = "2.14.1"
-uvicorn = "0.40.0"
+uvicorn = "0.54.0"
 uvloop = "0.23.0"
 apolo-events-client = ">=26.9,<27.0"
 
@@ -44,12 +44,12 @@ platform-storage-worker = "platform_storage_api.worker:main"
 platform-storage-admission-controller = "platform_storage_api.admission_controller.__main__:main"
 
 [tool.poetry.group.dev.dependencies]
-aioresponses = "0.7.8"
+aioresponses = "0.7.9"
 docker = "7.2.0"
 mypy = "2.4.0"
 pdbpp = "0.12.1"
 pre-commit = "4.7.0"
-pytest = "9.1.1"
+pytest = "9.2.0"
 pytest-aiohttp = "1.1.1"
 pytest-asyncio = "1.4.1"
 pytest-docker = "3.2.6"
@@ -60,7 +60,7 @@ enable = true
 vcs = "git"
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
@@ -87,6 +87,7 @@ combine_as_imports = true
 lines_after_imports = 2
 
 [tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 filterwarnings = [
