@@ -14,7 +14,6 @@ RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-storage-ap
     && rm -rf /tmp/dist
 
 FROM python:${PY_VERSION}-slim-bookworm AS runtime
-
 LABEL org.opencontainers.image.source="https://github.com/neuro-inc/platform-storage-api"
 
 # Name of your service (folder under /home)
@@ -39,6 +38,5 @@ COPY --from=builder --chown=$SERVICE_NAME:$SERVICE_GID /root/.local /home/${SERV
 
 ENV NP_STORAGE_API_PORT=8080
 EXPOSE $NP_STORAGE_API_PORT
-
 
 ENTRYPOINT [ "platform-storage-api" ]
