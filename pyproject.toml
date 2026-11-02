@@ -46,7 +46,7 @@ platform-storage-admission-controller = "platform_storage_api.admission_controll
 [tool.poetry.group.dev.dependencies]
 aioresponses = "0.7.9"
 docker = "7.2.0"
-mypy = "2.4.0"
+mypy = "2.4.1"
 pdbpp = "0.12.1"
 pre-commit = "4.7.0"
 pytest = "9.2.0"
