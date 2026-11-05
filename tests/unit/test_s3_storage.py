@@ -39,7 +39,7 @@ def _create_client_error(status_code: int, code: str) -> ClientError:
 
 class TestS3Client:
     def test_timeouts(self, s3_client: botocore.client.BaseClient) -> None:
-        assert s3_client.meta.config.connect_timeout == 3
+        assert s3_client.meta.config.connect_timeout == 1.5
         assert s3_client.meta.config.read_timeout == 3
         assert s3_client.meta.config.retries == {
             "mode": "standard",

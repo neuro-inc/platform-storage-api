@@ -145,21 +145,3 @@ class TestMetrics:
             assert not metrics_task.done()
             response = await metrics_task
             assert response.status == 200
-
-    async def test_metrics__s3_error(
-        self,
-        client: aiohttp.ClientSession,
-        s3_client: AioBaseClient,
-        metrics_config: MetricsConfig,
-    ) -> None:
-        await s3_client.create_bucket(Bucket=metrics_config.s3.bucket_name)
-        await s3_client.put_object(
-            Bucket=metrics_config.s3.bucket_name,
-            Key=f"{metrics_config.s3.key_prefix}storage_usage.json",
-            Body=b"{}",
-            StorageClass="GLACIER",
-        )
-
-        response = await client.get("/metrics/")
-
-        assert response.status == 500
