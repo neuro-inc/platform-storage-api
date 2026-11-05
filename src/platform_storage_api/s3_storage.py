@@ -75,8 +75,9 @@ class StorageMetricsS3Storage:
                 Bucket=self._bucket_name, Key=self._key
             )
         except ClientError as err:
-            if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                return StorageUsage(projects=[])
+            if err.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
+                raise
+            return StorageUsage(projects=[])
         with response["Body"]:
             payload = response["Body"].read()
         return _EntityFactory.create_storage_usage(payload)
@@ -119,8 +120,9 @@ class StorageMetricsAsyncS3Storage:
                 Bucket=self._bucket_name, Key=self._key
             )
         except ClientError as err:
-            if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                return StorageUsage(projects=[])
+            if err.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
+                raise
+            return StorageUsage(projects=[])
         async with response["Body"]:
             payload = await response["Body"].read()
         return _EntityFactory.create_storage_usage(payload)

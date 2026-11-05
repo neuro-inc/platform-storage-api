@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import textwrap
+import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
+from unittest import mock
 
 import aiohttp
 import pytest
@@ -13,7 +16,8 @@ from yarl import URL
 
 from platform_storage_api.config import MetricsConfig
 from platform_storage_api.metrics import create_app
-from platform_storage_api.storage_usage import StorageUsageService
+from platform_storage_api.s3_storage import StorageMetricsS3Storage
+from platform_storage_api.storage_usage import StorageUsage, StorageUsageService
 
 from .conftest import run_asgi_app
 
@@ -111,3 +115,33 @@ class TestMetrics:
             storage_used_bytes{org_name="no_org",project_name="test-project"}"""
             )
         )
+
+    async def test_metrics__openmetrics(self, client: aiohttp.ClientSession) -> None:
+        response = await client.get(
+            "/metrics/", headers={"Accept": "application/openmetrics-text"}
+        )
+
+        assert response.status == 200
+        assert response.content_type == "application/openmetrics-text"
+        data = await response.text()
+        assert data.endswith("# EOF\n")
+
+    async def test_ping__slow_storage(self, client: aiohttp.ClientSession) -> None:
+        def get_storage_usage() -> StorageUsage:
+            time.sleep(3)
+            return StorageUsage(projects=[])
+
+        with mock.patch.object(
+            StorageMetricsS3Storage, "get_storage_usage", side_effect=get_storage_usage
+        ):
+            start = time.monotonic()
+            metrics_task = asyncio.create_task(client.get("/metrics/"))
+            await asyncio.sleep(0.5)
+            response = await client.get("/ping")
+            elapsed = time.monotonic() - start
+
+            assert response.status == 200
+            assert elapsed < 1.5
+            assert not metrics_task.done()
+            response = await metrics_task
+            assert response.status == 200

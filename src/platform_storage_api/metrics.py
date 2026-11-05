@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
@@ -6,10 +7,11 @@ import botocore
 import botocore.client
 import botocore.config
 import botocore.session
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from neuro_logging import init_logging
-from prometheus_client import CollectorRegistry, make_asgi_app
+from prometheus_client import CollectorRegistry
+from prometheus_client.exposition import choose_encoder
 
 from .config import EnvironConfigFactory, MetricsConfig
 from .s3 import create_s3_client
@@ -37,10 +39,13 @@ def create_app(config: MetricsConfig) -> Iterator[FastAPI]:
         registry = CollectorRegistry()
         registry.register(collector)
 
-        metrics_app = make_asgi_app(registry=registry)
         app = FastAPI(debug=False)
 
-        app.mount("/metrics", metrics_app)
+        @app.get("/metrics/")
+        async def metrics(request: Request) -> Response:
+            encoder, content_type = choose_encoder(request.headers.get("accept", ""))
+            output = await asyncio.to_thread(encoder, registry)
+            return Response(output, media_type=content_type)
 
         @app.get("/ping")
         async def ping() -> Response:
