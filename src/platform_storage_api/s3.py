@@ -16,7 +16,15 @@ from .config import S3Config
 def create_s3_client(
     session: botocore.session.Session, config: S3Config
 ) -> Iterator[botocore.client.BaseClient]:
-    client = session.create_client("s3", **_create_s3_client_kwargs(config))
+    kwargs = _create_s3_client_kwargs(config)
+    kwargs["config"] = kwargs["config"].merge(
+        botocore.config.Config(
+            connect_timeout=3,
+            read_timeout=5,
+            retries={"mode": "standard", "total_max_attempts": 2},
+        )
+    )
+    client = session.create_client("s3", **kwargs)
     yield client
     client.close()
 

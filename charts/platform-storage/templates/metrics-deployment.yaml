@@ -49,6 +49,7 @@ spec:
             path: /ping
             port: http
           initialDelaySeconds: 10
+          timeoutSeconds: 5
           periodSeconds: 10
         command:
           - platform-storage-metrics
