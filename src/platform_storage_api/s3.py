@@ -20,7 +20,7 @@ def create_s3_client(
     kwargs["config"] = kwargs["config"].merge(
         botocore.config.Config(
             connect_timeout=3,
-            read_timeout=5,
+            read_timeout=3,
             retries={"mode": "standard", "total_max_attempts": 2},
         )
     )
