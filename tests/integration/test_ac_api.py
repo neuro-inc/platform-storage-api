@@ -388,7 +388,7 @@ class TestMutateApi:
         return await self._test__ensure_volumes_will_be_added(
             nfs_api,
             uuid_mock,
-            volume_expected={"nfs": {"path": "/var/exports", "server": "0.0.0.0"}},
+            volume_expected={"nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}},
         )
 
     async def test__host_path__ensure_volumes_will_be_added(
@@ -399,7 +399,7 @@ class TestMutateApi:
         return await self._test__ensure_volumes_will_be_added(
             host_path_api,
             uuid_mock,
-            volume_expected={"hostPath": {"path": "/var/exports", "type": ""}},
+            volume_expected={"hostPath": {"path": "/var/exports/org/proj", "type": ""}},
         )
 
     async def _test__ensure_volumes_will_be_added(
@@ -461,7 +461,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
-                    "subPath": "org/proj",
+                    "subPath": "",
                 },
             },
         ]
@@ -476,7 +476,7 @@ class TestMutateApi:
         return await self._test__resolve_single_volume(
             nfs_api,
             uuid_mock,
-            volume_expected={"nfs": {"path": "/var/exports", "server": "0.0.0.0"}},
+            volume_expected={"nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}},
         )
 
     async def test__host_path__resolve_single_volume(
@@ -487,7 +487,7 @@ class TestMutateApi:
         return await self._test__resolve_single_volume(
             host_path_api,
             uuid_mock,
-            volume_expected={"hostPath": {"path": "/var/exports", "type": ""}},
+            volume_expected={"hostPath": {"path": "/var/exports/org/proj", "type": ""}},
         )
 
     async def _test__resolve_single_volume(
@@ -551,7 +551,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
-                    "subPath": "org/proj",
+                    "subPath": "",
                 },
             },
         ]
@@ -632,7 +632,7 @@ class TestMutateApi:
         return await self._test__resolve_single_volume_to_multiple_containers(
             nfs_api,
             uuid_mock,
-            volume_expected={"nfs": {"path": "/var/exports", "server": "0.0.0.0"}},
+            volume_expected={"nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}},
         )
 
     async def test__host_path__resolve_single_volume_to_multiple_containers(
@@ -643,7 +643,7 @@ class TestMutateApi:
         return await self._test__resolve_single_volume_to_multiple_containers(
             host_path_api,
             uuid_mock,
-            volume_expected={"hostPath": {"path": "/var/exports", "type": ""}},
+            volume_expected={"hostPath": {"path": "/var/exports/org/proj", "type": ""}},
         )
 
     async def _test__resolve_single_volume_to_multiple_containers(
@@ -723,7 +723,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
-                    "subPath": "org/proj/data1",
+                    "subPath": "data1",
                 },
             },
             {
@@ -732,7 +732,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
-                    "subPath": "org/proj/data1",
+                    "subPath": "data1",
                 },
             },
             {
@@ -741,7 +741,7 @@ class TestMutateApi:
                 "value": {
                     "mountPath": "/var/mount-volume",
                     "name": "storage-auto-injected-volume-1",
-                    "subPath": "org/proj/data1",
+                    "subPath": "data1",
                 },
             },
             {
@@ -751,7 +751,7 @@ class TestMutateApi:
                     "mountPath": "/var/mount-volume-2",
                     "name": "storage-auto-injected-volume-1",
                     "readOnly": True,
-                    "subPath": "org/proj/data2",
+                    "subPath": "data2",
                 },
             },
             {
@@ -761,7 +761,7 @@ class TestMutateApi:
                     "mountPath": "/var/mount-volume-2",
                     "name": "storage-auto-injected-volume-1",
                     "readOnly": True,
-                    "subPath": "org/proj/data2",
+                    "subPath": "data2",
                 },
             },
             {
@@ -771,7 +771,7 @@ class TestMutateApi:
                     "mountPath": "/var/mount-volume-2",
                     "name": "storage-auto-injected-volume-1",
                     "readOnly": True,
-                    "subPath": "org/proj/data2",
+                    "subPath": "data2",
                 },
             },
         ]
