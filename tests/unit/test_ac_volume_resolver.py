@@ -112,15 +112,54 @@ async def test__resolve_successfully(
     volume_path: str,
 ) -> None:
     """
-    Successful resolving
+    Successful resolving. The nfs path is scoped to the project and the
+    sub path holds only the remainder.
     """
-    storage_path = "/default/org/project"
+    storage_path = "/org/project/some/path"
 
     async with volume_resolver_with_nfs as vr:
         volume_mount = await vr.resolve_volume_mount(storage_path)
 
-        assert volume_mount.sub_path == "default/org/project"
+        assert volume_mount.sub_path == "some/path"
         assert volume_mount.volume.backend == VolumeBackend.NFS
         spec = cast(NfsVolumeSpec, volume_mount.volume.spec)
         assert spec.server == "0.0.0.0"
-        assert spec.path == volume_path
+        assert spec.path == f"{volume_path}/org/project"
+
+
+async def test__resolve_project_root_has_empty_sub_path(
+    volume_resolver_with_nfs: KubeVolumeResolver,
+    kube_api_with_nfs: Mock,
+    volume_path: str,
+) -> None:
+    """
+    A mount of the project root itself produces an empty sub path.
+    """
+    async with volume_resolver_with_nfs as vr:
+        volume_mount = await vr.resolve_volume_mount("/org/project")
+
+        assert volume_mount.sub_path == ""
+        spec = cast(NfsVolumeSpec, volume_mount.volume.spec)
+        assert spec.path == f"{volume_path}/org/project"
+
+
+async def test__resolve_two_projects_of_one_org(
+    volume_resolver_with_nfs: KubeVolumeResolver,
+    kube_api_with_nfs: Mock,
+    volume_path: str,
+) -> None:
+    """
+    Two projects of one org resolve to two distinct nfs paths.
+    """
+    async with volume_resolver_with_nfs as vr:
+        first = await vr.resolve_volume_mount("/org/project-a/data")
+        second = await vr.resolve_volume_mount("/org/project-b/data")
+
+        assert cast(NfsVolumeSpec, first.volume.spec).path == (
+            f"{volume_path}/org/project-a"
+        )
+        assert cast(NfsVolumeSpec, second.volume.spec).path == (
+            f"{volume_path}/org/project-b"
+        )
+        assert first.sub_path == "data"
+        assert second.sub_path == "data"

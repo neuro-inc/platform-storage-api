@@ -210,6 +210,9 @@ class AdmissionControllerApi:
                 logger.error(error_message)
                 raise ForbiddenError(error_message)
 
+        for injection_schema in injection_spec:
+            await self._ensure_within_project(injection_schema)
+
         # here we are already confident that paths are valid,
         # so in addition, we try to create them
         for injection_schema in injection_spec:
@@ -219,6 +222,23 @@ class AdmissionControllerApi:
                 pass
 
         return injection_spec
+
+    async def _ensure_within_project(self, injection_schema: MountSchema) -> None:
+        """
+        Rejects a mount target whose real path escapes the caller's own
+        org/project prefix. An in-project symlink target is allowed. A fast
+        admission-time check with a TOCTOU window, backed by the
+        project-scoped volume at mount time.
+        """
+        storage_path = injection_schema.storage_path
+        project_path = "/".join(["", injection_schema.org, injection_schema.project])
+
+        real_path = await self._storage.get_real_path(storage_path)
+        project_real_path = await self._storage.get_real_path(project_path)
+        if not real_path.is_relative_to(project_real_path):
+            error_message = f"mount target escapes the project: `{storage_path}`"
+            logger.error(error_message)
+            raise ForbiddenError(error_message)
 
     async def _mutate(
         self,
