@@ -211,7 +211,7 @@ async def test_inject_single_storage(kube_client: KubeClient) -> None:
         )
         assert actual_host_path_volume_mount.name == volume_name
         assert actual_host_path_volume_mount.mount_path == "/var/pod_mount"
-        assert actual_host_path_volume_mount.sub_path == ""
+        assert not actual_host_path_volume_mount.sub_path
 
 
 async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
