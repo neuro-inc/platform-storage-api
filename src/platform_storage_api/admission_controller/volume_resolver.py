@@ -248,7 +248,7 @@ class KubeVolumeResolver:
 
             return KubeVolumeMount(
                 volume=volume,
-                sub_path="" if sub_path == PurePath(".") else str(sub_path),
+                sub_path="" if sub_path == PurePath() else str(sub_path),
             )
 
         raise VolumeResolverError()

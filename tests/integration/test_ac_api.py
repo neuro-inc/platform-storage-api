@@ -3,6 +3,7 @@ import json
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from itertools import count
+from pathlib import Path
 from typing import Any, cast
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -388,7 +389,9 @@ class TestMutateApi:
         return await self._test__ensure_volumes_will_be_added(
             nfs_api,
             uuid_mock,
-            volume_expected={"nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}},
+            volume_expected={
+                "nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}
+            },
         )
 
     async def test__host_path__ensure_volumes_will_be_added(
@@ -476,7 +479,9 @@ class TestMutateApi:
         return await self._test__resolve_single_volume(
             nfs_api,
             uuid_mock,
-            volume_expected={"nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}},
+            volume_expected={
+                "nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}
+            },
         )
 
     async def test__host_path__resolve_single_volume(
@@ -632,7 +637,9 @@ class TestMutateApi:
         return await self._test__resolve_single_volume_to_multiple_containers(
             nfs_api,
             uuid_mock,
-            volume_expected={"nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}},
+            volume_expected={
+                "nfs": {"path": "/var/exports/org/proj", "server": "0.0.0.0"}
+            },
         )
 
     async def test__host_path__resolve_single_volume_to_multiple_containers(
@@ -777,6 +784,120 @@ class TestMutateApi:
         ]
 
         assert data["patch"] == expected_ops
+
+    @staticmethod
+    def _pod_request(storage_uri: str) -> dict[str, Any]:
+        return {
+            "request": {
+                "uid": str(uuid4()),
+                "object": {
+                    "kind": "Pod",
+                    "metadata": {
+                        "labels": {
+                            LABEL_APOLO_ORG_NAME: "org",
+                            LABEL_APOLO_PROJECT_NAME: "proj",
+                        },
+                        "annotations": {
+                            ANNOTATION_APOLO_INJECT_STORAGE: json.dumps(
+                                [
+                                    {
+                                        "mount_path": "/var/mount-volume",
+                                        "storage_uri": storage_uri,
+                                        "mount_mode": "rw",
+                                    }
+                                ]
+                            )
+                        },
+                    },
+                    "spec": {"containers": [{"name": "container"}]},
+                },
+            }
+        }
+
+    async def test__nfs__in_project_symlink_target_allowed(
+        self,
+        nfs_api: ApiConfig,
+        uuid_mock: Mock,
+        local_mount_path: str,
+    ) -> None:
+        """
+        A mount target that is a symlink pointing inside the project passes
+        admission.
+        """
+        project_dir = Path(local_mount_path) / "org" / "proj"
+        (project_dir / "real").mkdir(parents=True)
+        (project_dir / "link").symlink_to(project_dir / "real")
+
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+        response = await self.http.post(
+            url, json=self._pod_request("storage://default/org/proj/link")
+        )
+        await self._ensure_allowed(response)
+
+    async def test__nfs__symlink_target_escape_declined(
+        self,
+        nfs_api: ApiConfig,
+        local_mount_path: str,
+    ) -> None:
+        """
+        A mount target that is a symlink pointing out of the project is
+        declined by the real-path check.
+        """
+        base = Path(local_mount_path)
+        (base / "org" / "proj").mkdir(parents=True)
+        (base / "other" / "proj").mkdir(parents=True)
+        (base / "org" / "proj" / "link").symlink_to(base / "other" / "proj")
+
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+        response = await self.http.post(
+            url, json=self._pod_request("storage://default/org/proj/link")
+        )
+        await self._ensure_not_allowed(
+            response,
+            code=403,
+            expected_message="mount target escapes the project: `/org/proj/link`",
+        )
+
+    async def test__nfs__parent_symlink_escape_declined(
+        self,
+        nfs_api: ApiConfig,
+        local_mount_path: str,
+    ) -> None:
+        """
+        A mount target whose parent is a symlink out of the project is
+        declined by the real-path check.
+        """
+        base = Path(local_mount_path)
+        (base / "org" / "proj").mkdir(parents=True)
+        (base / "other" / "secret").mkdir(parents=True)
+        (base / "org" / "proj" / "sub").symlink_to(base / "other" / "secret")
+
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+        response = await self.http.post(
+            url, json=self._pod_request("storage://default/org/proj/sub/file")
+        )
+        await self._ensure_not_allowed(
+            response,
+            code=403,
+            expected_message="mount target escapes the project: `/org/proj/sub/file`",
+        )
+
+    async def test__nfs__in_project_path_allowed(
+        self,
+        nfs_api: ApiConfig,
+        uuid_mock: Mock,
+        local_mount_path: str,
+    ) -> None:
+        """
+        A regular in-project path passes the admission check.
+        """
+        (Path(local_mount_path) / "org" / "proj").mkdir(parents=True)
+
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+        response = await self.http.post(
+            url, json=self._pod_request("storage://default/org/proj/data")
+        )
+        await self._ensure_allowed(response)
 
     async def _ensure_allowed(self, response: ClientResponse) -> dict[str, Any]:
         data = await self.__ensure_success_response(response)
