@@ -203,6 +203,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
+    async def move_file(self, old: PurePath, new: PurePath) -> bool:
+        pass
+
+    @abc.abstractmethod
     async def disk_usage(self, path: PurePath) -> DiskUsage:
         pass
 
@@ -614,6 +618,46 @@ class LocalFileSystem(FileSystem):
 
     async def rename(self, old: PurePath, new: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
+
+    def _move_file(self, old: PurePath, new: PurePath) -> bool:
+        with (
+            self._resolve_dir_fd(old.parent) as src_dir_fd,
+            self._resolve_dir_fd(new.parent) as dst_dir_fd,
+        ):
+            flags = getattr(os, "O_PATH", os.O_RDONLY) | os.O_NOFOLLOW
+            try:
+                fd = os.open(old.name, flags, dir_fd=src_dir_fd)
+            except OSError as e:
+                if e.errno == errno.ELOOP:
+                    return False
+                raise
+            try:
+                orig_st = os.fstat(fd)
+                if not statmodule.S_ISREG(orig_st.st_mode):
+                    return False
+                tmp_name = f".{new.name}.{os.urandom(8).hex()}"
+                os.link(f"/proc/self/fd/{fd}", tmp_name, dst_dir_fd=dst_dir_fd)
+                try:
+                    os.rename(
+                        tmp_name,
+                        new.name,
+                        src_dir_fd=dst_dir_fd,
+                        dst_dir_fd=dst_dir_fd,
+                    )
+                except BaseException:
+                    os.unlink(tmp_name, dir_fd=dst_dir_fd)
+                    raise
+                st = os.stat(old.name, dir_fd=src_dir_fd, follow_symlinks=False)
+                if os.path.samestat(orig_st, st):
+                    os.unlink(old.name, dir_fd=src_dir_fd)
+                return True
+            finally:
+                os.close(fd)
+
+    async def move_file(self, old: PurePath, new: PurePath) -> bool:
+        return await self._loop.run_in_executor(
+            self._executor, self._move_file, old, new
+        )
 
     def _disk_usage(self, path: PurePath) -> DiskUsage:
         with self._resolve_dir_fd(path) as fd:

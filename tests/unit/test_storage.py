@@ -3,13 +3,13 @@ import shutil
 from io import BytesIO
 from pathlib import Path, PurePath
 from typing import Any
-from unittest import mock
 
 import pytest
 
 from platform_storage_api.fs.local import FileStatusType, FileSystem, LocalFileSystem
 from platform_storage_api.storage import (
     MultipleStoragePathResolver,
+    RootRenameError,
     SingleStoragePathResolver,
     Storage,
 )
@@ -226,48 +226,94 @@ class TestStorage:
         (local_tmp_dir_path / "org" / "p1" / "dir").mkdir(parents=True)
         (local_tmp_dir_path / "victim" / "proj").mkdir(parents=True)
         (local_tmp_dir_path / "org" / "p1" / "evil").symlink_to("../victim/proj")
+        (local_tmp_dir_path / "org" / "p1" / "dir" / "proj").symlink_to(
+            "../../../victim/proj"
+        )
+        (local_tmp_dir_path / "org" / "p1" / "file").write_text("file")
+        (local_tmp_dir_path / "org" / "keep").write_text("keep")
+        (local_tmp_dir_path / "org" / "old").symlink_to("../victim/proj")
         return local_tmp_dir_path
 
-    @pytest.mark.parametrize("destination", ["/org/p2", "/org2", "/org/p1/../p2"])
-    async def test_rename_symlink_to_org_or_project_root(
+    @staticmethod
+    def _snapshot(root: Path) -> dict[str, str]:
+        return {
+            str(path.relative_to(root)): (
+                f"-> {os.readlink(path)}"
+                if path.is_symlink()
+                else "dir"
+                if path.is_dir()
+                else path.read_text()
+            )
+            for path in sorted(root.rglob("*"))
+        }
+
+    @pytest.mark.parametrize(
+        ("source", "destination"),
+        [
+            ("/org/p1/evil", "/org/p2"),
+            ("/org/p1/evil", "/org/keep"),
+            ("/org/p1/evil", "/org2"),
+            ("/org/p1/dir", "/org/p2"),
+            ("/org/p1/dir", "/org2"),
+            ("/org/p1/file", "/org2"),
+            ("/org/p1", "/org2"),
+            ("/org/old", "/org/p2"),
+            ("/org/p1", "/"),
+        ],
+    )
+    async def test_rename_to_org_or_project_root_refused(
+        self, storage: Storage, tree: Path, source: str, destination: str
+    ) -> None:
+        before = self._snapshot(tree)
+
+        with pytest.raises(RootRenameError):
+            await storage.rename(source, destination)
+
+        assert self._snapshot(tree) == before
+
+    @pytest.mark.parametrize(
+        ("source", "destination"),
+        [
+            ("/org/p1", "/org/p2"),
+            ("/org", "/org2"),
+            ("/org", "/victim/org"),
+            ("/org/p1/evil", "/org/p1/dir/evil"),
+        ],
+    )
+    async def test_rename_to_org_or_project_root_allowed(
+        self, storage: Storage, tree: Path, source: str, destination: str
+    ) -> None:
+        kind = self._snapshot(tree)[source.lstrip("/")]
+
+        await storage.rename(source, destination)
+
+        assert not os.path.lexists(tree / source.lstrip("/"))
+        assert self._snapshot(tree)[destination.lstrip("/")] == kind
+
+    @pytest.mark.skipif(
+        not Path("/proc/self/fd").is_dir(), reason="links an open file by /proc"
+    )
+    @pytest.mark.parametrize("destination", ["/org/p2", "/org/keep"])
+    async def test_rename_file_to_project_root(
         self, storage: Storage, tree: Path, destination: str
     ) -> None:
-        with pytest.raises(NotADirectoryError):
-            await storage.rename("/org/p1/evil", storage.sanitize_path(destination))
+        await storage.rename("/org/p1/file", destination)
 
-        assert os.readlink(tree / "org" / "p1" / "evil") == "../victim/proj"
-        assert sorted(p.name for p in (tree / "org").iterdir()) == ["p1"]
-        assert sorted(p.name for p in tree.iterdir()) == ["org", "victim"]
+        assert not os.path.lexists(tree / "org" / "p1" / "file")
+        assert (tree / destination.lstrip("/")).read_text() == "file"
+        assert sorted(p.name for p in (tree / "org").iterdir()) == sorted(
+            {"p1", "keep", "old", destination.split("/")[-1]}
+        )
 
-    async def test_rename_symlink_to_project_root_source_taken(
-        self, storage: Storage, local_fs: LocalFileSystem, tree: Path
-    ) -> None:
-        rename = local_fs.rename
-
-        async def rename_then_take_source(old: PurePath, new: PurePath) -> None:
-            await rename(old, new)
-            (tree / "org" / "p1" / "evil").mkdir()
-
-        with (
-            mock.patch.object(local_fs, "rename", side_effect=rename_then_take_source),
-            pytest.raises(NotADirectoryError),
-        ):
-            await storage.rename("/org/p1/evil", "/org/p2")
-
-        assert not os.path.lexists(tree / "org" / "p2")
-        assert (tree / "org" / "p1" / "evil").is_dir()
-
-    async def test_rename_dir_to_project_root(
+    @pytest.mark.skipif(
+        not Path("/proc/self/fd").is_dir(), reason="links an open file by /proc"
+    )
+    async def test_rename_file_to_project_root_dir_refused(
         self, storage: Storage, tree: Path
     ) -> None:
-        await storage.rename("/org/p1/dir", "/org/p2")
+        before = self._snapshot(tree)
 
-        assert (tree / "org" / "p2").is_dir()
-        assert not (tree / "org" / "p2").is_symlink()
+        with pytest.raises(IsADirectoryError):
+            await storage.rename("/org/p1/file", "/org/p1")
 
-    async def test_rename_symlink_below_project_root(
-        self, storage: Storage, tree: Path
-    ) -> None:
-        await storage.rename("/org/p1/evil", "/org/p1/dir/evil")
-
-        assert os.readlink(tree / "org" / "p1" / "dir" / "evil") == "../victim/proj"
+        assert self._snapshot(tree) == before

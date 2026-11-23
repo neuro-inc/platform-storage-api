@@ -1576,8 +1576,16 @@ class TestRename:
         response = await self.rename(
             server_url, client, alice, alice, "p1/dir", alice, "p3"
         )
+        assert response.status == aiohttp.web.HTTPBadRequest.status_code
+        payload = await response.json()
+        assert payload["error"] == "Cannot move this entry to an org or project root"
+        assert not os.path.lexists(local_tmp_dir_path / alice.name / "p3")
+
+        response = await self.rename(
+            server_url, client, alice, alice, "p1", alice, "p3"
+        )
         assert response.status == aiohttp.web.HTTPNoContent.status_code
-        assert (local_tmp_dir_path / alice.name / "p3").is_dir()
+        assert (local_tmp_dir_path / alice.name / "p3" / "dir").is_dir()
 
     async def test_rename_file_same_dir(
         self,

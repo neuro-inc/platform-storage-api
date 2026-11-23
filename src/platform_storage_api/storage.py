@@ -13,10 +13,18 @@ from .config import Config, StorageMode
 from .fs.local import (
     DiskUsage,
     FileStatus,
+    FileStatusType,
     FileSystem,
     RemoveListing,
     copy_streams,
 )
+
+
+class RootRenameError(OSError):
+    def __init__(self, path: str) -> None:
+        super().__init__(
+            errno.EPERM, "Cannot move this entry to an org or project root", path
+        )
 
 
 class StoragePathResolver(abc.ABC):
@@ -207,17 +215,25 @@ class Storage:
 
     @trace
     async def rename(self, old: PurePath | str, new: PurePath | str) -> None:
-        real_old = await self._path_resolver.resolve_path(PurePath(old))
-        real_new = await self._path_resolver.resolve_path(PurePath(new))
+        old_path = PurePath(old)
+        new_path = PurePath(new)
+        real_old = await self._path_resolver.resolve_path(old_path)
+        real_new = await self._path_resolver.resolve_path(new_path)
+        old_depth = len(old_path.relative_to("/").parts)
+        new_depth = len(new_path.relative_to("/").parts)
+        if new_depth > 2:
+            await self._fs.rename(real_old, real_new)
+            return
+        if new_depth == 2 and old_depth > 2:
+            if not await self._fs.move_file(real_old, real_new):
+                raise RootRenameError(str(new_path))
+            return
+        if not 1 <= old_depth <= new_depth:
+            raise RootRenameError(str(new_path))
+        status = await self._fs.get_filestatus(real_old)
+        if status.type == FileStatusType.SYMLINK:
+            raise RootRenameError(str(new_path))
         await self._fs.rename(real_old, real_new)
-        if len(PurePath(new).relative_to("/").parts) <= 2 and (
-            await self._fs.is_symlink(real_new)
-        ):
-            try:
-                await self._fs.rename(real_new, real_old)
-            except OSError:
-                await self._fs.remove(real_new)
-            raise NotADirectoryError(errno.ENOTDIR, "Not a directory", str(new))
 
     @trace
     async def disk_usage(self, path: PurePath | str | None = None) -> DiskUsage:
