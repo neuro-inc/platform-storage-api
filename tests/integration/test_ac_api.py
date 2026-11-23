@@ -943,6 +943,33 @@ class TestMutateApi:
             expected_message="mount target escapes the project: `/org/proj`",
         )
 
+    async def test__nfs__project_root_replaced_before_mkdir_declined(
+        self,
+        nfs_api: ApiConfig,
+        storage: Storage,
+        local_mount_path: str,
+    ) -> None:
+        base = Path(local_mount_path)
+        (base / "org" / "proj").mkdir(parents=True)
+        (base / "other" / "proj").mkdir(parents=True)
+        mkdir = storage.mkdir
+
+        async def replace_then_mkdir(path: str) -> None:
+            (base / "org" / "proj").rmdir()
+            (base / "org" / "proj").symlink_to("../other/proj")
+            await mkdir(path)
+
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+        with patch.object(storage, "mkdir", side_effect=replace_then_mkdir):
+            response = await self.http.post(
+                url, json=self._pod_request("storage://default/org/proj")
+            )
+        await self._ensure_not_allowed(
+            response,
+            code=403,
+            expected_message="mount target escapes the project: `/org/proj`",
+        )
+
     async def test__nfs__in_project_relative_symlink_allowed(
         self,
         nfs_api: ApiConfig,

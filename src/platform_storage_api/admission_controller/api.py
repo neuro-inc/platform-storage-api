@@ -220,6 +220,7 @@ class AdmissionControllerApi:
                 await self._storage.mkdir(injection_schema.storage_path)
             except FileExistsError:
                 pass
+            await self._ensure_within_project(injection_schema)
 
         return injection_spec
 
