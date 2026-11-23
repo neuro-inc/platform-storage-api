@@ -635,6 +635,10 @@ class LocalFileSystem(FileSystem):
                 orig_st = os.fstat(fd)
                 if not statmodule.S_ISREG(orig_st.st_mode):
                     return False
+                with contextlib.suppress(FileNotFoundError):
+                    dst_st = os.stat(new.name, dir_fd=dst_dir_fd, follow_symlinks=False)
+                    if os.path.samestat(orig_st, dst_st):
+                        return False
                 tmp_name = f".{new.name}.{os.urandom(8).hex()}"
                 os.link(f"/proc/self/fd/{fd}", tmp_name, dst_dir_fd=dst_dir_fd)
                 try:

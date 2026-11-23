@@ -37,12 +37,19 @@ class StoragePathResolver(abc.ABC):
         base_path = await self.resolve_base_path(path)
         return PurePath(base_path, path.relative_to("/"))
 
+    @abc.abstractmethod
+    def get_root_path(self, real_path: PurePath) -> PurePath:
+        pass
+
 
 class SingleStoragePathResolver(StoragePathResolver):
     def __init__(self, base_path: PurePath | str) -> None:
         self._base_path = PurePath(base_path)
 
     async def resolve_base_path(self, path: PurePath | None = None) -> PurePath:
+        return self._base_path
+
+    def get_root_path(self, real_path: PurePath) -> PurePath:
         return self._base_path
 
 
@@ -64,6 +71,11 @@ class MultipleStoragePathResolver(StoragePathResolver):
         if await self._fs.exists(storage_folder):
             return self._base_path
         return self._default_path
+
+    def get_root_path(self, real_path: PurePath) -> PurePath:
+        if real_path.is_relative_to(self._default_path):
+            return self._default_path
+        return self._base_path
 
 
 class Storage:
@@ -215,25 +227,27 @@ class Storage:
 
     @trace
     async def rename(self, old: PurePath | str, new: PurePath | str) -> None:
-        old_path = PurePath(old)
-        new_path = PurePath(new)
-        real_old = await self._path_resolver.resolve_path(old_path)
-        real_new = await self._path_resolver.resolve_path(new_path)
-        old_depth = len(old_path.relative_to("/").parts)
-        new_depth = len(new_path.relative_to("/").parts)
-        if new_depth > 2:
+        real_old = await self._path_resolver.resolve_path(PurePath(old))
+        real_new = await self._path_resolver.resolve_path(PurePath(new))
+        old_depth = self._get_depth(real_old)
+        new_depth = self._get_depth(real_new)
+        if new_depth > 2 and old_depth > 1:
             await self._fs.rename(real_old, real_new)
             return
         if new_depth == 2 and old_depth > 2:
             if not await self._fs.move_file(real_old, real_new):
-                raise RootRenameError(str(new_path))
+                raise RootRenameError(str(new))
             return
-        if not 1 <= old_depth <= new_depth:
-            raise RootRenameError(str(new_path))
+        if not 1 <= old_depth == new_depth <= 2:
+            raise RootRenameError(str(new))
         status = await self._fs.get_filestatus(real_old)
         if status.type == FileStatusType.SYMLINK:
-            raise RootRenameError(str(new_path))
+            raise RootRenameError(str(new))
         await self._fs.rename(real_old, real_new)
+
+    def _get_depth(self, real_path: PurePath) -> int:
+        root_path = self._path_resolver.get_root_path(real_path)
+        return len(real_path.relative_to(root_path).parts)
 
     @trace
     async def disk_usage(self, path: PurePath | str | None = None) -> DiskUsage:

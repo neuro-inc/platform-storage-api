@@ -259,6 +259,8 @@ class TestStorage:
             ("/org/p1", "/org2"),
             ("/org/old", "/org/p2"),
             ("/org/p1", "/"),
+            ("/org", "/victim/org"),
+            ("/org", "/victim/proj/org"),
         ],
     )
     async def test_rename_to_org_or_project_root_refused(
@@ -276,7 +278,7 @@ class TestStorage:
         [
             ("/org/p1", "/org/p2"),
             ("/org", "/org2"),
-            ("/org", "/victim/org"),
+            ("/org/p1", "/victim/proj/p1"),
             ("/org/p1/evil", "/org/p1/dir/evil"),
         ],
     )
@@ -315,5 +317,67 @@ class TestStorage:
 
         with pytest.raises(IsADirectoryError):
             await storage.rename("/org/p1/file", "/org/p1")
+
+        assert self._snapshot(tree) == before
+
+    @pytest.fixture
+    def multi_storage(self, local_fs: FileSystem, local_tmp_dir_path: Path) -> Storage:
+        return Storage(
+            MultipleStoragePathResolver(
+                local_fs, local_tmp_dir_path, local_tmp_dir_path / "cluster"
+            ),
+            local_fs,
+        )
+
+    @pytest.fixture
+    def multi_tree(self, local_tmp_dir_path: Path) -> Path:
+        default = local_tmp_dir_path / "cluster"
+        (default / "org" / "p1" / "dir").mkdir(parents=True)
+        (default / "victim" / "proj").mkdir(parents=True)
+        (default / "org" / "p1" / "evil").symlink_to("../victim/proj")
+        (default / "org" / "keep").write_text("keep")
+        return local_tmp_dir_path
+
+    @pytest.mark.parametrize(
+        ("source", "destination"),
+        [
+            ("/org/p1/evil", "/cluster/org/p2"),
+            ("/cluster/org/p1/evil", "/org/p2"),
+            ("/cluster/org/p1/dir", "/org/p2"),
+            ("/org/p1/dir", "/cluster/org2"),
+            ("/cluster/org", "/org2/p"),
+            ("/cluster", "/org/p1/dir/cluster"),
+        ],
+    )
+    async def test_rename_to_org_or_project_root_alias_refused(
+        self,
+        multi_storage: Storage,
+        multi_tree: Path,
+        source: str,
+        destination: str,
+    ) -> None:
+        before = self._snapshot(multi_tree)
+
+        with pytest.raises(RootRenameError):
+            await multi_storage.rename(source, destination)
+
+        assert self._snapshot(multi_tree) == before
+
+    async def test_rename_file_to_itself_through_alias(
+        self, multi_storage: Storage, multi_tree: Path
+    ) -> None:
+        before = self._snapshot(multi_tree)
+
+        await multi_storage.rename("/cluster/org/keep", "/org/keep")
+
+        assert self._snapshot(multi_tree) == before
+
+    async def test_move_file_to_itself_refused(
+        self, local_fs: LocalFileSystem, tree: Path
+    ) -> None:
+        before = self._snapshot(tree)
+        path = PurePath(tree / "org" / "keep")
+
+        assert not await local_fs.move_file(path, path)
 
         assert self._snapshot(tree) == before
