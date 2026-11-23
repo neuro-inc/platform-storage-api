@@ -1,8 +1,10 @@
+import errno
 import os
 import shutil
 from io import BytesIO
 from pathlib import Path, PurePath
 from typing import Any
+from unittest import mock
 
 import pytest
 
@@ -12,6 +14,10 @@ from platform_storage_api.storage import (
     RootRenameError,
     SingleStoragePathResolver,
     Storage,
+)
+
+LINKS_BY_PROC = pytest.mark.skipif(
+    not Path("/proc/self/fd").is_dir(), reason="links an open file by /proc"
 )
 
 
@@ -292,9 +298,7 @@ class TestStorage:
         assert not os.path.lexists(tree / source.lstrip("/"))
         assert self._snapshot(tree)[destination.lstrip("/")] == kind
 
-    @pytest.mark.skipif(
-        not Path("/proc/self/fd").is_dir(), reason="links an open file by /proc"
-    )
+    @LINKS_BY_PROC
     @pytest.mark.parametrize("destination", ["/org/p2", "/org/keep"])
     async def test_rename_file_to_project_root(
         self, storage: Storage, tree: Path, destination: str
@@ -307,9 +311,7 @@ class TestStorage:
             {"p1", "keep", "old", destination.split("/")[-1]}
         )
 
-    @pytest.mark.skipif(
-        not Path("/proc/self/fd").is_dir(), reason="links an open file by /proc"
-    )
+    @LINKS_BY_PROC
     async def test_rename_file_to_project_root_dir_refused(
         self, storage: Storage, tree: Path
     ) -> None:
@@ -381,3 +383,116 @@ class TestStorage:
         assert not await local_fs.move_file(path, path)
 
         assert self._snapshot(tree) == before
+
+    @LINKS_BY_PROC
+    async def test_rename_file_to_project_root_source_not_removed(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        before = self._snapshot(tree)
+        unlink = os.unlink
+
+        def deny_source(path: Any, *args: Any, **kwargs: Any) -> None:
+            if path == "file":
+                raise PermissionError(errno.EACCES, "Permission denied", path)
+            unlink(path, *args, **kwargs)
+
+        with (
+            mock.patch.object(os, "unlink", side_effect=deny_source),
+            pytest.raises(PermissionError),
+        ):
+            await storage.rename("/org/p1/file", "/org/keep")
+
+        assert self._snapshot(tree) == before
+
+    @LINKS_BY_PROC
+    @pytest.mark.skipif(os.geteuid() == 0, reason="root writes a read-only dir")
+    async def test_rename_file_to_project_root_source_dir_read_only(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        before = self._snapshot(tree)
+        (tree / "org" / "p1").chmod(0o555)
+        try:
+            with pytest.raises(PermissionError):
+                await storage.rename("/org/p1/file", "/org/keep")
+        finally:
+            (tree / "org" / "p1").chmod(0o755)
+
+        assert self._snapshot(tree) == before
+
+    @LINKS_BY_PROC
+    async def test_rename_file_to_project_root_source_gone(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        link = os.link
+
+        def link_then_drop_source(*args: Any, **kwargs: Any) -> None:
+            link(*args, **kwargs)
+            (tree / "org" / "p1" / "file").unlink()
+
+        with mock.patch.object(os, "link", side_effect=link_then_drop_source):
+            await storage.rename("/org/p1/file", "/org/p2")
+
+        assert (tree / "org" / "p2").read_text() == "file"
+        assert sorted(p.name for p in (tree / "org").iterdir()) == [
+            "keep",
+            "old",
+            "p1",
+            "p2",
+        ]
+
+    @LINKS_BY_PROC
+    async def test_rename_file_to_project_root_source_replaced(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        link = os.link
+        source = tree / "org" / "p1" / "file"
+
+        def replace_source_then_link(*args: Any, **kwargs: Any) -> None:
+            source.rename(tree / "org" / "p1" / "moved")
+            source.symlink_to("../../victim/proj")
+            link(*args, **kwargs)
+
+        with mock.patch.object(os, "link", side_effect=replace_source_then_link):
+            await storage.rename("/org/p1/file", "/org/p2")
+
+        assert not (tree / "org" / "p2").is_symlink()
+        assert (tree / "org" / "p2").read_text() == "file"
+        assert os.readlink(source) == "../../victim/proj"
+        assert sorted(p.name for p in (tree / "org").iterdir()) == [
+            "keep",
+            "old",
+            "p1",
+            "p2",
+        ]
+
+    @LINKS_BY_PROC
+    async def test_rename_two_links_of_one_file_to_project_root(
+        self, storage: Storage, local_fs: LocalFileSystem, tree: Path
+    ) -> None:
+        os.link(tree / "org" / "p1" / "file", tree / "org" / "p1" / "file2")
+        link = os.link
+        nested: list[bool] = []
+
+        def link_and_move_other(*args: Any, **kwargs: Any) -> None:
+            link(*args, **kwargs)
+            if not nested:
+                nested.append(True)
+                assert local_fs._move_file(
+                    PurePath(tree / "org" / "p1" / "file2"),
+                    PurePath(tree / "org" / "p2"),
+                )
+
+        with mock.patch.object(os, "link", side_effect=link_and_move_other):
+            await storage.rename("/org/p1/file", "/org/p2")
+
+        assert (tree / "org" / "p2").read_text() == "file"
+        assert sorted(p.name for p in (tree / "org").iterdir()) == [
+            "keep",
+            "old",
+            "p1",
+            "p2",
+        ]
+        assert sorted(p.name for p in (tree / "org" / "p1").iterdir()) == [
+            "dir",
+            "evil",
+        ]

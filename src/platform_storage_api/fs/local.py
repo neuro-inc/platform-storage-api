@@ -619,6 +619,17 @@ class LocalFileSystem(FileSystem):
     async def rename(self, old: PurePath, new: PurePath) -> None:
         await self._loop.run_in_executor(self._executor, self._rename, old, new)
 
+    @staticmethod
+    def _unlink_same_file(name: str, dir_fd: int, orig_st: os.stat_result) -> bool:
+        try:
+            st = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+            if not os.path.samestat(orig_st, st):
+                return False
+            os.unlink(name, dir_fd=dir_fd)
+        except FileNotFoundError:
+            return False
+        return True
+
     def _move_file(self, old: PurePath, new: PurePath) -> bool:
         with (
             self._resolve_dir_fd(old.parent) as src_dir_fd,
@@ -639,21 +650,34 @@ class LocalFileSystem(FileSystem):
                     dst_st = os.stat(new.name, dir_fd=dst_dir_fd, follow_symlinks=False)
                     if os.path.samestat(orig_st, dst_st):
                         return False
+                    if statmodule.S_ISDIR(dst_st.st_mode):
+                        raise IsADirectoryError(
+                            errno.EISDIR, "Is a directory", str(new)
+                        )
                 tmp_name = f".{new.name}.{os.urandom(8).hex()}"
                 os.link(f"/proc/self/fd/{fd}", tmp_name, dst_dir_fd=dst_dir_fd)
+                unlinked = False
                 try:
+                    unlinked = self._unlink_same_file(old.name, src_dir_fd, orig_st)
                     os.rename(
                         tmp_name,
                         new.name,
                         src_dir_fd=dst_dir_fd,
                         dst_dir_fd=dst_dir_fd,
                     )
-                except BaseException:
+                except OSError:
+                    if unlinked:
+                        os.link(
+                            tmp_name,
+                            old.name,
+                            src_dir_fd=dst_dir_fd,
+                            dst_dir_fd=src_dir_fd,
+                            follow_symlinks=False,
+                        )
                     os.unlink(tmp_name, dir_fd=dst_dir_fd)
                     raise
-                st = os.stat(old.name, dir_fd=src_dir_fd, follow_symlinks=False)
-                if os.path.samestat(orig_st, st):
-                    os.unlink(old.name, dir_fd=src_dir_fd)
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(tmp_name, dir_fd=dst_dir_fd)
                 return True
             finally:
                 os.close(fd)
