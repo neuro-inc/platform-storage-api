@@ -163,6 +163,14 @@ class Storage:
         real_path = await self._path_resolver.resolve_path(PurePath(path))
         return await self._fs.realpath(real_path)
 
+    async def get_real_base_path(self, path: PurePath | str) -> PurePath:
+        base_path = await self._path_resolver.resolve_base_path(PurePath(path))
+        return await self._fs.realpath(base_path)
+
+    async def is_symlink(self, path: PurePath | str) -> bool:
+        real_path = await self._path_resolver.resolve_path(PurePath(path))
+        return await self._fs.is_symlink(real_path)
+
     @trace
     async def mkdir(self, path: PurePath | str) -> None:
         real_path = await self._path_resolver.resolve_path(PurePath(path))

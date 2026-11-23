@@ -185,6 +185,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
+    async def is_symlink(self, path: PurePath) -> bool:
+        pass
+
+    @abc.abstractmethod
     async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
         pass
 
@@ -452,6 +456,9 @@ class LocalFileSystem(FileSystem):
 
     async def realpath(self, path: PurePath) -> PurePath:
         return await self._loop.run_in_executor(self._executor, self._realpath, path)
+
+    async def is_symlink(self, path: PurePath) -> bool:
+        return await self._loop.run_in_executor(self._executor, Path(path).is_symlink)
 
     def _remove_as_dir(self, path: PurePath) -> bool:
         real_path = Path(path)
