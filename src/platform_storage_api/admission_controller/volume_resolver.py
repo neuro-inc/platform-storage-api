@@ -227,11 +227,10 @@ class KubeVolumeResolver:
         in a kube spec of a POD.
         :param path: an absolute path to a file
         """
-        local_path = await self.to_local_path(storage_path=path)
-
         parts = PurePath(path).parts
         project_path = PurePath(*parts[:3])
         project_local_path = await self.to_local_path(storage_path=str(project_path))
+        local_path = project_local_path / PurePath(path).relative_to(project_path)
 
         prefixes = sorted(
             self._local_fs_prefix_to_kube_volume.items(),
@@ -247,6 +246,8 @@ class KubeVolumeResolver:
             try:
                 project_rel = project_local_path.relative_to(fs_path_prefix)
             except ValueError:
+                if not PurePath(fs_path_prefix).is_relative_to(project_local_path):
+                    raise VolumeResolverError() from None
                 volume = kube_volume
             else:
                 sub_path = local_path.relative_to(project_local_path)

@@ -301,3 +301,25 @@ async def test__resolve_multi_storage(
 
     assert cast(NfsVolumeSpec, volume_mount.volume.spec).path == expected_path
     assert volume_mount.sub_path == expected_sub_path
+
+
+async def test__resolve_multi_storage_resolves_the_base_once(
+    local_mount_path: str,
+    local_fs: FileSystem,
+    admission_controller_config: AdmissionControllerConfig,
+) -> None:
+    resolver = _multi_storage_resolver(
+        local_mount_path,
+        local_fs,
+        admission_controller_config,
+        {"/default": "/default-export", "/org/proj/data": "/data-export"},
+    )
+    async with resolver as vr:
+        with patch.object(
+            local_fs, "exists", AsyncMock(side_effect=[False, True, True, True])
+        ):
+            volume_mount = await vr.resolve_volume_mount("/org/proj/data")
+
+    spec = cast(NfsVolumeSpec, volume_mount.volume.spec)
+    assert spec.path == "/default-export/org/proj"
+    assert volume_mount.sub_path == "data"
