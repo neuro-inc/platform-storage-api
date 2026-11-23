@@ -882,6 +882,110 @@ class TestMutateApi:
             expected_message="mount target escapes the project: `/org/proj/sub/file`",
         )
 
+    @pytest.mark.parametrize(
+        ("dirs", "links", "storage_path"),
+        [
+            (["other/proj"], {"org/proj": "../other/proj"}, "/org/proj"),
+            (["other/proj"], {"org/proj": "../other/proj"}, "/org/proj/data"),
+            ([], {"org/proj": "{outside}"}, "/org/proj"),
+            (["org"], {"org/proj": "proj"}, "/org/proj"),
+            (["other/proj"], {"org": "other"}, "/org/proj"),
+            ([], {"org": "{outside}"}, "/org/proj"),
+            ([], {"org": "org"}, "/org/proj"),
+        ],
+    )
+    async def test__nfs__project_root_symlink_declined(
+        self,
+        nfs_api: ApiConfig,
+        local_mount_path: str,
+        tmp_path: Path,
+        dirs: list[str],
+        links: dict[str, str],
+        storage_path: str,
+    ) -> None:
+        base = Path(local_mount_path)
+        for path in dirs:
+            (base / path).mkdir(parents=True)
+        for path, target in links.items():
+            (base / path).parent.mkdir(parents=True, exist_ok=True)
+            (base / path).symlink_to(target.format(outside=tmp_path))
+
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+        response = await self.http.post(
+            url, json=self._pod_request(f"storage://default{storage_path}")
+        )
+        await self._ensure_not_allowed(
+            response,
+            code=403,
+            expected_message=f"mount target escapes the project: `{storage_path}`",
+        )
+
+    async def test__host_path__project_root_symlink_declined(
+        self,
+        host_path_api: ApiConfig,
+        local_mount_path: str,
+    ) -> None:
+        base = Path(local_mount_path)
+        (base / "other" / "proj").mkdir(parents=True)
+        (base / "org").mkdir()
+        (base / "org" / "proj").symlink_to("../other/proj")
+
+        url = (
+            f"http://{host_path_api.host}:{host_path_api.port}"
+            "/admission-controller/mutate"
+        )
+        response = await self.http.post(
+            url, json=self._pod_request("storage://default/org/proj")
+        )
+        await self._ensure_not_allowed(
+            response,
+            code=403,
+            expected_message="mount target escapes the project: `/org/proj`",
+        )
+
+    async def test__nfs__project_root_replaced_before_mkdir_declined(
+        self,
+        nfs_api: ApiConfig,
+        storage: Storage,
+        local_mount_path: str,
+    ) -> None:
+        base = Path(local_mount_path)
+        (base / "org" / "proj").mkdir(parents=True)
+        (base / "other" / "proj").mkdir(parents=True)
+        mkdir = storage.mkdir
+
+        async def replace_then_mkdir(path: str) -> None:
+            (base / "org" / "proj").rmdir()
+            (base / "org" / "proj").symlink_to("../other/proj")
+            await mkdir(path)
+
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+        with patch.object(storage, "mkdir", side_effect=replace_then_mkdir):
+            response = await self.http.post(
+                url, json=self._pod_request("storage://default/org/proj")
+            )
+        await self._ensure_not_allowed(
+            response,
+            code=403,
+            expected_message="mount target escapes the project: `/org/proj`",
+        )
+
+    async def test__nfs__in_project_relative_symlink_allowed(
+        self,
+        nfs_api: ApiConfig,
+        uuid_mock: Mock,
+        local_mount_path: str,
+    ) -> None:
+        project_dir = Path(local_mount_path) / "org" / "proj"
+        (project_dir / "real").mkdir(parents=True)
+        (project_dir / "link").symlink_to("real")
+
+        url = f"http://{nfs_api.host}:{nfs_api.port}/admission-controller/mutate"
+        response = await self.http.post(
+            url, json=self._pod_request("storage://default/org/proj/link")
+        )
+        await self._ensure_allowed(response)
+
     async def test__nfs__in_project_path_allowed(
         self,
         nfs_api: ApiConfig,

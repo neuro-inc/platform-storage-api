@@ -1,5 +1,6 @@
 import calendar
 import json
+import os
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -1543,6 +1544,48 @@ class TestRename:
             server_url, client, user, owner, path
         )
         assert response_status.status == aiohttp.web.HTTPNotFound.status_code
+
+    async def test_rename_symlink_to_project_root(
+        self,
+        server_url: str,
+        api: ApiConfig,
+        client: aiohttp.ClientSession,
+        alice: _User,
+        local_tmp_dir_path: Path,
+    ) -> None:
+        await self.put_dir(server_url, client, alice, "p1/dir")
+        (local_tmp_dir_path / "victim").mkdir()
+        link = local_tmp_dir_path / alice.name / "p1" / "evil"
+        link.symlink_to("../victim")
+
+        response = await self.rename(
+            server_url, client, alice, alice, "p1/evil", alice, "p2"
+        )
+        assert response.status == aiohttp.web.HTTPBadRequest.status_code
+        assert os.readlink(link) == "../victim"
+        assert not os.path.lexists(local_tmp_dir_path / alice.name / "p2")
+
+        response = await self.rename(
+            server_url, client, alice, alice, "p1/evil", alice, "p1/dir/evil"
+        )
+        assert response.status == aiohttp.web.HTTPNoContent.status_code
+        assert os.readlink(local_tmp_dir_path / alice.name / "p1/dir/evil") == (
+            "../victim"
+        )
+
+        response = await self.rename(
+            server_url, client, alice, alice, "p1/dir", alice, "p3"
+        )
+        assert response.status == aiohttp.web.HTTPBadRequest.status_code
+        payload = await response.json()
+        assert payload["error"] == "Cannot move this entry to an org or project root"
+        assert not os.path.lexists(local_tmp_dir_path / alice.name / "p3")
+
+        response = await self.rename(
+            server_url, client, alice, alice, "p1", alice, "p3"
+        )
+        assert response.status == aiohttp.web.HTTPNoContent.status_code
+        assert (local_tmp_dir_path / alice.name / "p3" / "dir").is_dir()
 
     async def test_rename_file_same_dir(
         self,

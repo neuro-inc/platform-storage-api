@@ -220,22 +220,27 @@ class AdmissionControllerApi:
                 await self._storage.mkdir(injection_schema.storage_path)
             except FileExistsError:
                 pass
+            await self._ensure_within_project(injection_schema)
 
         return injection_spec
 
     async def _ensure_within_project(self, injection_schema: MountSchema) -> None:
-        """
-        Rejects a mount target whose real path escapes the caller's own
-        org/project prefix. An in-project symlink target is allowed. A fast
-        admission-time check with a TOCTOU window, backed by the
-        project-scoped volume at mount time.
-        """
         storage_path = injection_schema.storage_path
-        project_path = "/".join(["", injection_schema.org, injection_schema.project])
+        org_path = "/".join(["", injection_schema.org])
+        project_path = "/".join([org_path, injection_schema.project])
 
-        real_path = await self._storage.get_real_path(storage_path)
-        project_real_path = await self._storage.get_real_path(project_path)
-        if not real_path.is_relative_to(project_real_path):
+        storage_root = await self._storage.get_real_base_path(project_path)
+        project_real_path = (
+            storage_root / injection_schema.org / injection_schema.project
+        )
+        if (
+            await self._storage.is_symlink(org_path)
+            or await self._storage.is_symlink(project_path)
+            or await self._storage.get_real_path(project_path) != project_real_path
+            or not (await self._storage.get_real_path(storage_path)).is_relative_to(
+                project_real_path
+            )
+        ):
             error_message = f"mount target escapes the project: `{storage_path}`"
             logger.error(error_message)
             raise ForbiddenError(error_message)

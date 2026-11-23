@@ -1,16 +1,23 @@
+import errno
 import os
 import shutil
 from io import BytesIO
 from pathlib import Path, PurePath
 from typing import Any
+from unittest import mock
 
 import pytest
 
 from platform_storage_api.fs.local import FileStatusType, FileSystem, LocalFileSystem
 from platform_storage_api.storage import (
     MultipleStoragePathResolver,
+    RootRenameError,
     SingleStoragePathResolver,
     Storage,
+)
+
+LINKS_BY_PROC = pytest.mark.skipif(
+    not Path("/proc/self/fd").is_dir(), reason="links an open file by /proc"
 )
 
 
@@ -219,3 +226,273 @@ class TestStorage:
         assert res.total == total
         assert res.used == used
         assert res.free == free
+
+    @pytest.fixture
+    def tree(self, local_tmp_dir_path: Path) -> Path:
+        (local_tmp_dir_path / "org" / "p1" / "dir").mkdir(parents=True)
+        (local_tmp_dir_path / "victim" / "proj").mkdir(parents=True)
+        (local_tmp_dir_path / "org" / "p1" / "evil").symlink_to("../victim/proj")
+        (local_tmp_dir_path / "org" / "p1" / "dir" / "proj").symlink_to(
+            "../../../victim/proj"
+        )
+        (local_tmp_dir_path / "org" / "p1" / "file").write_text("file")
+        (local_tmp_dir_path / "org" / "keep").write_text("keep")
+        (local_tmp_dir_path / "org" / "old").symlink_to("../victim/proj")
+        return local_tmp_dir_path
+
+    @staticmethod
+    def _snapshot(root: Path) -> dict[str, str]:
+        return {
+            str(path.relative_to(root)): (
+                f"-> {os.readlink(path)}"
+                if path.is_symlink()
+                else "dir"
+                if path.is_dir()
+                else path.read_text()
+            )
+            for path in sorted(root.rglob("*"))
+        }
+
+    @pytest.mark.parametrize(
+        ("source", "destination"),
+        [
+            ("/org/p1/evil", "/org/p2"),
+            ("/org/p1/evil", "/org/keep"),
+            ("/org/p1/evil", "/org2"),
+            ("/org/p1/dir", "/org/p2"),
+            ("/org/p1/dir", "/org2"),
+            ("/org/p1/file", "/org2"),
+            ("/org/p1", "/org2"),
+            ("/org/old", "/org/p2"),
+            ("/org/p1", "/"),
+            ("/org", "/victim/org"),
+            ("/org", "/victim/proj/org"),
+        ],
+    )
+    async def test_rename_to_org_or_project_root_refused(
+        self, storage: Storage, tree: Path, source: str, destination: str
+    ) -> None:
+        before = self._snapshot(tree)
+
+        with pytest.raises(RootRenameError):
+            await storage.rename(source, destination)
+
+        assert self._snapshot(tree) == before
+
+    @pytest.mark.parametrize(
+        ("source", "destination"),
+        [
+            ("/org/p1", "/org/p2"),
+            ("/org", "/org2"),
+            ("/org/p1", "/victim/proj/p1"),
+            ("/org/p1/evil", "/org/p1/dir/evil"),
+        ],
+    )
+    async def test_rename_to_org_or_project_root_allowed(
+        self, storage: Storage, tree: Path, source: str, destination: str
+    ) -> None:
+        kind = self._snapshot(tree)[source.lstrip("/")]
+
+        await storage.rename(source, destination)
+
+        assert not os.path.lexists(tree / source.lstrip("/"))
+        assert self._snapshot(tree)[destination.lstrip("/")] == kind
+
+    @LINKS_BY_PROC
+    @pytest.mark.parametrize("destination", ["/org/p2", "/org/keep"])
+    async def test_rename_file_to_project_root(
+        self, storage: Storage, tree: Path, destination: str
+    ) -> None:
+        await storage.rename("/org/p1/file", destination)
+
+        assert not os.path.lexists(tree / "org" / "p1" / "file")
+        assert (tree / destination.lstrip("/")).read_text() == "file"
+        assert sorted(p.name for p in (tree / "org").iterdir()) == sorted(
+            {"p1", "keep", "old", destination.split("/")[-1]}
+        )
+
+    @LINKS_BY_PROC
+    async def test_rename_file_to_project_root_dir_refused(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        before = self._snapshot(tree)
+
+        with pytest.raises(IsADirectoryError):
+            await storage.rename("/org/p1/file", "/org/p1")
+
+        assert self._snapshot(tree) == before
+
+    @pytest.fixture
+    def multi_storage(self, local_fs: FileSystem, local_tmp_dir_path: Path) -> Storage:
+        return Storage(
+            MultipleStoragePathResolver(
+                local_fs, local_tmp_dir_path, local_tmp_dir_path / "cluster"
+            ),
+            local_fs,
+        )
+
+    @pytest.fixture
+    def multi_tree(self, local_tmp_dir_path: Path) -> Path:
+        default = local_tmp_dir_path / "cluster"
+        (default / "org" / "p1" / "dir").mkdir(parents=True)
+        (default / "victim" / "proj").mkdir(parents=True)
+        (default / "org" / "p1" / "evil").symlink_to("../victim/proj")
+        (default / "org" / "keep").write_text("keep")
+        return local_tmp_dir_path
+
+    @pytest.mark.parametrize(
+        ("source", "destination"),
+        [
+            ("/org/p1/evil", "/cluster/org/p2"),
+            ("/cluster/org/p1/evil", "/org/p2"),
+            ("/cluster/org/p1/dir", "/org/p2"),
+            ("/org/p1/dir", "/cluster/org2"),
+            ("/cluster/org", "/org2/p"),
+            ("/cluster", "/org/p1/dir/cluster"),
+        ],
+    )
+    async def test_rename_to_org_or_project_root_alias_refused(
+        self,
+        multi_storage: Storage,
+        multi_tree: Path,
+        source: str,
+        destination: str,
+    ) -> None:
+        before = self._snapshot(multi_tree)
+
+        with pytest.raises(RootRenameError):
+            await multi_storage.rename(source, destination)
+
+        assert self._snapshot(multi_tree) == before
+
+    async def test_rename_file_to_itself_through_alias(
+        self, multi_storage: Storage, multi_tree: Path
+    ) -> None:
+        before = self._snapshot(multi_tree)
+
+        await multi_storage.rename("/cluster/org/keep", "/org/keep")
+
+        assert self._snapshot(multi_tree) == before
+
+    async def test_move_file_to_itself_refused(
+        self, local_fs: LocalFileSystem, tree: Path
+    ) -> None:
+        before = self._snapshot(tree)
+        path = PurePath(tree / "org" / "keep")
+
+        assert not await local_fs.move_file(path, path)
+
+        assert self._snapshot(tree) == before
+
+    @LINKS_BY_PROC
+    async def test_rename_file_to_project_root_source_not_removed(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        before = self._snapshot(tree)
+        unlink = os.unlink
+
+        def deny_source(path: Any, *args: Any, **kwargs: Any) -> None:
+            if path == "file":
+                raise PermissionError(errno.EACCES, "Permission denied", path)
+            unlink(path, *args, **kwargs)
+
+        with (
+            mock.patch.object(os, "unlink", side_effect=deny_source),
+            pytest.raises(PermissionError),
+        ):
+            await storage.rename("/org/p1/file", "/org/keep")
+
+        assert self._snapshot(tree) == before
+
+    @LINKS_BY_PROC
+    @pytest.mark.skipif(os.geteuid() == 0, reason="root writes a read-only dir")
+    async def test_rename_file_to_project_root_source_dir_read_only(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        before = self._snapshot(tree)
+        (tree / "org" / "p1").chmod(0o555)
+        try:
+            with pytest.raises(PermissionError):
+                await storage.rename("/org/p1/file", "/org/keep")
+        finally:
+            (tree / "org" / "p1").chmod(0o755)
+
+        assert self._snapshot(tree) == before
+
+    @LINKS_BY_PROC
+    async def test_rename_file_to_project_root_source_gone(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        link = os.link
+
+        def link_then_drop_source(*args: Any, **kwargs: Any) -> None:
+            link(*args, **kwargs)
+            (tree / "org" / "p1" / "file").unlink()
+
+        with mock.patch.object(os, "link", side_effect=link_then_drop_source):
+            await storage.rename("/org/p1/file", "/org/p2")
+
+        assert (tree / "org" / "p2").read_text() == "file"
+        assert sorted(p.name for p in (tree / "org").iterdir()) == [
+            "keep",
+            "old",
+            "p1",
+            "p2",
+        ]
+
+    @LINKS_BY_PROC
+    async def test_rename_file_to_project_root_source_replaced(
+        self, storage: Storage, tree: Path
+    ) -> None:
+        link = os.link
+        source = tree / "org" / "p1" / "file"
+
+        def replace_source_then_link(*args: Any, **kwargs: Any) -> None:
+            source.rename(tree / "org" / "p1" / "moved")
+            source.symlink_to("../../victim/proj")
+            link(*args, **kwargs)
+
+        with mock.patch.object(os, "link", side_effect=replace_source_then_link):
+            await storage.rename("/org/p1/file", "/org/p2")
+
+        assert not (tree / "org" / "p2").is_symlink()
+        assert (tree / "org" / "p2").read_text() == "file"
+        assert os.readlink(source) == "../../victim/proj"
+        assert sorted(p.name for p in (tree / "org").iterdir()) == [
+            "keep",
+            "old",
+            "p1",
+            "p2",
+        ]
+
+    @LINKS_BY_PROC
+    async def test_rename_two_links_of_one_file_to_project_root(
+        self, storage: Storage, local_fs: LocalFileSystem, tree: Path
+    ) -> None:
+        os.link(tree / "org" / "p1" / "file", tree / "org" / "p1" / "file2")
+        link = os.link
+        nested: list[bool] = []
+
+        def link_and_move_other(*args: Any, **kwargs: Any) -> None:
+            link(*args, **kwargs)
+            if not nested:
+                nested.append(True)
+                assert local_fs._move_file(
+                    PurePath(tree / "org" / "p1" / "file2"),
+                    PurePath(tree / "org" / "p2"),
+                )
+
+        with mock.patch.object(os, "link", side_effect=link_and_move_other):
+            await storage.rename("/org/p1/file", "/org/p2")
+
+        assert (tree / "org" / "p2").read_text() == "file"
+        assert sorted(p.name for p in (tree / "org").iterdir()) == [
+            "keep",
+            "old",
+            "p1",
+            "p2",
+        ]
+        assert sorted(p.name for p in (tree / "org" / "p1").iterdir()) == [
+            "dir",
+            "evil",
+        ]

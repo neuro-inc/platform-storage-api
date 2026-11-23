@@ -43,6 +43,7 @@ from .security import (
     PermissionChecker,
 )
 from .storage import (
+    RootRenameError,
     Storage,
     create_path_resolver,
 )
@@ -734,6 +735,8 @@ class StorageHandler:
         except NotADirectoryError as e:
             msg = "Destination is not a directory"
             raise _http_bad_request(msg, errno=e.errno) from e
+        except RootRenameError as e:
+            raise _http_bad_request(str(e.strerror), errno=e.errno) from e
         except OSError as e:
             msg = "Incorrect destination"
             raise _http_bad_request(msg, errno=e.errno) from e
