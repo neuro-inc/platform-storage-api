@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import errno
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -163,10 +164,12 @@ class Storage:
         real_path = await self._path_resolver.resolve_path(PurePath(path))
         return await self._fs.realpath(real_path)
 
+    @trace
     async def get_real_base_path(self, path: PurePath | str) -> PurePath:
         base_path = await self._path_resolver.resolve_base_path(PurePath(path))
         return await self._fs.realpath(base_path)
 
+    @trace
     async def is_symlink(self, path: PurePath | str) -> bool:
         real_path = await self._path_resolver.resolve_path(PurePath(path))
         return await self._fs.is_symlink(real_path)
@@ -207,6 +210,14 @@ class Storage:
         real_old = await self._path_resolver.resolve_path(PurePath(old))
         real_new = await self._path_resolver.resolve_path(PurePath(new))
         await self._fs.rename(real_old, real_new)
+        if len(PurePath(new).relative_to("/").parts) <= 2 and (
+            await self._fs.is_symlink(real_new)
+        ):
+            try:
+                await self._fs.rename(real_new, real_old)
+            except OSError:
+                await self._fs.remove(real_new)
+            raise NotADirectoryError(errno.ENOTDIR, "Not a directory", str(new))
 
     @trace
     async def disk_usage(self, path: PurePath | str | None = None) -> DiskUsage:
