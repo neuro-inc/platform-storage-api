@@ -204,14 +204,14 @@ async def test_inject_single_storage(kube_client: KubeClient) -> None:
         # ensures it has a proper name and a proper mount path
         assert volume_name.startswith(INJECTED_VOLUME_NAME_PREFIX)
         actual_host_path = actual_host_path_volume.host_path.path
-        assert actual_host_path == ACTUAL_HOST_PATH
+        assert actual_host_path == f"{ACTUAL_HOST_PATH}/{org}/{project}"
 
         actual_host_path_volume_mount = next(
             iter(v for v in container.volume_mounts if v.name == volume_name)
         )
         assert actual_host_path_volume_mount.name == volume_name
         assert actual_host_path_volume_mount.mount_path == "/var/pod_mount"
-        assert actual_host_path_volume_mount.sub_path == f"{org}/{project}"
+        assert not actual_host_path_volume_mount.sub_path
 
 
 async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
@@ -252,7 +252,7 @@ async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
         for volume in volumes:
             assert volume.host_path is not None
             assert volume.name.startswith(INJECTED_VOLUME_NAME_PREFIX)
-            assert volume.host_path.path == ACTUAL_HOST_PATH
+            assert volume.host_path.path == f"{ACTUAL_HOST_PATH}/{org}/{project}"
 
         volume_names = {v.name for v in volumes}
         volume_mounts = [v for v in container.volume_mounts if v.name in volume_names]
@@ -262,4 +262,4 @@ async def test_inject_multiple_storages(kube_client: KubeClient) -> None:
         for volume_mount in volume_mounts:
             assert volume_mount.mount_path.startswith("/var/pod_mount")
             assert volume_mount.sub_path is not None
-            assert volume_mount.sub_path.startswith(f"{org}/{project}")
+            assert volume_mount.sub_path in {"1", "2"}

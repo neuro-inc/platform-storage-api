@@ -229,15 +229,26 @@ class KubeVolumeResolver:
         """
         local_path = await self.to_local_path(storage_path=path)
 
+        parts = PurePath(path).parts
+        project_path = PurePath(*parts[:3])
+        project_local_path = await self.to_local_path(storage_path=str(project_path))
+
         for fs_path_prefix, kube_volume in self._local_fs_prefix_to_kube_volume.items():
             try:
-                sub_path = local_path.relative_to(fs_path_prefix)
+                project_rel = project_local_path.relative_to(fs_path_prefix)
             except ValueError:
                 continue
 
+            sub_path = local_path.relative_to(project_local_path)
+            spec = dataclasses.replace(
+                kube_volume.spec,
+                path=str(PurePath(kube_volume.spec.path) / project_rel),
+            )
+            volume = dataclasses.replace(kube_volume, spec=spec)
+
             return KubeVolumeMount(
-                volume=kube_volume,
-                sub_path=str(sub_path),
+                volume=volume,
+                sub_path="" if sub_path == PurePath() else str(sub_path),
             )
 
         raise VolumeResolverError()

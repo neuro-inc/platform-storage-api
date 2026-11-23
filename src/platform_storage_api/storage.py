@@ -159,6 +159,11 @@ class Storage:
         return await self._fs.exists(real_path)
 
     @trace
+    async def get_real_path(self, path: PurePath | str) -> PurePath:
+        real_path = await self._path_resolver.resolve_path(PurePath(path))
+        return await self._fs.realpath(real_path)
+
+    @trace
     async def mkdir(self, path: PurePath | str) -> None:
         real_path = await self._path_resolver.resolve_path(PurePath(path))
         await self._fs.mkdir(real_path)

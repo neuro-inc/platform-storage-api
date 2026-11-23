@@ -181,6 +181,10 @@ class FileSystem(AbstractAsyncContextManager):  # type: ignore
         pass
 
     @abc.abstractmethod
+    async def realpath(self, path: PurePath) -> PurePath:
+        pass
+
+    @abc.abstractmethod
     async def remove(self, path: PurePath, *, recursive: bool = False) -> None:
         pass
 
@@ -442,6 +446,12 @@ class LocalFileSystem(FileSystem):
 
     async def exists(self, path: PurePath) -> bool:
         return await self._loop.run_in_executor(self._executor, Path(path).exists)
+
+    def _realpath(self, path: PurePath) -> PurePath:
+        return PurePath(os.path.realpath(path))
+
+    async def realpath(self, path: PurePath) -> PurePath:
+        return await self._loop.run_in_executor(self._executor, self._realpath, path)
 
     def _remove_as_dir(self, path: PurePath) -> bool:
         real_path = Path(path)
